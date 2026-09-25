@@ -1,4 +1,11 @@
-export type CommandHandler = (arg?: unknown) => void | Promise<void>;
+export interface CommandResult {
+  ok: boolean;
+  reason?: string;
+}
+
+export type CommandHandler = (
+  arg?: unknown,
+) => void | CommandResult | Promise<void | CommandResult>;
 
 /**
  * The single dispatch point for both keybindings and the palette (FR-020).
@@ -14,9 +21,10 @@ export class CommandRegistry {
     return this.handlers.has(id);
   }
 
-  async run(id: string, arg?: unknown): Promise<void> {
+  /** Returns the handler's result when it provides one (e.g. validation). */
+  async run(id: string, arg?: unknown): Promise<void | CommandResult> {
     const handler = this.handlers.get(id);
     if (!handler) throw new Error(`Unknown command: ${id}`);
-    await handler(arg);
+    return handler(arg);
   }
 }

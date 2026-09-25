@@ -5,6 +5,7 @@ import { isAllowedUrl, isLocalHostname } from "../nav/policy";
 export interface SiteViewEvents {
   onLoading: (loading: boolean) => void;
   onReady: (url: string) => void;
+  onNavigated: (url: string) => void;
   onFailed: (url: string, reason: string) => void;
   onTitle: (title: string) => void;
 }
@@ -92,6 +93,12 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
   });
 
   wc.on("page-title-updated", (_event, title) => events.onTitle(title));
+
+  // Track the live URL, including in-page (SPA route) navigations.
+  wc.on("did-navigate", (_event, url) => events.onNavigated(url));
+  wc.on("did-navigate-in-page", (_event, url, isMainFrame) => {
+    if (isMainFrame) events.onNavigated(url);
+  });
 
   return view;
 }

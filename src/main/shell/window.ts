@@ -17,15 +17,12 @@ import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
 import { DevToolsController } from "./devtools";
 import { PickerController } from "./picker";
-import { CommandRegistry } from "./commands";
+import { CommandRegistry, type CommandResult } from "./commands";
 import { registerIpc } from "../ipc";
 
 export const STRIP_HEIGHT = 36;
 
-export interface CommandResult {
-  ok: boolean;
-  reason?: string;
-}
+export type { CommandResult };
 
 export class AppWindow {
   readonly win: BaseWindow;
@@ -44,10 +41,12 @@ export class AppWindow {
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
+  private currentUrl: string;
 
   constructor() {
     this.store = new StateStore(path.join(app.getPath("userData"), "state.json"));
     const state = this.store.get();
+    this.currentUrl = state.target ?? DEFAULT_TARGET;
 
     this.win = new BaseWindow({
       width: state.bounds?.width ?? DEFAULT_WIDTH,
@@ -66,6 +65,7 @@ export class AppWindow {
     this.siteView = createSiteView({
       onLoading: (loading) => this.setLoading(loading),
       onReady: (url) => this.handleReady(url),
+      onNavigated: (url) => this.handleNavigated(url),
       onFailed: (url, reason) => this.handleFailed(url, reason),
       onTitle: (title) => this.win.setTitle(title ? `${title} — localbrowser` : "localbrowser"),
     });
@@ -127,9 +127,6 @@ export class AppWindow {
     // dispatcher so shortcuts keep working from the DevTools panel too.
     this.siteView.webContents.on("devtools-opened", () => this.attachDevToolsInput());
     this.siteView.webContents.on("devtools-closed", () => this.detachDevToolsInput());
-
-    this.siteView.webContents.on("did-navigate", () => this.picker.invalidate());
-    this.siteView.webContents.on("did-navigate-in-page", () => this.picker.invalidate());
   }
 
   private readonly handleInput = (event: Electron.Event, input: Electron.Input): void => {
@@ -169,10 +166,8 @@ export class AppWindow {
     const { commands } = this;
     commands.register("palette.open", () => this.openPalette(""));
     commands.register("palette.close", () => this.closePalette());
-    commands.register("palette.editUrl", () => this.openPalette(this.store.get().target ?? ""));
-    commands.register("target.navigate", (arg) => {
-      this.navigate(String(arg ?? ""));
-    });
+    commands.register("palette.editUrl", () => this.openPalette(this.currentUrl));
+    commands.register("target.navigate", (arg) => this.navigate(String(arg ?? "")));
     commands.register("strip.toggle", () => this.toggleStrip());
     commands.register("view.reload", () => this.siteView.webContents.reload());
     commands.register("view.hardReload", () => this.siteView.webContents.reloadIgnoringCache());
@@ -211,7 +206,8 @@ export class AppWindow {
 
   async runCommand(id: string, arg?: unknown): Promise<CommandResult> {
     try {
-      await this.commands.run(id, arg);
+      const result = await this.commands.run(id, arg);
+      if (result && typeof result === "object" && "ok" in result) return result;
       return { ok: true };
     } catch (error) {
       return { ok: false, reason: error instanceof Error ? error.message : "Command failed" };
@@ -291,11 +287,25 @@ export class AppWindow {
     this.failed = false;
     this.relayout();
     if (url) {
+      this.currentUrl = url;
       this.store.setTarget(url);
       this.store.recordRecent(url);
     }
     this.reportLoading(false);
     this.sendToShell("viewport:ready", { url });
+    this.broadcastState();
+  }
+
+  /**
+   * Tracks the live URL (including in-page SPA route changes) so ⌘L prefills
+   * the real current page and the persisted target follows where you are.
+   * Recents are recorded only on full loads, so routing does not spam them.
+   */
+  private handleNavigated(url: string): void {
+    this.picker.invalidate();
+    if (!url || url === this.currentUrl) return;
+    this.currentUrl = url;
+    this.store.setTarget(url);
     this.broadcastState();
   }
 
