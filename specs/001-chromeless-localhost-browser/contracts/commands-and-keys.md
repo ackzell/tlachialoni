@@ -17,7 +17,7 @@ focus, then dispatched through `command:run` semantics.
 | `view.hardReload`      | Hard Reload                  | `⇧⌘R`                 | Bypasses cache                                        |
 | `view.back`            | Back                         | `⌘←`                  | Disabled with no history; yields in editable fields   |
 | `view.forward`         | Forward                      | `⌘→`                  | Disabled with no history; yields in editable fields   |
-| `devtools.toggle`      | Toggle DevTools              | `⌘⇧J`                 | Reopens on the persisted side                         |
+| `devtools.toggle`      | Toggle DevTools              | `⌘⌥J`                 | Reopens on the persisted side; `⌥` avoids the `⇧` slot macOS leans on |
 | `devtools.dock.bottom` | Dock DevTools Bottom | `⌘1` | Plain Command+number; `⇧⌘3/4/5` are macOS screenshots |
 | `devtools.dock.right` | Dock DevTools Right | `⌘2` |  |
 | `devtools.dock.left` | Dock DevTools Left | `⌘3` |  |

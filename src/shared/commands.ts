@@ -98,8 +98,8 @@ export const COMMANDS: CommandDef[] = [
   {
     id: "devtools.toggle",
     label: "Toggle DevTools",
-    acceleratorLabel: "⌘⇧J",
-    accelerator: { meta: true, shift: true, code: "KeyJ" },
+    acceleratorLabel: "⌘⌥J",
+    accelerator: { meta: true, alt: true, code: "KeyJ" },
     palette: true,
   },
   {
