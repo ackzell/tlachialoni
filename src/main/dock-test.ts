@@ -77,6 +77,37 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
       state: rightState,
     };
 
+    // Shortcuts must work from the page and from the DevTools panel.
+    const pressKey = (target: Electron.WebContents | null, code: string): void => {
+      if (!target || target.isDestroyed()) return;
+      target.focus();
+      target.sendInputEvent({ type: "keyDown", keyCode: code, modifiers: ["meta"] });
+      target.sendInputEvent({ type: "keyUp", keyCode: code, modifiers: ["meta"] });
+    };
+    const siteStripBefore = appWindow.getState().stripVisible;
+    pressKey(wc, "b");
+    await wait(400);
+    const siteStripAfter = appWindow.getState().stripVisible;
+    const devtoolsContents = wc.devToolsWebContents;
+    const devtoolsInputEvents: string[] = [];
+    devtoolsContents?.on("before-input-event", (_event, input) => {
+      devtoolsInputEvents.push(`${input.type}:${input.code}`);
+    });
+    pressKey(devtoolsContents, "b");
+    await wait(400);
+    const devtoolsStripAfter = appWindow.getState().stripVisible;
+    log.devtoolsInputEvents = devtoolsInputEvents;
+    log.shortcutSite = {
+      before: siteStripBefore,
+      after: siteStripAfter,
+      toggled: siteStripBefore !== siteStripAfter,
+    };
+    log.shortcutFromDevTools = {
+      before: siteStripAfter,
+      after: devtoolsStripAfter,
+      toggled: siteStripAfter !== devtoolsStripAfter,
+    };
+
     // Picker overlay lifecycle (FR-013): injected only while armed.
     const count = () =>
       wc.executeJavaScript(
@@ -94,7 +125,8 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
       bottom.innerHeight < baseline.innerHeight &&
       right.innerWidth < baseline.innerWidth &&
       overlayArmed === 1 &&
-      overlayDisarmed === 0;
+      overlayDisarmed === 0 &&
+      Boolean((log.shortcutSite as { toggled: boolean }).toggled);
   } catch (error) {
     log.error = String(error);
     log.pass = false;

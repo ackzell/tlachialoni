@@ -11,12 +11,13 @@ export interface DevToolsStatus {
  * DevTools docking. There is no supported API to change the dock side while
  * DevTools is open, so a side change closes and reopens them (research §2).
  *
- * The side can also be changed from inside DevTools itself; the front-end
- * reloads when that happens, and `EUI.DockController...dockSide()` reports the
- * real value, so we sync from there to keep the persisted side truthful.
+ * The side can also be changed from inside DevTools itself, where no event tells
+ * us; the front-end exposes `EUI.DockController...dockSide()`, so we poll it
+ * while DevTools are open and persist any change.
  */
 export class DevToolsController {
-  private devtoolsListener: (() => void) | null = null;
+  private dockPoller: NodeJS.Timeout | null = null;
+  private lastSyncedSide: DockMode | null = null;
 
   constructor(
     private readonly getView: () => WebContentsView | null,
@@ -42,13 +43,14 @@ export class DevToolsController {
     }
     this.store.setDockMode(mode);
     this.store.setDevtoolsOpen(true);
+    this.lastSyncedSide = mode;
     this.notify({ open: true, mode });
-    this.attachDockSync(wc);
+    this.startDockPolling();
     setTimeout(() => void this.syncDockSide(), 500);
   }
 
   close(): void {
-    this.detachDockSync();
+    this.stopDockPolling();
     const wc = this.wc();
     if (!wc) return;
     if (wc.isDevToolsOpened()) wc.closeDevTools();
@@ -77,18 +79,24 @@ export class DevToolsController {
     if (!this.isOpen()) this.open(this.store.get().dockMode);
   }
 
-  /** Reads the real dock side from the DevTools front-end. */
+  dispose(): void {
+    this.stopDockPolling();
+  }
+
+  /** Reads the real dock side from the DevTools front-end and persists changes. */
   async syncDockSide(): Promise<DockMode | null> {
-    const wc = this.wc();
-    const devtools = wc?.devToolsWebContents;
+    const devtools = this.wc()?.devToolsWebContents;
     if (!devtools || devtools.isDestroyed()) return null;
     try {
       const side = (await devtools.executeJavaScript(
         "EUI.DockController.DockController.instance().dockSide()",
       )) as string;
       if (side === "bottom" || side === "right" || side === "left") {
-        this.store.setDockMode(side);
-        this.notify({ open: true, mode: side });
+        if (side !== this.lastSyncedSide) {
+          this.lastSyncedSide = side;
+          this.store.setDockMode(side);
+          this.notify({ open: true, mode: side });
+        }
         return side;
       }
     } catch {
@@ -97,19 +105,13 @@ export class DevToolsController {
     return null;
   }
 
-  private attachDockSync(wc: Electron.WebContents): void {
-    const devtools = wc.devToolsWebContents;
-    if (!devtools || devtools.isDestroyed()) return;
-    this.detachDockSync();
-    const handler = (): void => {
-      void this.syncDockSide();
-    };
-    devtools.on("did-finish-load", handler);
-    this.devtoolsListener = () => devtools.removeListener("did-finish-load", handler);
+  private startDockPolling(): void {
+    this.stopDockPolling();
+    this.dockPoller = setInterval(() => void this.syncDockSide(), 1000);
   }
 
-  private detachDockSync(): void {
-    this.devtoolsListener?.();
-    this.devtoolsListener = null;
+  private stopDockPolling(): void {
+    if (this.dockPoller) clearInterval(this.dockPoller);
+    this.dockPoller = null;
   }
 }

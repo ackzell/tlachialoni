@@ -43,6 +43,7 @@ export class AppWindow {
   private shellLoaded = false;
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
+  private attachedDevTools: Electron.WebContents | null = null;
 
   constructor() {
     this.store = new StateStore(path.join(app.getPath("userData"), "state.json"));
@@ -93,6 +94,8 @@ export class AppWindow {
 
   show(): void {
     this.win.show();
+    this.win.focus();
+    this.siteView.webContents.focus();
     this.relayout();
     if (this.store.get().devtoolsOpen) this.devtools.open(this.store.get().dockMode);
     this.applyTheme();
@@ -109,33 +112,55 @@ export class AppWindow {
       this.store.setDevtoolsOpen(this.devtools.isOpen());
     });
     this.win.on("closed", () => {
+      this.devtools.dispose();
+      this.detachDevToolsInput();
       // Views are not destroyed automatically with a BaseWindow.
       for (const view of [this.siteView, this.shellView]) {
         if (!view.webContents.isDestroyed()) view.webContents.close();
       }
     });
 
-    const handleInput = (event: Electron.Event, input: Electron.Input): void => {
-      if (input.type !== "keyDown") return;
-      if (input.code === "Escape" && this.picker.isArmed()) {
-        event.preventDefault();
-        this.picker.disarm();
-        return;
-      }
-      const command = commandForInput(input);
-      if (!command) return;
-      if ((command.id === "view.back" || command.id === "view.forward") && this.editableFocused) {
-        return;
-      }
-      event.preventDefault();
-      void this.commands.run(command.id);
-    };
+    this.siteView.webContents.on("before-input-event", this.handleInput);
+    this.shellView.webContents.on("before-input-event", this.handleInput);
 
-    this.siteView.webContents.on("before-input-event", handleInput);
-    this.shellView.webContents.on("before-input-event", handleInput);
+    // While focus is inside DevTools, key events go there — attach the same
+    // dispatcher so shortcuts keep working from the DevTools panel too.
+    this.siteView.webContents.on("devtools-opened", () => this.attachDevToolsInput());
+    this.siteView.webContents.on("devtools-closed", () => this.detachDevToolsInput());
 
     this.siteView.webContents.on("did-navigate", () => this.picker.invalidate());
     this.siteView.webContents.on("did-navigate-in-page", () => this.picker.invalidate());
+  }
+
+  private readonly handleInput = (event: Electron.Event, input: Electron.Input): void => {
+    if (input.type !== "keyDown") return;
+    if (input.code === "Escape" && this.picker.isArmed()) {
+      event.preventDefault();
+      this.picker.disarm();
+      return;
+    }
+    const command = commandForInput(input);
+    if (!command) return;
+    if ((command.id === "view.back" || command.id === "view.forward") && this.editableFocused) {
+      return;
+    }
+    event.preventDefault();
+    void this.commands.run(command.id);
+  };
+
+  private attachDevToolsInput(): void {
+    const devtools = this.siteView.webContents.devToolsWebContents;
+    if (!devtools || devtools.isDestroyed() || devtools === this.attachedDevTools) return;
+    this.detachDevToolsInput();
+    devtools.on("before-input-event", this.handleInput);
+    this.attachedDevTools = devtools;
+  }
+
+  private detachDevToolsInput(): void {
+    if (this.attachedDevTools && !this.attachedDevTools.isDestroyed()) {
+      this.attachedDevTools.removeListener("before-input-event", this.handleInput);
+    }
+    this.attachedDevTools = null;
   }
 
   // ---- commands --------------------------------------------------------
