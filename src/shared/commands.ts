@@ -105,22 +105,22 @@ export const COMMANDS: CommandDef[] = [
   {
     id: "devtools.dock.bottom",
     label: "Dock DevTools Bottom",
-    acceleratorLabel: "⌘⇧1",
-    accelerator: { meta: true, shift: true, code: "Digit1" },
+    acceleratorLabel: "⌘1",
+    accelerator: { meta: true, code: "Digit1" },
     palette: true,
   },
   {
     id: "devtools.dock.right",
     label: "Dock DevTools Right",
-    acceleratorLabel: "⌘⇧2",
-    accelerator: { meta: true, shift: true, code: "Digit2" },
+    acceleratorLabel: "⌘2",
+    accelerator: { meta: true, code: "Digit2" },
     palette: true,
   },
   {
     id: "devtools.dock.left",
     label: "Dock DevTools Left",
-    acceleratorLabel: "⌘⇧3",
-    accelerator: { meta: true, shift: true, code: "Digit3" },
+    acceleratorLabel: "⌘3",
+    accelerator: { meta: true, code: "Digit3" },
     palette: true,
   },
   {

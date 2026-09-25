@@ -17,7 +17,7 @@ npm run dev
 | # | Scenario | Requirement(s) | Result | Evidence / notes |
 | - | -------- | -------------- | ------ | ---------------- |
 | S0 | M0 spike: docked DevTools in a frameless window | constitution (spike-first), FR-002 | PASS *(auto)* | `LOCALBROWSER_DOCK_TEST=1`: baseline 1440x900; bottom -> innerHeight 600 (delta 300); right -> innerWidth 885 (delta 555) |
-| S1 | Core render: frameless, edge-to-edge, DevTools docked, reflow, restore | FR-001–FR-003, SC-001, SC-002 | PARTIAL *(manual)* | Checks 1,2,3,5 PASS (frameless, docked, reflow, zero chrome). Check 4 FAILed: a dock-side change made *inside* DevTools was not persisted (reopened right). Root cause + fix applied (`EUI.DockController.dockSide()` sync); re-verification pending. |
+| S1 | Core render: frameless, edge-to-edge, DevTools docked, reflow, restore | FR-001–FR-003, SC-001, SC-002 | PASS *(manual)* | Checks 1,2,3,5 PASS. Check 4 PASS after the dock-side sync fix: a side chosen with DevTools' own controls is honored on relaunch. Findings: shortcuts must work while DevTools has focus (fixed via app-menu accelerators); dock shortcuts settled on plain `⌘1/2/3` (`⇧⌘3/4/5` are macOS screenshots). |
 | S2 | Palette: open, shorthand, recents, rejection, dismissal, prefill | FR-005–FR-007, FR-022 | pending | |
 | S3 | DevTools placement: toggle + dock sides + persistence | FR-008 | pending | |
 | S4 | Picker: hover highlight, click inspects, disarm, no residue | FR-012, FR-013, SC-004 | PASS *(auto, overlay lifecycle)* / pending (hover+inspect) | Overlay element count while armed = 1, after disarm = 0 |

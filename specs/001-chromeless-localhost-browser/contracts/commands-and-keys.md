@@ -18,9 +18,9 @@ focus, then dispatched through `command:run` semantics.
 | `view.back`            | Back                         | `⌘←`                  | Disabled with no history; yields in editable fields   |
 | `view.forward`         | Forward                      | `⌘→`                  | Disabled with no history; yields in editable fields   |
 | `devtools.toggle`      | Toggle DevTools              | `⌘⇧J`                 | Reopens on the persisted side                         |
-| `devtools.dock.bottom` | Dock DevTools Bottom         | `⌘⇧1`                 |                                                       |
-| `devtools.dock.right`  | Dock DevTools Right          | `⌘⇧2`                 |                                                       |
-| `devtools.dock.left`   | Dock DevTools Left           | `⌘⇧3`                 |                                                       |
+| `devtools.dock.bottom` | Dock DevTools Bottom | `⌘1` | Plain Command+number; `⇧⌘3/4/5` are macOS screenshots |
+| `devtools.dock.right` | Dock DevTools Right | `⌘2` |  |
+| `devtools.dock.left` | Dock DevTools Left | `⌘3` |  |
 | `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | Hover highlight; click selects in DevTools            |
 | `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | Eight commands, one per mineral variant               |
 | `theme.cycleMode`      | Cycle Color Mode             | —                     | `system → dark → light`, persisted                    |
@@ -40,6 +40,7 @@ focus, then dispatched through `command:run` semantics.
 3. **Editable focus**: when `site:focus-editable` reports an editable element,
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
+5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators (the macOS **View** menu) and fire app-wide, wherever focus is.
 
 ## Guard rails
 
