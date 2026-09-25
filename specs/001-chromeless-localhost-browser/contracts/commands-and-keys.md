@@ -41,6 +41,7 @@ focus, then dispatched through `command:run` semantics.
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
 5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators (the macOS **View** menu) and fire app-wide, wherever focus is.
+6. **Mouse / swipe history**: the mouse's back/forward thumb buttons navigate history — on macOS mouse drivers deliver them as synthesized `swipe` events (`left` → back, `right` → forward); on Windows/Linux as `app-command` `browser-backward` / `browser-forward`.
 
 ## Guard rails
 

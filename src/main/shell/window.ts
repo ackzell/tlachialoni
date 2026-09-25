@@ -123,6 +123,19 @@ export class AppWindow {
     this.siteView.webContents.on("before-input-event", this.handleInput);
     this.shellView.webContents.on("before-input-event", this.handleInput);
 
+    // Mouse back/forward buttons. On Windows/Linux the OS surfaces them as app
+    // commands; on macOS mouse drivers (Logitech Options+ and friends) deliver
+    // the thumb buttons as synthesized swipe events, the same way Safari and
+    // Chrome receive them, so a swipe navigates history.
+    this.win.on("app-command", (_event, command) => {
+      if (command === "browser-backward") void this.commands.run("view.back");
+      else if (command === "browser-forward") void this.commands.run("view.forward");
+    });
+    this.win.on("swipe", (_event, direction) => {
+      if (direction === "left") void this.commands.run("view.back");
+      else if (direction === "right") void this.commands.run("view.forward");
+    });
+
     // While focus is inside DevTools, key events go there — attach the same
     // dispatcher so shortcuts keep working from the DevTools panel too.
     this.siteView.webContents.on("devtools-opened", () => this.attachDevToolsInput());
