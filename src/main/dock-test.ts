@@ -1,20 +1,22 @@
+import { app } from "electron";
 import fs from "node:fs";
 import type { WebContentsView } from "electron";
 import type { AppWindow } from "./shell/window";
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Reads the DevTools front-end dock state (undocumented but stable API). */
-async function dockState(wc: Electron.WebContents): Promise<string | null> {
+/** Reads the DevTools front-end dock side (undocumented but reachable). */
+async function dockState(wc: Electron.WebContents): Promise<unknown> {
   const devtools = wc.devToolsWebContents;
   if (!devtools) return null;
+  const expression = `(() => {
+    const dc = EUI.DockController.DockController.instance();
+    return JSON.stringify({ dockSide: dc.dockSide(), isVertical: dc.isVertical() });
+  })()`;
   try {
-    const state = await devtools.executeJavaScript(
-      "(() => { try { return EUI.DockController.DockController.instance().state(); } catch (e) { try { return SDK.DockController.DockController.instance().state(); } catch (e2) { return null; } } })()",
-    );
-    return typeof state === "string" ? state : null;
-  } catch {
-    return null;
+    return await devtools.executeJavaScript(expression);
+  } catch (error) {
+    return `EXEC_ERR:${String(error)}`;
   }
 }
 
@@ -98,7 +100,9 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
     log.pass = false;
   }
 
-  process.stdout.write(`DOCK_TEST ${JSON.stringify(log)}\n`);
+  process.stdout.write(
+    `DOCK_TEST ${JSON.stringify({ ...log, userData: app.getPath("userData") })}\n`,
+  );
 }
 
 export type { WebContentsView };

@@ -25,7 +25,8 @@ app.whenReady().then(async () => {
 
   if (process.env.LOCALBROWSER_DOCK_TEST === "1") {
     await runDockSelfTest(mainWindow);
-    app.exit(0);
+    if (process.env.LOCALBROWSER_GRACEFUL === "1") app.quit();
+    else app.exit(0);
   } else if (process.env.LOCALBROWSER_UI_SNAPSHOT === "1") {
     await runUiSnapshot(mainWindow);
     app.exit(0);
