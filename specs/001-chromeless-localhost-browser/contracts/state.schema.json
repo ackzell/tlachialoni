@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localbrowser.local/contracts/state.schema.json",
+  "title": "localbrowser persisted state",
+  "description": "Single JSON document stored in app.getPath('userData'). Written atomically (temp file + fsync + rename). Multiple instances may read and write concurrently; see concurrency rules in data-model.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "target": {
+      "description": "Normalized absolute local URL. Must satisfy the local-target policy.",
+      "type": ["string", "null"],
+      "default": "http://localhost:3000",
+      "pattern": "^https?://[^\\s]+$"
+    },
+    "recents": {
+      "description": "Newest-first, deduplicated by url, maximum 10 entries.",
+      "type": "array",
+      "maxItems": 10,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "lastOpenedAt"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https?://[^\\s]+$"
+          },
+          "lastOpenedAt": {
+            "type": "integer",
+            "description": "Epoch milliseconds"
+          }
+        }
+      }
+    },
+    "dockMode": {
+      "description": "DevTools dock side.",
+      "type": "string",
+      "enum": ["bottom", "right", "left"],
+      "default": "bottom"
+    },
+    "devtoolsOpen": {
+      "type": "boolean",
+      "default": true
+    },
+    "stripVisible": {
+      "type": "boolean",
+      "default": false
+    },
+    "bounds": {
+      "description": "Restored window frame; clamped to a connected display.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "width": { "type": "integer", "minimum": 480 },
+        "height": { "type": "integer", "minimum": 360 }
+      }
+    },
+    "variant": {
+      "type": "string",
+      "enum": [
+        "obsidian",
+        "gold",
+        "turquoise",
+        "quartz",
+        "lapis-lazuli",
+        "amethyst",
+        "jade",
+        "fire-opal"
+      ],
+      "default": "obsidian"
+    },
+    "colorMode": {
+      "type": "string",
+      "enum": ["system", "dark", "light"],
+      "default": "system"
+    }
+  }
+}
