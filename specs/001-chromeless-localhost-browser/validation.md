@@ -20,7 +20,7 @@ npm run dev
 | S1 | Core render: frameless, edge-to-edge, DevTools docked, reflow, restore | FR-001–FR-003, SC-001, SC-002 | PASS *(manual)* | Checks 1,2,3,5 PASS. Check 4 PASS after the dock-side sync fix: a side chosen with DevTools' own controls is honored on relaunch. Findings: shortcuts must work while DevTools has focus (fixed via app-menu accelerators); dock shortcuts settled on plain `⌘1/2/3` (`⇧⌘3/4/5` are macOS screenshots). |
 | S2 | Palette: open, shorthand, recents, rejection, dismissal, prefill | FR-005–FR-007, FR-022 | PASS *(manual)* | Checks 1–6 PASS. Check 3 fixed: an invalid target (`example.com`) shows a rejection message and keeps the palette open. Check 5 fixed: `⌘L` prefills the full live URL, including deep routes and SPA (`did-navigate-in-page`) changes. |
 | S3 | DevTools placement: toggle + dock sides + persistence | FR-008 | PASS *(manual)* | Toggle is reload-free (page state survives). Dock sides `⌘1/2/3` reflow with no overlap; resize reflows together. Side + open/closed state restored across relaunch. Findings: toggle rebound from `⌘⇧J` to `⌘⌥J` at the user's request; dock-side switching works but could feel more fluid (accepted for now). |
-| S4 | Picker: hover highlight, click inspects, disarm, no residue | FR-012, FR-013, SC-004 | PASS *(auto, overlay lifecycle)* / pending (hover+inspect) | Overlay element count while armed = 1, after disarm = 0 |
+| S4 | Picker: hover highlight, click inspects, disarm, no residue | FR-012, FR-013, SC-004 | PASS *(auto + manual)* | Overlay count while armed = 1, after disarm = 0 (auto). Hover highlights exactly one element with no layout shift; click selects it in DevTools, opening DevTools when closed; `Esc` and navigation disarm; no residue after disarm. |
 | S5 | Drag strip: toggle, drag, controls, no page relayout, persistence | FR-009, SC-002 | pending | |
 | S6 | Reload / hard reload / back / forward + editable guard | FR-010, FR-011 | pending | |
 | S7 | Theming: 8 variants, system dark/light + override, DevTools follow | FR-016–FR-018, SC-006 | pending | UI captures confirm jade dark/light + palette/strip/failure styling |
@@ -29,7 +29,7 @@ npm run dev
 | S10 | Multiple instances: independent windows, merged recents, shared prefs | FR-023, FR-004 | pending | |
 | S11 | Checks: `npm run check`, `npm run test` | constitution (workflow) | PASS *(auto)* | `vp check` clean (41 formatted, 0 lint); `vp test` 21 passed; production build green |
 
-**Overall**: in progress — S0, S4 (partial), S11 verified automatically; S1–S3 passed; S5–S10 pending.
+**Overall**: in progress — S0, S11 verified automatically; S1–S4 passed; S5–S10 pending.
 
 ## Handoff — resuming validation
 
@@ -42,8 +42,8 @@ npm run dev
 
 **To rebuild before testing**: `npm run dev`
 
-**Next up**: S4 (picker hover + inspect), S5 (strip), S6 (reload/history),
-S7 (theming), S8 (loading/failure), S9 (local-only policy), S10 (multi-instance).
+**Next up**: S5 (strip), S6 (reload/history), S7 (theming),
+S8 (loading/failure), S9 (local-only policy), S10 (multi-instance).
 
 **Reminder**: keep app-menu accelerators as the shortcut mechanism (they work
 while DevTools has focus); dock shortcuts are `⌘1`/`⌘2`/`⌘3`.
