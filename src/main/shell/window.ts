@@ -33,7 +33,7 @@ export class AppWindow {
   readonly picker: PickerController;
   readonly commands = new CommandRegistry();
 
-  private loading = false;
+  private showLoading = false;
   private failed = false;
   private paletteOpen = false;
   private editableFocused = false;
@@ -192,7 +192,9 @@ export class AppWindow {
     commands.register("theme.cycleMode", () => this.cycleColorMode());
     commands.register("failure.retry", () => {
       this.failed = false;
+      this.showLoading = true;
       this.relayout();
+      this.reportLoading(true);
       this.siteView.webContents.reload();
     });
     commands.register("window.close", () => this.win.close());
@@ -275,7 +277,7 @@ export class AppWindow {
 
   private loadTarget(url: string): void {
     this.failed = false;
-    this.loading = true;
+    this.showLoading = true;
     this.requestedTarget = url;
     this.relayout();
     this.reportLoading(true);
@@ -283,7 +285,7 @@ export class AppWindow {
   }
 
   private handleReady(url: string): void {
-    this.loading = false;
+    this.showLoading = false;
     this.failed = false;
     this.relayout();
     if (url) {
@@ -312,7 +314,7 @@ export class AppWindow {
   private handleFailed(url: string, reason: string): void {
     // Ignore a late failure from a navigation that has since been superseded.
     if (this.requestedTarget && sameUrl(url, this.requestedTarget) === false) return;
-    this.loading = false;
+    this.showLoading = false;
     this.failed = true;
     this.closePalette();
     this.relayout();
@@ -320,9 +322,13 @@ export class AppWindow {
   }
 
   private setLoading(loading: boolean): void {
-    this.loading = loading;
+    // The veil is a target-load indicator only (raised by loadTarget/retry).
+    // Spinner activity from the page itself — reloads, link clicks, iframe
+    // loads — never covers the view: the old frame stays visible until the new
+    // one commits, so there is no white flash to hide (matches Chrome).
+    if (!loading) this.showLoading = false;
     this.relayout();
-    this.reportLoading(loading);
+    this.reportLoading(this.showLoading);
   }
 
   private reportLoading(loading: boolean): void {
@@ -405,7 +411,7 @@ export class AppWindow {
     const { width, height } = this.win.getContentBounds();
     this.siteView.setBounds({ x: 0, y: 0, width, height });
 
-    const overlayActive = this.paletteOpen || this.loading || this.failed;
+    const overlayActive = this.paletteOpen || this.showLoading || this.failed;
     if (overlayActive) {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
       this.shellView.setVisible(true);
