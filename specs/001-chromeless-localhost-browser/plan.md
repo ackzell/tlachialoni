@@ -46,19 +46,19 @@ bounded; a handful of shell components
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle / requirement (constitution v2.0.0) | Plan compliance |
-| --- | --- |
-| I. Chromeless by Default | Strip, palette, and failure view are transient; no URL bar, tabs, or menu; SC-002 verified in quickstart |
-| II. The Guest Page is Sacred | Guest view sandboxed with no Node; only the armed picker injects a transient overlay, removed on selection/cancel/navigation |
-| III. Keyboard-First Ergonomics | One command dispatcher; every command has both a keybinding and a palette entry (see `contracts/commands-and-keys.md`) |
-| IV. Real Chromium DevTools, Docked | `openDevTools({ mode })` on the site view; genuine DevTools docked bottom/right/left, side and open state persisted |
-| V. One Target Per Window | One site view per window; multiple independent instances supported (FR-023) |
-| VI. Identity Through Tlapalli | All shell colors are CSS variables generated from Tlapalli sources; Source Code Pro bundled locally |
-| Technology Foundations | Electron + electron-vite + Vite+ (checks only) + Vue/VueUse/TS + JSON store, exactly as specified |
-| Security & Isolation | Local-only navigation policy, popups → system browser, picker cleanup, `contextIsolation` + `sandbox` |
-| Development Workflow | Spike-first gate (M0) below; MIT + README + NOTICE; `vp check` / `vp test` before commit |
+| Principle / requirement (constitution v2.0.0) | Plan compliance                                                                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| I. Chromeless by Default                      | Strip, palette, and failure view are transient; no URL bar, tabs, or menu; SC-002 verified in quickstart                     |
+| II. The Guest Page is Sacred                  | Guest view sandboxed with no Node; only the armed picker injects a transient overlay, removed on selection/cancel/navigation |
+| III. Keyboard-First Ergonomics                | One command dispatcher; every command has both a keybinding and a palette entry (see `contracts/commands-and-keys.md`)       |
+| IV. Real Chromium DevTools, Docked            | `openDevTools({ mode })` on the site view; genuine DevTools docked bottom/right/left, side and open state persisted          |
+| V. One Target Per Window                      | One site view per window; multiple independent instances supported (FR-023)                                                  |
+| VI. Identity Through Tlapalli                 | All shell colors are CSS variables generated from Tlapalli sources; Source Code Pro bundled locally                          |
+| Technology Foundations                        | Electron + electron-vite + Vite+ (checks only) + Vue/VueUse/TS + JSON store, exactly as specified                            |
+| Security & Isolation                          | Local-only navigation policy, popups → system browser, picker cleanup, `contextIsolation` + `sandbox`                        |
+| Development Workflow                          | Spike-first gate (M0) below; MIT + README + NOTICE; `vp check` / `vp test` before commit                                     |
 
 **Gate result**: PASS — no violations. Complexity Tracking is intentionally empty.
 
@@ -124,7 +124,6 @@ localbrowser/
 │           ├── composables/         # useCommands, useTheme, useRecents, usePicker
 │           └── theme/
 │               ├── tokens.ts        # CSS variable contract + variant list
-│               ├── tlapalli.tokens.ts  # GENERATED (committed) — values per variant × mode
 │               └── apply.ts         # applies variant + mode to the document
 └── tests/
     ├── unit/                        # Vitest: policy, normalization, store merge, token mapping
@@ -160,14 +159,14 @@ renderer entry that hosts all three surfaces; the target is a separate
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-| --- | --- |
-| Docked DevTools inside a `WebContentsView` may behave differently than assumed on macOS | M0 spike first; fallback documented in `research.md` |
-| No supported API to change dock side while open | Close and reopen DevTools with the new mode; persist the choice; accept a brief flash |
-| `view.getBounds()` ignores the docked-DevTools inset | Palette/failure overlays are transient and modal, so overlap is acceptable; if it becomes a problem, inset the overlay using the page's `innerWidth`/`innerHeight` |
-| `did-fail-load` does not fire for HTTP 4xx/5xx | Treat network-level failures (connection refused, DNS, timeout) as the failure view; HTTP error pages render as served |
-| Multiple instances overwriting shared state | Atomic writes, merge-on-write recents, last-writer-wins scalars (FR-004) |
-| Picker residue in the guest page | Overlay is owned by the guest preload and removed on disarm; disarm automatically on navigation via a generation counter |
+| Risk                                                                                    | Mitigation                                                                                                                                                         |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Docked DevTools inside a `WebContentsView` may behave differently than assumed on macOS | M0 spike first; fallback documented in `research.md`                                                                                                               |
+| No supported API to change dock side while open                                         | Close and reopen DevTools with the new mode; persist the choice; accept a brief flash                                                                              |
+| `view.getBounds()` ignores the docked-DevTools inset                                    | Palette/failure overlays are transient and modal, so overlap is acceptable; if it becomes a problem, inset the overlay using the page's `innerWidth`/`innerHeight` |
+| `did-fail-load` does not fire for HTTP 4xx/5xx                                          | Treat network-level failures (connection refused, DNS, timeout) as the failure view; HTTP error pages render as served                                             |
+| Multiple instances overwriting shared state                                             | Atomic writes, merge-on-write recents, last-writer-wins scalars (FR-004)                                                                                           |
+| Picker residue in the guest page                                                        | Overlay is owned by the guest preload and removed on disarm; disarm automatically on navigation via a generation counter                                           |
 
 ## Complexity Tracking
 

@@ -9,17 +9,17 @@ contract.
 
 The single record restored on launch and updated as the developer works.
 
-| Field | Type | Default | Purpose / requirements |
-| --- | --- | --- | --- |
-| `schemaVersion` | integer ≥ 1 | `1` | Enables forward migration; readers must handle older versions |
-| `target` | string \| null | `http://localhost:3000` | The target to load on launch; must satisfy the local-target policy |
-| `recents` | RecentEntry[] | `[]` | Ordered, deduplicated targets; newest first; bounded |
-| `dockMode` | `bottom` \| `right` \| `left` | `bottom` | DevTools dock side (FR-002, FR-008) |
-| `devtoolsOpen` | boolean | `true` | Whether DevTools were open at exit (FR-003) |
-| `stripVisible` | boolean | `false` | Drag strip visibility (FR-009) |
-| `bounds` | `{ x, y, width, height }` integers | centered 1440 × 900 | Window frame to restore (FR-004) |
-| `variant` | VariantSlug | `obsidian` | Tlapalli mineral variant (FR-016) |
-| `colorMode` | `system` \| `dark` \| `light` | `system` | Color mode override (FR-017) |
+| Field           | Type                               | Default                 | Purpose / requirements                                             |
+| --------------- | ---------------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| `schemaVersion` | integer ≥ 1                        | `1`                     | Enables forward migration; readers must handle older versions      |
+| `target`        | string \| null                     | `http://localhost:3000` | The target to load on launch; must satisfy the local-target policy |
+| `recents`       | RecentEntry[]                      | `[]`                    | Ordered, deduplicated targets; newest first; bounded               |
+| `dockMode`      | `bottom` \| `right` \| `left`      | `bottom`                | DevTools dock side (FR-002, FR-008)                                |
+| `devtoolsOpen`  | boolean                            | `true`                  | Whether DevTools were open at exit (FR-003)                        |
+| `stripVisible`  | boolean                            | `false`                 | Drag strip visibility (FR-009)                                     |
+| `bounds`        | `{ x, y, width, height }` integers | centered 1440 × 900     | Window frame to restore (FR-004)                                   |
+| `variant`       | VariantSlug                        | `obsidian`              | Tlapalli mineral variant (FR-016)                                  |
+| `colorMode`     | `system` \| `dark` \| `light`      | `system`                | Color mode override (FR-017)                                       |
 
 ### Validation rules (applied on load and on write)
 
@@ -43,11 +43,11 @@ The single record restored on launch and updated as the developer works.
 
 The single address rendered in a window.
 
-| Attribute | Description |
-| --- | --- |
-| `url` | Normalized absolute URL (`http://host:port/path`) |
+| Attribute      | Description                                            |
+| -------------- | ------------------------------------------------------ |
+| `url`          | Normalized absolute URL (`http://host:port/path`)      |
 | `host`, `port` | Derived; used by the policy and the failure view label |
-| `isValid` | Result of the local-target policy |
+| `isValid`      | Result of the local-target policy                      |
 
 **Normalization** (FR-006): `:5173` → `http://localhost:5173`; `5173` →
 `http://localhost:3000` is **not** implied — a bare number is treated as a port on
@@ -57,9 +57,9 @@ with feedback and the current target is unchanged.
 
 ## Entity: RecentEntry
 
-| Attribute | Description |
-| --- | --- |
-| `url` | Normalized target URL |
+| Attribute      | Description                 |
+| -------------- | --------------------------- |
+| `url`          | Normalized target URL       |
 | `lastOpenedAt` | Ordering key (newest first) |
 
 Recorded only after a target loads successfully. Merged (not overwritten) when
@@ -69,9 +69,9 @@ multiple instances write, so no instance's history is lost.
 
 Transient (never persisted); governs the `⌘⇧C` element picker (FR-012, FR-013).
 
-| State | Meaning | Transitions |
-| --- | --- | --- |
-| `idle` | No overlay, no listeners | `arm` → `armed` |
+| State   | Meaning                                               | Transitions                                                                                                                                                       |
+| ------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`  | No overlay, no listeners                              | `arm` → `armed`                                                                                                                                                   |
 | `armed` | Overlay + capture-phase listeners active in the guest | `hover` (stays armed, updates highlight) · `pick` → `idle` (inspect then cleanup) · `cancel` (Esc / `⌘⇧C`) → `idle` · `navigation`/`reload` → `idle` (invalidate) |
 
 **Invariant**: on any transition to `idle`, the overlay node and all listeners are
@@ -81,11 +81,11 @@ removed, and no element handles are retained across navigations (FR-013).
 
 The unit the palette and keybindings both invoke (FR-020).
 
-| Attribute | Description |
-| --- | --- |
-| `id` | Stable identifier (e.g. `devtools.toggle`) |
-| `title` | Palette label |
-| `keybinding` | Optional accelerator label shown in the palette |
+| Attribute     | Description                                               |
+| ------------- | --------------------------------------------------------- |
+| `id`          | Stable identifier (e.g. `devtools.toggle`)                |
+| `title`       | Palette label                                             |
+| `keybinding`  | Optional accelerator label shown in the palette           |
 | `enabledWhen` | Optional predicate (e.g. `back` disabled with no history) |
 
 The catalog and accelerator map are the contract in
@@ -93,10 +93,10 @@ The catalog and accelerator map are the contract in
 
 ## Entity: ThemeSelection
 
-| Attribute | Description |
-| --- | --- |
-| `variant` | One of the eight mineral slugs |
-| `mode` | `system` \| `dark` \| `light` |
+| Attribute      | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `variant`      | One of the eight mineral slugs                                              |
+| `mode`         | `system` \| `dark` \| `light`                                               |
 | `resolvedMode` | `dark` \| `light` after applying the system preference when `mode = system` |
 
 Changing either applies CSS variables to the shell and sets

@@ -215,7 +215,11 @@ rejected. Items marked **(verify in M0)** are assumptions the spike must confirm
 
 ## Open items to confirm during implementation
 
-1. Docked DevTools inside a `WebContentsView` on macOS, all three sides, frameless **(M0, gate)**.
+1. **RESOLVED (M0 spike PASS)**: docked DevTools work inside a `WebContentsView` on
+   frameless macOS. Measured with `LOCALBROWSER_DOCK_TEST=1`: baseline page viewport
+   1440×900; `mode: 'bottom'` shrinks the page to 600 tall (Δ300); `mode: 'right'`
+   shrinks it to 885 wide (Δ555). Switching sides uses close + reopen and works.
+   No fallback needed.
 2. Which hide signal (did-finish-load vs dom-ready) feels right against real dev servers **(M1)**.
 3. Picker overlay + click capture with the docked panel inset **(M3)**.
 4. DevTools theme actually follows `nativeTheme.themeSource` on macOS builds **(M4)**.

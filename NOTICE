@@ -1,0 +1,21 @@
+# Third-party notices
+
+## Tlapalli
+
+The color values used by this application's shell UI are derived from the
+**Tlapalli** theme system.
+
+- Copyright (c) 2026 Axel Uriel Martínez Castillo (ackzell.dev)
+- License: MIT
+- Sources:
+  - https://github.com/ackzell/tlapalli-vscode-theme
+  - https://github.com/ackzell/tlapalli-zed-theme
+  - https://tlapalli.ackzell.dev
+
+Tlapalli's logo and image assets are not covered by this notice and are not used
+by this application.
+
+## Fonts
+
+Source Code Pro is bundled via the `@fontsource-variable/source-code-pro`
+package and is licensed under the SIL Open Font License 1.1.

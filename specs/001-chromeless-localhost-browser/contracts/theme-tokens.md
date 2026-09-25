@@ -6,21 +6,21 @@ generated into a committed module; nothing else in the app may hard-code a color
 
 ## CSS variable contract
 
-| Variable | Role | Tlapalli source (VSCode key) |
-| --- | --- | --- |
-| `--lb-bg` | App/canvas background | `editor.background` |
-| `--lb-bg-elevated` | Elevated surface (palette, strip) | `editorWidget.background` |
-| `--lb-surface` | Control fill | `button.background` |
-| `--lb-fg` | Primary text | `editor.foreground` |
-| `--lb-fg-muted` | Secondary text | `descriptionForeground` |
-| `--lb-fg-subtle` | De-emphasized text | `editorLineNumber.foreground` |
-| `--lb-border` | Hairlines and dividers | `panel.border` |
-| `--lb-accent` | Links / active text | `textLink.foreground` |
-| `--lb-signature` | Brand accent swatch / focus ring | `activityBarBadge.background` |
-| `--lb-selection` | Selected row / text selection | `editor.selectionBackground` |
-| `--lb-hover` | Hover fill | `list.hoverBackground` |
-| `--lb-error` | Error text / failure view accent | `list.errorForeground` |
-| `--lb-progress` | Loading indicator | `progressBar.background` |
+| Variable           | Role                              | Tlapalli source (VSCode key)  |
+| ------------------ | --------------------------------- | ----------------------------- |
+| `--lb-bg`          | App/canvas background             | `editor.background`           |
+| `--lb-bg-elevated` | Elevated surface (palette, strip) | `editorWidget.background`     |
+| `--lb-surface`     | Control fill                      | `button.background`           |
+| `--lb-fg`          | Primary text                      | `editor.foreground`           |
+| `--lb-fg-muted`    | Secondary text                    | `descriptionForeground`       |
+| `--lb-fg-subtle`   | De-emphasized text                | `editorLineNumber.foreground` |
+| `--lb-border`      | Hairlines and dividers            | `panel.border`                |
+| `--lb-accent`      | Links / active text               | `textLink.foreground`         |
+| `--lb-signature`   | Brand accent swatch / focus ring  | `activityBarBadge.background` |
+| `--lb-selection`   | Selected row / text selection     | `editor.selectionBackground`  |
+| `--lb-hover`       | Hover fill                        | `list.hoverBackground`        |
+| `--lb-error`       | Error text / failure view accent  | `list.errorForeground`        |
+| `--lb-progress`    | Loading indicator                 | `progressBar.background`      |
 
 Notes: `focusBorder` is unusable as a ring (it equals the background), hence
 `--lb-signature` for focus. Alpha values are 8-digit `#RRGGBBAA` and are valid CSS
@@ -36,8 +36,9 @@ VSCode `colors` map from `themes/tlapalli-<slug>[-light]-theme.json`.
 
 - `scripts/build-theme-tokens.ts` reads the consolidated Tlapalli source
   (`ackzell/tlapalli-vscode-theme`, `zed-themes/tlapalli.json`; VSCode `colors`
-  maps as fallback) and emits `src/renderer/src/theme/tlapalli.tokens.ts`:
-  a map of `variant → mode → { [cssVariable]: value }`.
+  maps as fallback) and emits `src/shared/theme-tokens.ts`: a map of
+  `variant → mode → { [cssVariable]: value }`. Both main (window background) and
+  the renderer import it.
 - The generated file is committed, so builds need no network access. Re-run the
   script only when the upstream theme changes.
 

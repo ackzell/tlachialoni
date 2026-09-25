@@ -1,0 +1,29 @@
+/* The shell is a transparent overlay; only its surfaces paint. */
+html,
+body,
+#app {
+  height: 100%;
+}
+
+html,
+body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Source Code Pro Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--lb-fg, #a7a7a7);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.shell-root {
+  height: 100%;
+}

@@ -18,7 +18,7 @@
 - Q: When the palette is open, how should it close, and where should keyboard focus go afterwards? → A: `Esc` and click-outside both dismiss it, focus returns to the page, and invalid submissions keep it open with visible feedback.
 - Q: What should happen if the tool is launched again while an instance is already running? → A: Multiple instances are allowed — each launch opens an independent window with its own target, so parallel related projects can be open at once.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Render a local dev site with docked DevTools (Priority: P1)
 
@@ -219,7 +219,7 @@ renders.
 - **Slow or starting server**: while the target is loading, a themed loading indicator is shown over the themed background until first paint; it disappears immediately on paint and is never shown over an already-painted page.
 - **Multiple instances**: launching the tool again opens an independent window; quitting or changing one instance does not affect the others, and targets opened in any instance remain in recents.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -247,14 +247,14 @@ renders.
 - **FR-022**: The system MUST dismiss the palette on `Esc` or a click outside it, return keyboard focus to the page afterwards, and keep the palette open with visible feedback when a submission is invalid.
 - **FR-023**: The system MUST allow more than one instance to run at once, each rendering its own target independently, so a developer can work on parallel related projects side by side.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Target**: the single local http/https address currently rendered; stored in normalized form.
 - **Recents**: an ordered, deduplicated list of **RecentEntry** records (a successfully loaded target URL plus its last-opened time), newest first, at most ten entries.
 - **Preferences (PersistedState)**: the single persisted record — current target, recents, DevTools dock side, DevTools open state, strip visibility, window bounds, theme variant, and color mode.
 - **Picker session**: the transient armed/disarmed state of element picking and the lifecycle of its highlight overlay.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

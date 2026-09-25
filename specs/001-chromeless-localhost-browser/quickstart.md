@@ -14,13 +14,13 @@ guide, not an implementation guide; see `plan.md` for structure and `data-model.
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Build and launch the app with shell HMR (electron-vite dev) |
-| `npm run build` | Production build |
-| `npm run preview` | Run the production build |
-| `npm run check` | `vp check` — format, lint, and type-check |
-| `npm run test` | `vp test` — Vitest unit tests |
+| Command           | Purpose                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `npm run dev`     | Build and launch the app with shell HMR (electron-vite dev) |
+| `npm run build`   | Production build                                            |
+| `npm run preview` | Run the production build                                    |
+| `npm run check`   | `vp check` — format, lint, and type-check                   |
+| `npm run test`    | `vp test` — Vitest unit tests                               |
 
 ## Validation scenarios
 

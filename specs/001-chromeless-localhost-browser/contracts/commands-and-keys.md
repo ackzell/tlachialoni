@@ -7,26 +7,26 @@ focus, then dispatched through `command:run` semantics.
 
 ## Command catalog
 
-| Command id | Palette label | Accelerator | Notes |
-| --- | --- | --- | --- |
-| `palette.open` | Show Command Palette | `⌘P` | Opens empty; recents + commands listed |
-| `palette.editUrl` | Edit Current URL | `⌘L` | Opens palette prefilled with the current target |
-| `target.navigate` | Go to… | (palette input) | Validated against the local-target policy |
-| `strip.toggle` | Toggle Window Controls | `⌘B` | Explicit toggle; overlay, does not move the page |
-| `view.reload` | Reload | `⌘R` | |
-| `view.hardReload` | Hard Reload | `⇧⌘R` | Bypasses cache |
-| `view.back` | Back | `⌘←` | Disabled with no history; yields in editable fields |
-| `view.forward` | Forward | `⌘→` | Disabled with no history; yields in editable fields |
-| `devtools.toggle` | Toggle DevTools | `⌘⇧J` | Reopens on the persisted side |
-| `devtools.dock.bottom` | Dock DevTools Bottom | `⌘⇧1` | |
-| `devtools.dock.right` | Dock DevTools Right | `⌘⇧2` | |
-| `devtools.dock.left` | Dock DevTools Left | `⌘⇧3` | |
-| `picker.toggle` | Inspect Element (arm/disarm) | `⌘⇧C` | Hover highlight; click selects in DevTools |
-| `theme.variant.<slug>` | Theme: <Variant Name> | — | Eight commands, one per mineral variant |
-| `theme.cycleMode` | Cycle Color Mode | — | `system → dark → light`, persisted |
-| `failure.retry` | Retry | (failure view button) | Shown only while the target is unreachable |
-| `window.close` | Close Window | — | Strip close button; no accelerator to avoid accidents |
-| `app.quit` | Quit | `⌘Q` | OS-standard |
+| Command id             | Palette label                | Accelerator           | Notes                                                 |
+| ---------------------- | ---------------------------- | --------------------- | ----------------------------------------------------- |
+| `palette.open`         | Show Command Palette         | `⌘P`                  | Opens empty; recents + commands listed                |
+| `palette.editUrl`      | Edit Current URL             | `⌘L`                  | Opens palette prefilled with the current target       |
+| `target.navigate`      | Go to…                       | (palette input)       | Validated against the local-target policy             |
+| `strip.toggle`         | Toggle Window Controls       | `⌘B`                  | Explicit toggle; overlay, does not move the page      |
+| `view.reload`          | Reload                       | `⌘R`                  |                                                       |
+| `view.hardReload`      | Hard Reload                  | `⇧⌘R`                 | Bypasses cache                                        |
+| `view.back`            | Back                         | `⌘←`                  | Disabled with no history; yields in editable fields   |
+| `view.forward`         | Forward                      | `⌘→`                  | Disabled with no history; yields in editable fields   |
+| `devtools.toggle`      | Toggle DevTools              | `⌘⇧J`                 | Reopens on the persisted side                         |
+| `devtools.dock.bottom` | Dock DevTools Bottom         | `⌘⇧1`                 |                                                       |
+| `devtools.dock.right`  | Dock DevTools Right          | `⌘⇧2`                 |                                                       |
+| `devtools.dock.left`   | Dock DevTools Left           | `⌘⇧3`                 |                                                       |
+| `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | Hover highlight; click selects in DevTools            |
+| `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | Eight commands, one per mineral variant               |
+| `theme.cycleMode`      | Cycle Color Mode             | —                     | `system → dark → light`, persisted                    |
+| `failure.retry`        | Retry                        | (failure view button) | Shown only while the target is unreachable            |
+| `window.close`         | Close Window                 | —                     | Strip close button; no accelerator to avoid accidents |
+| `app.quit`             | Quit                         | `⌘Q`                  | OS-standard                                           |
 
 `VariantSlug` ∈ `obsidian`, `gold`, `turquoise`, `quartz`, `lapis-lazuli`,
 `amethyst`, `jade`, `fire-opal`.
