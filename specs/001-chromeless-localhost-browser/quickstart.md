@@ -39,6 +39,8 @@ not work, stop and apply the fallback in `research.md` before building shell UI.
 With a server on port 3000, launch on a clean profile. The window shows the site
 edge to edge with DevTools docked at the bottom and **no** URL bar, tabs, or menu.
 Relaunch: the same target loads. Resize: page and DevTools reflow together.
+Confirm the guest page exposes no Node/Electron globals (sandbox and context
+isolation active).
 
 ### S2 — Palette (Story 2; FR-005–FR-007, FR-022)
 

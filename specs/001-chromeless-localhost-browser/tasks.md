@@ -43,12 +43,12 @@ source tree in plan.md).
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
 - [ ] T005 **M0 spike gate (constitution: spike-first)**: build a throwaway frameless `BaseWindow` with one `WebContentsView` loading `http://localhost:3000`; open DevTools with `mode: 'bottom'`, then `'right'`, then `'left'`; verify in-window docking, resize reflow, and window drag; record the outcome in the open items of research.md. If docking fails, stop and apply the documented fallback before T006. File: src/main/index.ts
-- [ ] T006 Compose the real window: `new BaseWindow({ frame: false })` with a site `WebContentsView` and a transparent shell `WebContentsView` (`setBackgroundColor('#00000000')`); re-layout both on the window `resize` event using `getContentBounds()`; close each view's `webContents` on the window `closed` event. Files: src/main/shell/window.ts, src/main/shell/site-view.ts, src/main/shell/shell-view.ts
+- [ ] T006 Compose the real window: `new BaseWindow({ frame: false })` with a site `WebContentsView` created with `webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false }` (constitution §II, FR-014) and a transparent shell `WebContentsView` (`setBackgroundColor('#00000000')`); re-layout both on the window `resize` event using `getContentBounds()`; close each view's `webContents` on the window `closed` event. Do not call `app.requestSingleInstanceLock()`; every launch creates an independent window with its own target (FR-023). Files: src/main/shell/window.ts, src/main/shell/site-view.ts, src/main/shell/shell-view.ts
 - [ ] T007 [P] Implement the persisted state store: atomic write (temp file + `fsync` + `rename`), `schemaVersion` handling, defaults, recents merge ("deduplicated by normalized URL, newest first, bounded (maximum 10)"), and bounds clamp ("minimum 480 × 360"). Files: src/main/state/schema.ts, src/main/state/store.ts
 - [ ] T008 [P] Unit-test state defaults, missing-field handling, and recents merge/dedupe/bound. File: tests/unit/store.test.ts
 - [ ] T009 [P] Implement the local-target policy: allow only http/https on loopback (`localhost`, `127.0.0.0/8`, `::1`), private ranges (`10/8`, `172.16/12`, `192.168/16`), and dev hostnames (`*.localhost`, `*.local`, `*.test`); normalize `:5173`, `5173`, and `localhost:5173` to `http://localhost:5173`; reject other schemes/hosts with a reason. File: src/main/nav/policy.ts
 - [ ] T010 [P] Unit-test policy normalization and rejection cases. File: tests/unit/policy.test.ts
-- [ ] T011 Implement the command registry and dispatcher with accelerator interception via `before-input-event` on each view, and maintain the editable-focus flag fed by `site:focus-editable`. Files: src/main/shell/commands.ts, src/preload/site.ts
+- [ ] T011 Implement the command registry and dispatcher with accelerator interception via `before-input-event` on each view, maintain the editable-focus flag fed by `site:focus-editable`, and seed the registry by implementing `view.reload` (`⌘R`) on the site view as its first command. Files: src/main/shell/commands.ts, src/preload/site.ts
 - [ ] T012 [P] Implement the typed IPC surface exactly as specified in contracts/ipc.md (shell bridge invoke/on channels; site bridge send/on channels). Files: src/main/ipc.ts, src/preload/shell.ts, src/preload/site.ts
 - [ ] T013 Implement navigation enforcement: `setWindowOpenHandler` denies guest popups and opens them in the system browser; `will-navigate`/`will-frame-navigate` to a non-local address opens externally and leaves the view unchanged. Files: src/main/shell/site-view.ts, src/main/nav/policy.ts
 - [ ] T014 [P] Build the Tlapalli token pipeline: scripts/build-theme-tokens.ts generates src/renderer/src/theme/tlapalli.tokens.ts for all 8 variants × dark/light using the CSS variables in contracts/theme-tokens.md; add tokens.ts and apply.ts. Files: scripts/build-theme-tokens.ts, src/renderer/src/theme/tokens.ts, src/renderer/src/theme/tlapalli.tokens.ts, src/renderer/src/theme/apply.ts
@@ -85,7 +85,7 @@ recents, shorthand normalization, and clear dismissal.
 **Independent Test**: quickstart S2.
 
 - [ ] T022 [US2] Build the CommandPalette component: top-center overlay with input and sectioned list (commands + recents). File: src/renderer/src/components/CommandPalette.vue
-- [ ] T023 [P] [US2] Implement useCommands: fuzzy filter plus command metadata (labels and accelerator labels per contracts/commands-and-keys.md). File: src/renderer/src/composables/useCommands.ts
+- [ ] T023 [P] [US2] Implement useCommands: fuzzy filter plus command metadata (labels and accelerator labels per contracts/commands-and-keys.md); verify the registry enumerates every command in contracts/commands-and-keys.md (FR-020 completeness). File: src/renderer/src/composables/useCommands.ts
 - [ ] T024 [US2] Wire `palette.open` (`⌘P`) and `palette.editUrl` (`⌘L`, prefilled with the current target). Files: src/main/shell/commands.ts, src/renderer/src/components/CommandPalette.vue
 - [ ] T025 [US2] Implement target entry: call `target:validate`, show inline feedback when rejected, and navigate on success (`target.navigate`). Files: src/renderer/src/components/CommandPalette.vue, src/main/shell/commands.ts
 - [ ] T026 [US2] Implement dismissal and focus: `Esc` and click-outside close the palette and return focus to the page; invalid submissions keep it open with feedback (FR-022). Files: src/renderer/src/components/CommandPalette.vue, src/main/shell/window.ts
@@ -120,7 +120,7 @@ clicked element in DevTools, leaving no residue.
 - [ ] T032 [US4] Implement the picker overlay in the site preload: on `picker:armed` attach capture-phase `mousemove`/`click` listeners and draw one fixed, `pointer-events: none` highlight box; on disarm remove the node and all listeners. File: src/preload/site.ts
 - [ ] T033 [US4] Implement the picker session in main: arm/disarm, handle `picker:hover`/`picker:picked`, and hard-disarm on navigation via a generation counter updated on `did-navigate`/`dom-ready`. Files: src/main/shell/picker.ts, src/main/ipc.ts
 - [ ] T034 [US4] Implement `picker.toggle` (`⌘⇧C`) and `Esc` disarm. Files: src/main/shell/commands.ts
-- [ ] T035 [US4] On pick, call `inspectElement(x, y)` with view-relative DIPs, opening DevTools if closed. Files: src/main/shell/picker.ts, src/main/shell/devtools.ts
+- [ ] T035 [US4] On pick, call `inspectElement(x, y)` with view-relative DIPs, opening DevTools if closed (uses the DevTools module built in US3). Files: src/main/shell/picker.ts, src/main/shell/devtools.ts
 
 **Checkpoint**: Stories 1–4 work independently.
 
@@ -148,7 +148,7 @@ inside editable fields.
 
 **Independent Test**: quickstart S6.
 
-- [ ] T039 [US6] Implement `view.reload` (`⌘R`) and `view.hardReload` (`⇧⌘R`, bypassing cache). Files: src/main/shell/site-view.ts, src/main/shell/commands.ts
+- [ ] T039 [US6] Implement `view.hardReload` (`⇧⌘R`, bypassing cache). Files: src/main/shell/site-view.ts, src/main/shell/commands.ts
 - [ ] T040 [US6] Implement `view.back` / `view.forward` (`⌘←`/`⌘→`) using navigation history, palette-disabled with no history, and yielding when the editable-focus flag is set. File: src/main/shell/commands.ts
 
 **Checkpoint**: Stories 1–6 work independently.
@@ -191,7 +191,7 @@ override) applied to every shell surface and to DevTools.
 - [ ] T047 [P] Add a state-concurrency unit test: two writers merge recents without loss and scalars are last-writer-wins. File: tests/unit/store-concurrency.test.ts
 - [ ] T048 [P] Finalize README (run instructions, Tlapalli thanks) and NOTICE (MIT attribution). Files: README.md, NOTICE
 - [ ] T049 Run `npm run check` and `npm run test` (scripts in package.json) and fix all failures
-- [ ] T050 Execute quickstart.md scenarios S0–S11 in order and record the results
+- [ ] T050 Execute quickstart.md scenarios S0–S11 in order, timing launch-to-first-paint against SC-001's 3-second budget, and record the results in specs/001-chromeless-localhost-browser/validation.md
 
 ---
 

@@ -45,9 +45,10 @@ the window and confirm both reflow. Delivers standalone value on its own.
 
 ### User Story 2 - Navigate with the command palette (Priority: P2)
 
-The developer presses `⌘P` to open a centered command palette. With an empty
-input it lists available commands and recent targets. Typing a URL, or a
-shorthand such as `:5173`, `5173`, or `localhost:5173`, navigates the view.
+The developer presses `⌘P` to open a top-centered command palette, centered
+horizontally near the top of the window. With an empty input it lists available
+commands and recent targets. Typing a URL, or a shorthand such as `:5173`,
+`5173`, or `localhost:5173`, navigates the view.
 Pressing `⌘L` opens the palette prefilled with the current target for editing.
 
 **Why this priority**: With no URL bar, the palette is the only way to point the
@@ -120,7 +121,7 @@ then confirm the overlay is gone.
 ### User Story 5 - Reveal the hidden drag strip (Priority: P5)
 
 By default the window shows no chrome and cannot be moved by its edge. Pressing
-`⌘B` (or a palette command) reveals a slim top strip that can drag the window
+`⌘B` (or a palette command) reveals a slim (~36px) top strip that can drag the window
 and exposes minimal controls: reload, toggle DevTools, and close. The strip's
 visibility persists across launches.
 
@@ -211,7 +212,7 @@ renders.
 - **Picker armed then navigation/reload**: the picker disarms automatically and leaves no overlay behind.
 - **Picker click with DevTools closed**: DevTools open in the persisted dock position and the clicked element is selected.
 - **Rapid dock-side changes**: the final state is stable, with no orphaned panel or leftover space.
-- **Recents growth**: the list stays deduplicated, newest first, and bounded.
+- **Recents growth**: the list stays deduplicated, newest first, and capped at ten entries.
 - **Window resize with the strip visible**: the strip spans the window width and does not alter the page's layout beyond the window resize itself.
 - **First-ever launch (no persisted state)**: target `http://localhost:3000`, obsidian variant, system mode, strip hidden, DevTools open docked bottom.
 - **Target changes port or dies mid-session**: the next load surfaces the failure view rather than a blank window.
@@ -249,8 +250,8 @@ renders.
 ### Key Entities *(include if feature involves data)*
 
 - **Target**: the single local http/https address currently rendered; stored in normalized form.
-- **Recents**: an ordered, deduplicated list of successfully loaded targets, newest first, bounded in length.
-- **Preferences**: persisted user state — current target, recents, DevTools dock side, DevTools open state, strip visibility, window bounds, theme variant, and color mode.
+- **Recents**: an ordered, deduplicated list of **RecentEntry** records (a successfully loaded target URL plus its last-opened time), newest first, at most ten entries.
+- **Preferences (PersistedState)**: the single persisted record — current target, recents, DevTools dock side, DevTools open state, strip visibility, window bounds, theme variant, and color mode.
 - **Picker session**: the transient armed/disarmed state of element picking and the lifecycle of its highlight overlay.
 
 ## Success Criteria *(mandatory)*
