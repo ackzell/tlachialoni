@@ -35,6 +35,7 @@ export class AppWindow {
 
   private showLoading = false;
   private failed = false;
+  private failedUrl: string | null = null;
   private paletteOpen = false;
   private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
@@ -185,7 +186,9 @@ export class AppWindow {
     const { commands } = this;
     commands.register("palette.open", () => this.openPalette(""));
     commands.register("palette.close", () => this.closePalette());
-    commands.register("palette.editUrl", () => this.openPalette(this.currentUrl));
+    commands.register("palette.editUrl", (arg) =>
+      this.openPalette(typeof arg === "string" && arg.trim() ? arg : this.currentUrl),
+    );
     commands.register("target.navigate", (arg) => this.navigate(String(arg ?? "")));
     commands.register("strip.toggle", () => this.toggleStrip());
     commands.register("view.reload", () => this.siteView.webContents.reload());
@@ -216,6 +219,7 @@ export class AppWindow {
       this.reportLoading(true);
       this.siteView.webContents.reload();
     });
+    commands.register("failure.dismiss", () => this.dismissFailure());
     commands.register("window.close", () => this.win.close());
   }
 
@@ -310,6 +314,7 @@ export class AppWindow {
 
   private loadTarget(url: string): void {
     this.failed = false;
+    this.failedUrl = null;
     this.showLoading = true;
     this.requestedTarget = url;
     this.relayout();
@@ -349,9 +354,19 @@ export class AppWindow {
     if (this.requestedTarget && sameUrl(url, this.requestedTarget) === false) return;
     this.showLoading = false;
     this.failed = true;
+    this.failedUrl = url;
     this.closePalette();
     this.relayout();
-    this.sendToShell("viewport:failed", { url, reason });
+    // Offer a way back only when we actually have a different working target.
+    const previousUrl = this.currentUrl && !sameUrl(this.currentUrl, url) ? this.currentUrl : null;
+    this.sendToShell("viewport:failed", { url, reason, previousUrl });
+  }
+
+  /** Returns from the failure view to the last successfully loaded target. */
+  private dismissFailure(): void {
+    const previous = this.currentUrl;
+    if (!this.failedUrl || !previous || sameUrl(previous, this.failedUrl)) return;
+    this.loadTarget(previous);
   }
 
   private setLoading(loading: boolean): void {
@@ -365,7 +380,10 @@ export class AppWindow {
   }
 
   private reportLoading(loading: boolean): void {
-    this.sendToShell("viewport:loading", { loading });
+    this.sendToShell("viewport:loading", {
+      loading,
+      url: this.requestedTarget ?? this.currentUrl,
+    });
   }
 
   private openPalette(initial: string): void {

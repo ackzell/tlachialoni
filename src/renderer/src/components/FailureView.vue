@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps<{ url: string; reason: string }>();
+const props = defineProps<{ url: string; reason: string; previousUrl?: string | null }>();
 const api = window.localbrowser;
 
 const displayUrl = computed(() => props.url || "the current target");
@@ -11,7 +11,12 @@ function retry(): void {
 }
 
 function editUrl(): void {
-  void api.runCommand("palette.editUrl");
+  // Prefill the target that actually failed, not the last successful one.
+  void api.runCommand("palette.editUrl", props.url || undefined);
+}
+
+function goBack(): void {
+  void api.runCommand("failure.dismiss");
 }
 </script>
 
@@ -24,6 +29,7 @@ function editUrl(): void {
       <div class="failure__actions">
         <button class="failure__btn failure__btn--primary" @click="retry">Retry</button>
         <button class="failure__btn" @click="editUrl">Edit URL</button>
+        <button v-if="previousUrl" class="failure__btn" @click="goBack">Go Back</button>
       </div>
     </div>
   </div>

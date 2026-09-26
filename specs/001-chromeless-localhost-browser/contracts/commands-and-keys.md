@@ -25,6 +25,7 @@ focus, then dispatched through `command:run` semantics.
 | `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | Eight commands, one per mineral variant               |
 | `theme.cycleMode`      | Cycle Color Mode             | —                     | `system → dark → light`, persisted                    |
 | `failure.retry`        | Retry                        | (failure view button) | Shown only while the target is unreachable            |
+| `failure.dismiss`      | Go Back to Last Target       | (failure view button) | Returns to the last working target; hidden when none  |
 | `window.close`         | Close Window                 | —                     | Strip close button; no accelerator to avoid accidents |
 | `app.quit`             | Quit                         | `⌘Q`                  | OS-standard                                           |
 

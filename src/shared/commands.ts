@@ -146,6 +146,11 @@ export const COMMANDS: CommandDef[] = [
     palette: false,
   },
   {
+    id: "failure.dismiss",
+    label: "Go Back to Last Target",
+    palette: false,
+  },
+  {
     id: "window.close",
     label: "Close Window",
     palette: true,

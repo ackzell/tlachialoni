@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useShell } from "../composables/useShell";
+import { describeTarget } from "../utils/target";
 
-const { state } = useShell();
+const { loadingTarget } = useShell();
 
-const host = computed(() => {
-  try {
-    return state.value?.target ? new URL(state.value.target).host : "";
-  } catch {
-    return "";
-  }
-});
+const label = computed(() => describeTarget(loadingTarget.value).label);
 </script>
 
 <template>
   <div class="veil">
     <div class="veil__spinner" />
-    <p class="veil__label">Loading {{ host }}</p>
+    <p class="veil__label">Loading {{ label }}</p>
   </div>
 </template>
 
@@ -43,6 +38,10 @@ const host = computed(() => {
 
 .veil__label {
   margin: 0;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--lb-fg-muted);
   font-size: 12px;
 }

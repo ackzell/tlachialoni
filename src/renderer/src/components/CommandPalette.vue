@@ -130,7 +130,7 @@ function onKeydown(event: KeyboardEvent): void {
 
 .palette {
   width: min(640px, 90vw);
-  background: var(--lb-bg-elevated);
+  background: var(--lb-bg);
   border: 1px solid var(--lb-border);
   border-radius: 8px;
   box-shadow: 0 24px 60px rgb(0 0 0 / 45%);

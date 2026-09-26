@@ -11,7 +11,12 @@ const { state, loading, failed, paletteOpen, paletteInitial } = useShell();
 <template>
   <div class="shell-root">
     <LoadingVeil v-if="loading && !failed" />
-    <FailureView v-else-if="failed" :url="failed.url" :reason="failed.reason" />
+    <FailureView
+      v-else-if="failed"
+      :url="failed.url"
+      :reason="failed.reason"
+      :previous-url="failed.previousUrl"
+    />
     <DragStrip v-if="state?.stripVisible && !paletteOpen" />
     <CommandPalette v-if="paletteOpen" :initial="paletteInitial" />
   </div>

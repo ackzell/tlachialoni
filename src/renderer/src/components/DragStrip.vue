@@ -1,30 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useShell } from "../composables/useShell";
+import { describeTarget } from "../utils/target";
 
 const api = window.localbrowser;
 const { state, devtools } = useShell();
 
 const target = computed(() => state.value?.target ?? "");
-
-/** Host + path so deep routes are visible, e.g. localhost:3000/en/guide. */
-const label = computed(() => {
-  try {
-    const url = new URL(target.value);
-    const path = `${url.pathname}${url.search}`;
-    return path && path !== "/" ? `${url.host}${path}` : url.host;
-  } catch {
-    return target.value;
-  }
-});
-
-const secure = computed(() => {
-  try {
-    return new URL(target.value).protocol === "https:";
-  } catch {
-    return false;
-  }
-});
+const display = computed(() => describeTarget(target.value));
 
 function reload(): void {
   void api.runCommand("view.reload");
@@ -42,7 +25,13 @@ function close(): void {
 <template>
   <header class="strip">
     <div class="strip__target" :title="target">
-      <svg v-if="secure" class="strip__lock" viewBox="0 0 16 16" aria-label="https" role="img">
+      <svg
+        v-if="display.secure"
+        class="strip__lock"
+        viewBox="0 0 16 16"
+        aria-label="https"
+        role="img"
+      >
         <path
           d="M5 7V5a3 3 0 0 1 6 0v2"
           fill="none"
@@ -80,7 +69,7 @@ function close(): void {
           stroke-width="1.3"
         />
       </svg>
-      <span class="strip__host">{{ label }}</span>
+      <span class="strip__host">{{ display.label }}</span>
     </div>
     <div class="strip__actions">
       <button class="strip__btn" title="Reload" @click="reload">⟳</button>

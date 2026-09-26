@@ -23,12 +23,14 @@ export interface ShellState {
 export interface Failure {
   url: string;
   reason: string;
+  previousUrl?: string | null;
 }
 
 const api = window.localbrowser;
 
 const state = ref<ShellState | null>(null);
 const loading = ref(false);
+const loadingTarget = ref("");
 const failed = ref<Failure | null>(null);
 const paletteOpen = ref(false);
 const paletteInitial = ref("");
@@ -48,7 +50,14 @@ function init(): void {
     state.value = payload as ShellState;
   });
   api.on("viewport:loading", (payload) => {
-    loading.value = Boolean((payload as { loading: boolean }).loading);
+    const { loading: isLoading, url } = payload as { loading: boolean; url?: string };
+    loading.value = isLoading;
+    // A target load (launch/Retry/palette navigate) supersedes any failure view
+    // and names the incoming target in the veil.
+    if (isLoading) {
+      failed.value = null;
+      if (url) loadingTarget.value = url;
+    }
   });
   api.on("viewport:ready", () => {
     failed.value = null;
@@ -87,6 +96,7 @@ export function useShell() {
   return {
     state: readonly(state),
     loading: readonly(loading),
+    loadingTarget: readonly(loadingTarget),
     failed: readonly(failed),
     paletteOpen: readonly(paletteOpen),
     paletteInitial: readonly(paletteInitial),
