@@ -36,6 +36,7 @@ export class AppWindow {
   private showLoading = false;
   private failed = false;
   private paletteOpen = false;
+  private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
   private shellLoaded = false;
   private pendingShellMessages: Array<[string, unknown]> = [];
@@ -114,11 +115,16 @@ export class AppWindow {
     this.win.on("closed", () => {
       this.devtools.dispose();
       this.detachDevToolsInput();
+      nativeTheme.removeListener("updated", this.handleNativeThemeUpdated);
       // Views are not destroyed automatically with a BaseWindow.
       for (const view of [this.siteView, this.shellView]) {
         if (!view.webContents.isDestroyed()) view.webContents.close();
       }
     });
+
+    // While colorMode is "system", follow live OS dark/light switches so the
+    // shell and window background re-resolve without a restart (FR-017).
+    nativeTheme.on("updated", this.handleNativeThemeUpdated);
 
     this.siteView.webContents.on("before-input-event", this.handleInput);
     this.shellView.webContents.on("before-input-event", this.handleInput);
@@ -242,9 +248,20 @@ export class AppWindow {
   }
 
   setVariant(variant: VariantSlug): void {
+    this.previewVariantSlug = null;
     this.store.setVariant(variant);
     this.applyTheme();
     this.broadcastState();
+  }
+
+  /**
+   * Applies a variant transiently while the palette selection moves through the
+   * theme rows; it is never persisted and is dropped when the palette closes.
+   */
+  previewVariant(variant: VariantSlug | null): void {
+    if (!this.paletteOpen) return;
+    this.previewVariantSlug = variant;
+    this.pushTheme();
   }
 
   setColorMode(mode: ColorMode): void {
@@ -262,8 +279,11 @@ export class AppWindow {
 
   setPaletteVisible(open: boolean): void {
     this.paletteOpen = open;
+    if (!open) {
+      this.clearThemePreview();
+      this.siteView.webContents.focus();
+    }
     this.relayout();
-    if (!open) this.siteView.webContents.focus();
   }
 
   closeWindow(): void {
@@ -356,6 +376,7 @@ export class AppWindow {
   }
 
   private closePalette(): void {
+    this.clearThemePreview();
     this.paletteOpen = false;
     this.relayout();
     this.sendToShell("palette:close", {});
@@ -368,12 +389,34 @@ export class AppWindow {
     this.broadcastState();
   }
 
+  private readonly handleNativeThemeUpdated = (): void => {
+    // Only the system mode is runtime-following; explicit overrides must stick.
+    if (this.store.get().colorMode === "system") this.pushTheme();
+  };
+
   private applyTheme(): void {
+    nativeTheme.themeSource = this.store.get().colorMode;
+    this.pushTheme();
+  }
+
+  /** Dropped whenever the palette closes or a variant is committed. */
+  private clearThemePreview(): void {
+    if (this.previewVariantSlug === null) return;
+    this.previewVariantSlug = null;
+    this.pushTheme();
+  }
+
+  private activeVariant(): VariantSlug {
+    return this.previewVariantSlug ?? this.store.get().variant;
+  }
+
+  /** Pushes the active variant + resolved mode to the window background and shell. */
+  private pushTheme(): void {
+    if (this.win.isDestroyed()) return;
     const state = this.store.get();
-    nativeTheme.themeSource = state.colorMode;
     this.win.setBackgroundColor(this.backgroundColor());
     this.sendToShell("theme:apply", {
-      variant: state.variant,
+      variant: this.activeVariant(),
       colorMode: state.colorMode,
       resolved: this.resolvedMode(),
     });
@@ -386,7 +429,7 @@ export class AppWindow {
   }
 
   private backgroundColor(): string {
-    const tokens = TLAPALLI_TOKENS[this.store.get().variant] ?? TLAPALLI_TOKENS.obsidian;
+    const tokens = TLAPALLI_TOKENS[this.activeVariant()] ?? TLAPALLI_TOKENS.obsidian;
     return tokens[this.resolvedMode()]["--lb-bg"];
   }
 

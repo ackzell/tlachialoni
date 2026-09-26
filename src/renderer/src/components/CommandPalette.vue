@@ -12,7 +12,14 @@ const selected = ref(0);
 const error = ref("");
 const input = ref<HTMLInputElement | null>(null);
 
-const rows = computed<Row[]>(() => buildRows(query.value, state.value?.recents ?? []));
+const rows = computed<Row[]>(() =>
+  buildRows(
+    query.value,
+    state.value?.recents ?? [],
+    undefined,
+    state.value ? { variant: state.value.variant, colorMode: state.value.colorMode } : undefined,
+  ),
+);
 
 watch(rows, () => {
   selected.value = 0;
@@ -20,6 +27,15 @@ watch(rows, () => {
 watch(query, () => {
   error.value = "";
 });
+
+/** Live-previews the highlighted theme row; null restores the persisted variant. */
+function previewSelected(): void {
+  const row = rows.value[selected.value];
+  const match = row?.kind === "command" ? /^theme\.variant\.(.+)$/.exec(row.id) : null;
+  void api.previewVariant(match ? match[1] : null);
+}
+
+watch([selected, rows], previewSelected);
 
 onMounted(async () => {
   await nextTick();
@@ -179,6 +195,11 @@ function onKeydown(event: KeyboardEvent): void {
   color: var(--lb-fg-subtle);
   font-size: 12px;
   flex: none;
+}
+
+/* The hover fill lands near --lb-fg-subtle, so lift the meta on the active row. */
+.palette__row.is-selected .palette__meta {
+  color: var(--lb-fg-muted);
 }
 
 .palette__empty {

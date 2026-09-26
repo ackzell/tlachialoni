@@ -56,9 +56,44 @@ function pick(colors: Colors, keys: string[]): string {
   return "#000000";
 }
 
+/**
+ * Blends `from` toward `to` by `ratio`, preserving any 8-digit alpha. Used to
+ * make the raw line-number color legible as shell UI text.
+ */
+function blend(from: string, to: string, ratio: number): string {
+  const parse = (hex: string): [number, number, number, number] => {
+    const raw = hex.replace("#", "");
+    const alpha = raw.length === 8 ? parseInt(raw.slice(6, 8), 16) : 255;
+    return [
+      parseInt(raw.slice(0, 2), 16),
+      parseInt(raw.slice(2, 4), 16),
+      parseInt(raw.slice(4, 6), 16),
+      alpha,
+    ];
+  };
+  const a = parse(from);
+  const b = parse(to);
+  const channel = (index: number): string =>
+    Math.round(a[index] + (b[index] - a[index]) * ratio)
+      .toString(16)
+      .padStart(2, "0");
+  const alpha = Math.round(a[3] + (b[3] - a[3]) * ratio);
+  const rgb = `#${channel(0)}${channel(1)}${channel(2)}`;
+  return alpha === 255 ? rgb : `${rgb}${alpha.toString(16).padStart(2, "0")}`;
+}
+
+/**
+ * How far `--lb-fg-subtle` is pulled toward `--lb-fg`. The raw
+ * `editorLineNumber.foreground` is nearly invisible against the shell
+ * background, so we blend it toward the foreground: brighter in dark modes,
+ * darker in light modes, still dimmer than `--lb-fg-muted`.
+ */
+const SUBTLE_FG_MIX = 0.15;
+
 function tokensFor(colors: Colors): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [cssVar, keys] of Object.entries(ROLE_KEYS)) out[cssVar] = pick(colors, keys);
+  out["--lb-fg-subtle"] = blend(out["--lb-fg-subtle"], out["--lb-fg"], SUBTLE_FG_MIX);
   return out;
 }
 

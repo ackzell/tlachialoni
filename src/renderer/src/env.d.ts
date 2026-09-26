@@ -6,6 +6,7 @@ export interface LocalBrowserApi {
   validateTarget(input: string): Promise<{ ok: boolean; url?: string; reason?: string }>;
   setVariant(variant: string): Promise<unknown>;
   setColorMode(mode: string): Promise<unknown>;
+  previewVariant(variant: string | null): Promise<unknown>;
   setPaletteVisible(open: boolean): void;
   ready(): void;
   closeWindow(): Promise<unknown>;

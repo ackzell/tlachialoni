@@ -13,6 +13,7 @@ There are two bridges: the **shell** preload (Vue surfaces) and the **site** pre
 | `command:run` | invoke → | `{ id: string, arg?: unknown }` | Runs one command through the registry; returns `{ ok, reason? }` |
 | `target:validate` | invoke → | `{ input: string }` | Returns `{ ok, url?, reason? }` for palette inline feedback |
 | `theme:setVariant` | invoke → | `{ variant: VariantSlug }` | Persists and applies a variant |
+| `theme:previewVariant` | invoke → | `{ variant: VariantSlug \| null }` | Transiently previews a variant while the palette highlights theme rows; `null` restores the persisted one. Never persists |
 | `theme:setColorMode` | invoke → | `{ mode: 'system' \| 'dark' \| 'light' }` | Persists and applies a mode |
 | `picker:arm` / `picker:disarm` | invoke → | — | Controls the picker session |
 | `window:close` | invoke → | — | Closes the current window (strip close button) |

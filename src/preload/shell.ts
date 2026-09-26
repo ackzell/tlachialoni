@@ -25,6 +25,8 @@ const api = {
   validateTarget: (input: string) => ipcRenderer.invoke("target:validate", { input }),
   setVariant: (variant: string) => ipcRenderer.invoke("theme:setVariant", { variant }),
   setColorMode: (mode: string) => ipcRenderer.invoke("theme:setColorMode", { mode }),
+  previewVariant: (variant: string | null) =>
+    ipcRenderer.invoke("theme:previewVariant", { variant }),
   setPaletteVisible: (open: boolean) => ipcRenderer.send("palette:visibility", { open }),
   ready: () => ipcRenderer.send("shell:ready"),
   closeWindow: () => ipcRenderer.invoke("window:close"),

@@ -24,6 +24,11 @@ export function registerIpc(appWindow: AppWindow): void {
     return { ok: true };
   });
 
+  ipcMain.handle("theme:previewVariant", (_event, payload: { variant: VariantSlug | null }) => {
+    appWindow.previewVariant(payload.variant);
+    return { ok: true };
+  });
+
   ipcMain.handle("picker:arm", () => {
     appWindow.pickerArm();
   });

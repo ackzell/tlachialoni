@@ -31,10 +31,16 @@ export interface Row {
   arg?: string;
 }
 
+export interface ThemeFlags {
+  variant: string;
+  colorMode: string;
+}
+
 export function buildRows(
   query: string,
   recents: readonly { url: string }[],
   commands: CommandDef[] = PALETTE_COMMANDS,
+  theme?: ThemeFlags,
 ): Row[] {
   const rows: Row[] = [];
   const trimmed = query.trim();
@@ -64,11 +70,18 @@ export function buildRows(
     .sort((a, b) => b.score - a.score);
 
   for (const { command } of scored) {
+    let detail: string | undefined;
+    if (command.id === "theme.cycleMode" && theme) {
+      detail = `mode: ${theme.colorMode}`;
+    } else if (theme && command.id === `theme.variant.${theme.variant}`) {
+      detail = "current";
+    }
     rows.push({
       kind: "command",
       id: command.id,
       label: command.label,
       accelerator: command.acceleratorLabel,
+      detail,
     });
   }
 

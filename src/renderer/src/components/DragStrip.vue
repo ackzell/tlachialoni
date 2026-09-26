@@ -5,11 +5,24 @@ import { useShell } from "../composables/useShell";
 const api = window.localbrowser;
 const { state, devtools } = useShell();
 
-const host = computed(() => {
+const target = computed(() => state.value?.target ?? "");
+
+/** Host + path so deep routes are visible, e.g. localhost:3000/en/guide. */
+const label = computed(() => {
   try {
-    return state.value?.target ? new URL(state.value.target).host : "";
+    const url = new URL(target.value);
+    const path = `${url.pathname}${url.search}`;
+    return path && path !== "/" ? `${url.host}${path}` : url.host;
   } catch {
-    return "";
+    return target.value;
+  }
+});
+
+const secure = computed(() => {
+  try {
+    return new URL(target.value).protocol === "https:";
+  } catch {
+    return false;
   }
 });
 
@@ -28,7 +41,47 @@ function close(): void {
 
 <template>
   <header class="strip">
-    <span class="strip__host">{{ host }}</span>
+    <div class="strip__target" :title="target">
+      <svg v-if="secure" class="strip__lock" viewBox="0 0 16 16" aria-label="https" role="img">
+        <path
+          d="M5 7V5a3 3 0 0 1 6 0v2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linecap="round"
+        />
+        <rect
+          x="3.5"
+          y="7"
+          width="9"
+          height="6.5"
+          rx="1.2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+        />
+      </svg>
+      <svg v-else class="strip__lock" viewBox="0 0 16 16" aria-label="http" role="img">
+        <path
+          d="M5 7V5a3 3 0 0 1 5.7-1.4"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linecap="round"
+        />
+        <rect
+          x="3.5"
+          y="7"
+          width="9"
+          height="6.5"
+          rx="1.2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+        />
+      </svg>
+      <span class="strip__host">{{ label }}</span>
+    </div>
     <div class="strip__actions">
       <button class="strip__btn" title="Reload" @click="reload">⟳</button>
       <button
@@ -58,9 +111,26 @@ function close(): void {
   app-region: drag;
 }
 
-.strip__host {
+.strip__target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   padding-left: 6px;
-  color: var(--lb-fg-subtle);
+}
+
+.strip__lock {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--lb-fg-muted);
+}
+
+.strip__host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lb-fg);
   font-size: 12px;
 }
 
@@ -81,6 +151,7 @@ function close(): void {
   border-radius: 4px;
   color: var(--lb-fg-muted);
   cursor: pointer;
+  font-size: 0.8rem;
 }
 
 .strip__btn:hover {
