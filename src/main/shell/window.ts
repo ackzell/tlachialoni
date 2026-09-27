@@ -490,6 +490,7 @@ export class AppWindow {
     const { width, height } = this.win.getContentBounds();
     this.siteView.setBounds({ x: 0, y: 0, width, height });
 
+    // toggle this to true when you want to work on the loadingveil
     const overlayActive = this.paletteOpen || this.showLoading || this.failed;
     if (overlayActive) {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
