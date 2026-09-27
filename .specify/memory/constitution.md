@@ -79,6 +79,8 @@ source keeps the small UI coherent without a design system of its own.
   rejected specifically because neither docks Chromium DevTools in-window.
 - **Build**: electron-vite, scaffolded from its Vue + TypeScript template,
   which understands Electron's main/preload/renderer split.
+- **Packaging**: electron-builder turns the electron-vite `out/` build into the
+  macOS artifact; the app icon is generated from committed source art.
 - **Checks**: Vite+ supplies lint, format, and test through `vp check` and
   `vp test`. `vp dev` / `vp build` MUST NOT replace electron-vite's dev/build;
   Vite+ is a checks layer, not the app build.
@@ -98,6 +100,27 @@ source keeps the small UI coherent without a design system of its own.
 - Transient picker injection MUST clean up on selection, cancel, or navigation;
   no residual listeners or elements may remain.
 
+## Packaging & Distribution
+
+The tool MUST ship as a standalone macOS application that runs without the
+repository: an installable artifact (`/Applications/tlachialoni.app`) launched by
+double-click, produced by one documented command from a clean checkout. Packaging
+is a first-class build target, not an afterthought.
+
+- The app bundle MUST carry the product name, version, identifier, and icon from
+  a single source of truth; the same metadata drives the bundle, the menu, and
+  the About panel.
+- Runtime assets the app reads (icon, theme tokens, fonts) MUST be bundled into
+  the artifact; the packaged app MUST NOT read them from the source tree or the
+  network.
+- The default pipeline MAY produce an ad-hoc/unsigned artifact for local use, but
+  it MUST leave room for Developer ID signing and notarization without
+  restructuring.
+
+Rationale: a tool that only runs from its own repository is a project, not a
+tool. Deferring packaging was correct while the interaction model was unproven;
+it is now proven, so shipping is part of the product.
+
 ## Development Workflow
 
 - Spec Kit drives development: constitution → `/speckit.specify` → clarify →
@@ -105,9 +128,9 @@ source keeps the small UI coherent without a design system of its own.
 - Risk retirement is spike-first. The docked-DevTools-in-a-frameless-window
   proof MUST succeed before UI is built on top of the architecture. If the
   architecture assumption fails, the fallback is documented before proceeding.
-- The repository is MIT-licensed and runs from source (`npm run dev`).
-  Packaging, code signing, and distribution are explicitly deferred until the
-  interaction model is proven.
+- The repository is MIT-licensed. The app runs from source (`npm run dev`)
+  during development and MUST also be packageable into a standalone artifact
+  (see Packaging & Distribution).
 - All changes MUST pass `vp check`, and `vp test` where tests exist, before
   commit.
 
@@ -122,4 +145,4 @@ source keeps the small UI coherent without a design system of its own.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.0.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-25
+**Version**: 2.1.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-27
