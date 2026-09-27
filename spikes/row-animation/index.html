@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Row animation spike</title>
+    <style>
+      /* Mirrors the real palette list so layout behavior is comparable. */
+      body {
+        margin: 0;
+        background: #100d0b;
+        color: #e6ded4;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      #panel {
+        width: 640px;
+        margin: 40px auto;
+        background: #100d0b;
+        border: 1px solid #2c2723;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      #query {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 14px 16px;
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid #2c2723;
+        color: #e6ded4;
+        font: inherit;
+        font-size: 14px;
+        outline: none;
+      }
+      .palette__list {
+        margin: 0;
+        padding: 6px;
+        list-style: none;
+        max-height: 46vh;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+      }
+      .palette__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        color: #a89e92;
+      }
+      .palette__row.is-selected {
+        background: #241f1b;
+        color: #e6ded4;
+      }
+      .palette__empty {
+        padding: 10px;
+        color: #6f665c;
+      }
+
+      /* Candidate transition/hover vocabulary, matching 004's tokens. */
+      .palette__row {
+        transition:
+          background-color 160ms cubic-bezier(0.2, 0, 0, 1),
+          color 160ms cubic-bezier(0.2, 0, 0, 1);
+      }
+      .palette-row-enter-active {
+        transition:
+          opacity 160ms cubic-bezier(0.2, 0, 0, 1),
+          transform 160ms cubic-bezier(0.2, 0, 0, 1);
+      }
+      .palette-row-enter-from {
+        opacity: 0;
+        transform: translateY(2px);
+      }
+      .palette-row-leave-active {
+        transition: opacity 160ms cubic-bezier(0.4, 0, 1, 1);
+        pointer-events: none;
+      }
+      .palette-row-leave-to {
+        opacity: 0;
+      }
+      .palette-row-move {
+        transition: transform 160ms cubic-bezier(0.2, 0, 0, 1);
+      }
+      @keyframes row-in {
+        from {
+          opacity: 0;
+          transform: translateY(2px);
+        }
+      }
+      .row-in {
+        animation: row-in 160ms cubic-bezier(0.2, 0, 0, 1);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <input id="query" placeholder="Type to filter commands" spellcheck="false" />
+      <div id="mount"></div>
+    </div>
+    <script type="module" src="./harness.js"></script>
+  </body>
+</html>
