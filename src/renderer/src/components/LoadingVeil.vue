@@ -24,14 +24,14 @@ const label = computed(() => describeTarget(loadingTarget.value).label);
   gap: 14px;
   align-items: center;
   justify-content: center;
-  background: var(--lb-bg);
+  background: var(--tb-bg);
 }
 
 .veil__spinner {
   width: 26px;
   height: 26px;
-  border: 2px solid var(--lb-border);
-  border-top-color: var(--lb-progress);
+  border: 2px solid var(--tb-border);
+  border-top-color: var(--tb-progress);
   border-radius: 50%;
   animation: veil-spin 0.8s linear infinite;
 }
@@ -42,7 +42,7 @@ const label = computed(() => describeTarget(loadingTarget.value).label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
   font-size: 12px;
 }
 

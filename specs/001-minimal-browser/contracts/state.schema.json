@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://localbrowser.local/contracts/state.schema.json",
-  "title": "localbrowser persisted state",
+  "$id": "https://tlachialoni.local/contracts/state.schema.json",
+  "title": "tlachialoni persisted state",
   "description": "Single JSON document stored in app.getPath('userData'). Written atomically (temp file + fsync + rename). Multiple instances may read and write concurrently; see concurrency rules in data-model.md.",
   "type": "object",
   "additionalProperties": false,

@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { useShell } from "../composables/useShell";
 import { describeTarget } from "../utils/target";
 
-const api = window.localbrowser;
+const api = window.tlachialoni;
 const { state, devtools } = useShell();
 
 const target = computed(() => state.value?.target ?? "");
@@ -93,8 +93,8 @@ function close(): void {
   align-items: center;
   justify-content: space-between;
   padding: 0 8px;
-  background: var(--lb-bg-elevated);
-  border-bottom: 1px solid var(--lb-border);
+  background: var(--tb-bg-elevated);
+  border-bottom: 1px solid var(--tb-border);
   user-select: none;
   -webkit-app-region: drag;
   app-region: drag;
@@ -112,14 +112,14 @@ function close(): void {
   width: 13px;
   height: 13px;
   flex: none;
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
 }
 
 .strip__host {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--lb-fg);
+  color: var(--tb-fg);
   font-size: 12px;
 }
 
@@ -138,18 +138,18 @@ function close(): void {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
   cursor: pointer;
   font-size: 0.8rem;
 }
 
 .strip__btn:hover {
-  background: var(--lb-hover);
-  color: var(--lb-fg);
+  background: var(--tb-hover);
+  color: var(--tb-fg);
 }
 
 .strip__btn.is-active {
-  color: var(--lb-accent);
-  border-color: var(--lb-border);
+  color: var(--tb-accent);
+  border-color: var(--tb-border);
 }
 </style>

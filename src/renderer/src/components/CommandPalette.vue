@@ -4,7 +4,7 @@ import { buildRows, type Row } from "../composables/useCommands";
 import { closePalette, useShell } from "../composables/useShell";
 
 const props = defineProps<{ initial: string }>();
-const api = window.localbrowser;
+const api = window.tlachialoni;
 const { state } = useShell();
 
 const query = ref(props.initial);
@@ -123,15 +123,15 @@ function onKeydown(event: KeyboardEvent): void {
   justify-content: center;
   align-items: flex-start;
   padding-top: 12vh;
-  background: color-mix(in srgb, var(--lb-bg) 45%, transparent);
+  background: color-mix(in srgb, var(--tb-bg) 45%, transparent);
   backdrop-filter: blur(2px);
   user-select: none;
 }
 
 .palette {
   width: min(640px, 90vw);
-  background: var(--lb-bg);
-  border: 1px solid var(--lb-border);
+  background: var(--tb-bg);
+  border: 1px solid var(--tb-border);
   border-radius: 8px;
   box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
   overflow: hidden;
@@ -143,21 +143,21 @@ function onKeydown(event: KeyboardEvent): void {
   padding: 14px 16px;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--lb-border);
+  border-bottom: 1px solid var(--tb-border);
   outline: none;
-  color: var(--lb-fg);
+  color: var(--tb-fg);
   font: inherit;
   font-size: 14px;
 }
 
 .palette__input::placeholder {
-  color: var(--lb-fg-subtle);
+  color: var(--tb-fg-subtle);
 }
 
 .palette__error {
   margin: 0;
   padding: 8px 16px;
-  color: var(--lb-error);
+  color: var(--tb-error);
   font-size: 12px;
 }
 
@@ -176,13 +176,13 @@ function onKeydown(event: KeyboardEvent): void {
   gap: 12px;
   padding: 8px 10px;
   border-radius: 6px;
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
   cursor: default;
 }
 
 .palette__row.is-selected {
-  background: var(--lb-hover);
-  color: var(--lb-fg);
+  background: var(--tb-hover);
+  color: var(--tb-fg);
 }
 
 .palette__label {
@@ -192,19 +192,19 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .palette__meta {
-  color: var(--lb-fg-subtle);
+  color: var(--tb-fg-subtle);
   font-size: 12px;
   flex: none;
 }
 
-/* The hover fill lands near --lb-fg-subtle, so lift the meta on the active row. */
+/* The hover fill lands near --tb-fg-subtle, so lift the meta on the active row. */
 .palette__row.is-selected .palette__meta {
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
 }
 
 .palette__empty {
   padding: 10px;
-  color: var(--lb-fg-subtle);
+  color: var(--tb-fg-subtle);
   font-size: 12px;
 }
 </style>

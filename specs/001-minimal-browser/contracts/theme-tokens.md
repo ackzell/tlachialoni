@@ -8,26 +8,26 @@ generated into a committed module; nothing else in the app may hard-code a color
 
 | Variable           | Role                              | Tlapalli source (VSCode key)  |
 | ------------------ | --------------------------------- | ----------------------------- |
-| `--lb-bg`          | App/canvas background             | `editor.background`           |
-| `--lb-bg-elevated` | Elevated surface (palette, strip) | `editorWidget.background`     |
-| `--lb-surface`     | Control fill                      | `button.background`           |
-| `--lb-fg`          | Primary text                      | `editor.foreground`           |
-| `--lb-fg-muted`    | Secondary text                    | `descriptionForeground`       |
-| `--lb-fg-subtle`   | De-emphasized text                | `editorLineNumber.foreground`, blended (see below) |
-| `--lb-border`      | Hairlines and dividers            | `panel.border`                |
-| `--lb-accent`      | Links / active text               | `textLink.foreground`         |
-| `--lb-signature`   | Brand accent swatch / focus ring  | `activityBarBadge.background` |
-| `--lb-selection`   | Selected row / text selection     | `editor.selectionBackground`  |
-| `--lb-hover`       | Hover fill                        | `list.hoverBackground`        |
-| `--lb-error`       | Error text / failure view accent  | `list.errorForeground`        |
-| `--lb-progress`    | Loading indicator                 | `progressBar.background`      |
+| `--tb-bg`          | App/canvas background             | `editor.background`           |
+| `--tb-bg-elevated` | Elevated surface (palette, strip) | `editorWidget.background`     |
+| `--tb-surface`     | Control fill                      | `button.background`           |
+| `--tb-fg`          | Primary text                      | `editor.foreground`           |
+| `--tb-fg-muted`    | Secondary text                    | `descriptionForeground`       |
+| `--tb-fg-subtle`   | De-emphasized text                | `editorLineNumber.foreground`, blended (see below) |
+| `--tb-border`      | Hairlines and dividers            | `panel.border`                |
+| `--tb-accent`      | Links / active text               | `textLink.foreground`         |
+| `--tb-signature`   | Brand accent swatch / focus ring  | `activityBarBadge.background` |
+| `--tb-selection`   | Selected row / text selection     | `editor.selectionBackground`  |
+| `--tb-hover`       | Hover fill                        | `list.hoverBackground`        |
+| `--tb-error`       | Error text / failure view accent  | `list.errorForeground`        |
+| `--tb-progress`    | Loading indicator                 | `progressBar.background`      |
 
 Notes: `focusBorder` is unusable as a ring (it equals the background), hence
-`--lb-signature` for focus. Alpha values are 8-digit `#RRGGBBAA` and are valid CSS
-as-is. `--lb-fg-subtle` is blended toward `--lb-fg` (`SUBTLE_FG_MIX` in the
+`--tb-signature` for focus. Alpha values are 8-digit `#RRGGBBAA` and are valid CSS
+as-is. `--tb-fg-subtle` is blended toward `--tb-fg` (`SUBTLE_FG_MIX` in the
 generator) because the raw `editorLineNumber.foreground` is nearly invisible as
 small shell text; the blend brightens dark modes, darkens light modes, and stays
-dimmer than `--lb-fg-muted`. Where the consolidated source does not expose a key,
+dimmer than `--tb-fg-muted`. Where the consolidated source does not expose a key,
 fall back to the VSCode `colors` map from
 `themes/tlapalli-<slug>[-light]-theme.json`.
 

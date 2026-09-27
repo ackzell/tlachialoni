@@ -61,7 +61,7 @@ export class AppWindow {
       transparent: false,
       backgroundColor: this.backgroundColor(),
       show: false,
-      title: "localbrowser",
+      title: "Tlachialoni",
     });
 
     this.siteView = createSiteView({
@@ -69,7 +69,7 @@ export class AppWindow {
       onReady: (url) => this.handleReady(url),
       onNavigated: (url) => this.handleNavigated(url),
       onFailed: (url, reason) => this.handleFailed(url, reason),
-      onTitle: (title) => this.win.setTitle(title ? `${title} — localbrowser` : "localbrowser"),
+      onTitle: (title) => this.win.setTitle(title ? `${title} — Tlachialoni` : "Tlachialoni"),
     });
 
     this.shellView = createShellView();
@@ -453,7 +453,7 @@ export class AppWindow {
 
   private backgroundColor(): string {
     const tokens = TLAPALLI_TOKENS[this.activeVariant()] ?? TLAPALLI_TOKENS.obsidian;
-    return tokens[this.resolvedMode()]["--lb-bg"];
+    return tokens[this.resolvedMode()]["--tb-bg"];
   }
 
   private broadcastState(): void {

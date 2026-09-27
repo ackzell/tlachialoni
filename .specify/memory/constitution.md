@@ -1,4 +1,4 @@
-# localbrowser Constitution
+# Tlachialoni Constitution
 
 ## Core Principles
 

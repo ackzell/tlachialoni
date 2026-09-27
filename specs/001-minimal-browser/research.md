@@ -1,4 +1,4 @@
-# Phase 0 Research: Chromeless Localhost Browser
+# Phase 0 Research: Minimal Browser
 
 Consolidated decisions from the design interview plus targeted Electron 44 and
 Tlapalli investigation. Each section states the decision, why, and what was
@@ -216,7 +216,7 @@ rejected. Items marked **(verify in M0)** are assumptions the spike must confirm
 ## Open items to confirm during implementation
 
 1. **RESOLVED (M0 spike PASS)**: docked DevTools work inside a `WebContentsView` on
-   frameless macOS. Measured with `LOCALBROWSER_DOCK_TEST=1`: baseline page viewport
+   frameless macOS. Measured with `TLACHIALONI_DOCK_TEST=1`: baseline page viewport
    1440×900; `mode: 'bottom'` shrinks the page to 600 tall (Δ300); `mode: 'right'`
    shrinks it to 885 wide (Δ555). Switching sides uses close + reopen and works.
    No fallback needed.

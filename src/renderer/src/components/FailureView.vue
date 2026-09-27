@@ -2,7 +2,7 @@
 import { computed } from "vue";
 
 const props = defineProps<{ url: string; reason: string; previousUrl?: string | null }>();
-const api = window.localbrowser;
+const api = window.tlachialoni;
 
 const displayUrl = computed(() => props.url || "the current target");
 
@@ -41,7 +41,7 @@ function goBack(): void {
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--lb-bg);
+  background: var(--tb-bg);
 }
 
 .failure__card {
@@ -52,8 +52,8 @@ function goBack(): void {
   width: min(440px, 88vw);
   padding: 28px 24px;
   text-align: center;
-  background: var(--lb-bg-elevated);
-  border: 1px solid var(--lb-border);
+  background: var(--tb-bg-elevated);
+  border: 1px solid var(--tb-border);
   border-radius: 10px;
 }
 
@@ -61,19 +61,19 @@ function goBack(): void {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: var(--lb-fg);
+  color: var(--tb-fg);
 }
 
 .failure__url {
   margin: 0;
-  color: var(--lb-accent);
+  color: var(--tb-accent);
   font-size: 12px;
   word-break: break-all;
 }
 
 .failure__reason {
   margin: 0;
-  color: var(--lb-fg-muted);
+  color: var(--tb-fg-muted);
   font-size: 12px;
 }
 
@@ -85,19 +85,19 @@ function goBack(): void {
 
 .failure__btn {
   padding: 6px 14px;
-  background: var(--lb-surface);
-  border: 1px solid var(--lb-border);
+  background: var(--tb-surface);
+  border: 1px solid var(--tb-border);
   border-radius: 6px;
-  color: var(--lb-fg);
+  color: var(--tb-fg);
   cursor: pointer;
 }
 
 .failure__btn:hover {
-  background: var(--lb-hover);
+  background: var(--tb-hover);
 }
 
 .failure__btn--primary {
-  color: var(--lb-accent);
-  border-color: var(--lb-signature);
+  color: var(--tb-accent);
+  border-color: var(--tb-signature);
 }
 </style>

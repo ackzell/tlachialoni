@@ -15,7 +15,7 @@ body {
 body {
   font-family: "Source Code Pro Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
-  color: var(--lb-fg, #a7a7a7);
+  color: var(--tb-fg, #a7a7a7);
   -webkit-font-smoothing: antialiased;
 }
 

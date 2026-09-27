@@ -8,8 +8,8 @@ import { runDockSelfTest, runUiSnapshot } from "./dock-test";
 let mainWindow: AppWindow | null = null;
 
 // Keep automated checks away from the user's real state.
-if (process.env.LOCALBROWSER_DOCK_TEST === "1" || process.env.LOCALBROWSER_UI_SNAPSHOT === "1") {
-  app.setPath("userData", path.join(os.tmpdir(), `localbrowser-docktest-${process.pid}`));
+if (process.env.TLACHIALONI_DOCK_TEST === "1" || process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
+  app.setPath("userData", path.join(os.tmpdir(), `tlachialoni-docktest-${process.pid}`));
 }
 
 /** Commands whose accelerators live on the menu so they work from any panel. */
@@ -68,11 +68,11 @@ app.whenReady().then(async () => {
   mainWindow = new AppWindow();
   mainWindow.show();
 
-  if (process.env.LOCALBROWSER_DOCK_TEST === "1") {
+  if (process.env.TLACHIALONI_DOCK_TEST === "1") {
     await runDockSelfTest(mainWindow);
-    if (process.env.LOCALBROWSER_GRACEFUL === "1") app.quit();
+    if (process.env.TLACHIALONI_GRACEFUL === "1") app.quit();
     else app.exit(0);
-  } else if (process.env.LOCALBROWSER_UI_SNAPSHOT === "1") {
+  } else if (process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
     await runUiSnapshot(mainWindow);
     app.exit(0);
   }

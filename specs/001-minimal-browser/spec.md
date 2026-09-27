@@ -1,6 +1,6 @@
-# Feature Specification: Chromeless Localhost Browser
+# Feature Specification: Minimal Browser
 
-**Feature Branch**: `001-chromeless-localhost-browser`
+**Feature Branch**: `001-minimal-browser`
 
 **Created**: 2026-09-25
 
@@ -272,5 +272,5 @@ renders.
 - The tool runs from source through the project's development command; packaging, signing, and distribution are deferred.
 - Users are developers running local http/https development servers, commonly on ports such as 3000 or 5173. The tool serves only local targets (loopback, private network ranges, and dev hostnames); public internet addresses are out of scope.
 - Applications under development bring their own framework-specific DevTools (for example, a Vue integration); the tool does not bundle or inject any.
-- The repository is MIT-licensed with a README; the project is named `localbrowser` and may be renamed later.
+- The repository is MIT-licensed with a README; the project is named `tlachialoni` and may be renamed later.
 - Each window renders one target; tabs and auto-update are out of scope. Multiple independent instances are supported so parallel related projects can be open at once (see FR-023).

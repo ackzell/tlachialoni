@@ -33,6 +33,6 @@ const api = {
   on: subscribe,
 };
 
-contextBridge.exposeInMainWorld("localbrowser", api);
+contextBridge.exposeInMainWorld("tlachialoni", api);
 
-export type LocalBrowserApi = typeof api;
+export type TlachialoniApi = typeof api;

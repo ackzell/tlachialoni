@@ -24,19 +24,19 @@ const SLUGS = [
 
 /** CSS variable -> ordered candidate VSCode color keys. */
 const ROLE_KEYS: Record<string, string[]> = {
-  "--lb-bg": ["editor.background"],
-  "--lb-bg-elevated": ["editorWidget.background", "editor.background"],
-  "--lb-surface": ["button.background", "badge.background", "editorWidget.background"],
-  "--lb-fg": ["editor.foreground"],
-  "--lb-fg-muted": ["descriptionForeground", "editor.foreground"],
-  "--lb-fg-subtle": ["editorLineNumber.foreground", "descriptionForeground"],
-  "--lb-border": ["panel.border", "sideBar.border", "editorGroup.border"],
-  "--lb-accent": ["textLink.foreground", "editor.foreground"],
-  "--lb-signature": ["activityBarBadge.background", "button.background"],
-  "--lb-selection": ["editor.selectionBackground"],
-  "--lb-hover": ["list.hoverBackground", "editor.selectionBackground"],
-  "--lb-error": ["list.errorForeground", "errorForeground"],
-  "--lb-progress": ["progressBar.background", "activityBarBadge.background"],
+  "--tb-bg": ["editor.background"],
+  "--tb-bg-elevated": ["editorWidget.background", "editor.background"],
+  "--tb-surface": ["button.background", "badge.background", "editorWidget.background"],
+  "--tb-fg": ["editor.foreground"],
+  "--tb-fg-muted": ["descriptionForeground", "editor.foreground"],
+  "--tb-fg-subtle": ["editorLineNumber.foreground", "descriptionForeground"],
+  "--tb-border": ["panel.border", "sideBar.border", "editorGroup.border"],
+  "--tb-accent": ["textLink.foreground", "editor.foreground"],
+  "--tb-signature": ["activityBarBadge.background", "button.background"],
+  "--tb-selection": ["editor.selectionBackground"],
+  "--tb-hover": ["list.hoverBackground", "editor.selectionBackground"],
+  "--tb-error": ["list.errorForeground", "errorForeground"],
+  "--tb-progress": ["progressBar.background", "activityBarBadge.background"],
 };
 
 type Colors = Record<string, string>;
@@ -83,17 +83,17 @@ function blend(from: string, to: string, ratio: number): string {
 }
 
 /**
- * How far `--lb-fg-subtle` is pulled toward `--lb-fg`. The raw
+ * How far `--tb-fg-subtle` is pulled toward `--tb-fg`. The raw
  * `editorLineNumber.foreground` is nearly invisible against the shell
  * background, so we blend it toward the foreground: brighter in dark modes,
- * darker in light modes, still dimmer than `--lb-fg-muted`.
+ * darker in light modes, still dimmer than `--tb-fg-muted`.
  */
 const SUBTLE_FG_MIX = 0.15;
 
 function tokensFor(colors: Colors): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [cssVar, keys] of Object.entries(ROLE_KEYS)) out[cssVar] = pick(colors, keys);
-  out["--lb-fg-subtle"] = blend(out["--lb-fg-subtle"], out["--lb-fg"], SUBTLE_FG_MIX);
+  out["--tb-fg-subtle"] = blend(out["--tb-fg-subtle"], out["--tb-fg"], SUBTLE_FG_MIX);
   return out;
 }
 

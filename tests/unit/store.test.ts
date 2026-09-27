@@ -13,7 +13,7 @@ import { StateStore } from "../../src/main/state/store";
 
 const tmpDirs: string[] = [];
 function tmpFile(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "localbrowser-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tlachialoni-"));
   tmpDirs.push(dir);
   return path.join(dir, "state.json");
 }

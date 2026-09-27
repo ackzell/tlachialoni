@@ -12,7 +12,7 @@ let box: HTMLDivElement | null = null;
 function ensureBox(): void {
   if (box) return;
   box = document.createElement("div");
-  box.setAttribute("data-localbrowser-picker", "");
+  box.setAttribute("data-tlachialoni-picker", "");
   Object.assign(box.style, {
     position: "fixed",
     zIndex: "2147483647",

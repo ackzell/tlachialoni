@@ -22,6 +22,6 @@ describe("Tlapalli tokens", () => {
   });
 
   it("gives obsidian a monochrome background", () => {
-    expect(TLAPALLI_TOKENS.obsidian.dark["--lb-bg"]).toBe("#020202");
+    expect(TLAPALLI_TOKENS.obsidian.dark["--tb-bg"]).toBe("#020202");
   });
 });

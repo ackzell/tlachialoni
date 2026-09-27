@@ -26,7 +26,7 @@ export interface Failure {
   previousUrl?: string | null;
 }
 
-const api = window.localbrowser;
+const api = window.tlachialoni;
 
 const state = ref<ShellState | null>(null);
 const loading = ref(false);

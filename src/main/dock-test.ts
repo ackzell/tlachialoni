@@ -28,7 +28,7 @@ interface Measurement {
 /**
  * M0 spike gate. Proves DevTools dock *inside* the window: a docked panel shrinks
  * the page viewport, a detached one does not. Also reads the DevTools front-end
- * dock state as a second signal. Run with LOCALBROWSER_DOCK_TEST=1.
+ * dock state as a second signal. Run with TLACHIALONI_DOCK_TEST=1.
  */
 export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
   const wc = appWindow.siteView.webContents;
@@ -111,7 +111,7 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
     // Picker overlay lifecycle (FR-013): injected only while armed.
     const count = () =>
       wc.executeJavaScript(
-        "document.querySelectorAll('[data-localbrowser-picker]').length",
+        "document.querySelectorAll('[data-tlachialoni-picker]').length",
       ) as Promise<number>;
     appWindow.pickerArm();
     await wait(300);
@@ -141,16 +141,16 @@ export type { WebContentsView };
 
 /**
  * Captures the shell surfaces to PNGs so the UI can be reviewed without a human
- * at the screen. Run with LOCALBROWSER_UI_SNAPSHOT=1.
+ * at the screen. Run with TLACHIALONI_UI_SNAPSHOT=1.
  */
 export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
-  const out = process.env.LOCALBROWSER_SNAPSHOT_DIR ?? "/tmp";
+  const out = process.env.TLACHIALONI_SNAPSHOT_DIR ?? "/tmp";
   const shell = appWindow.shellView.webContents;
 
   for (let i = 0; i < 50 && !appWindow.isShellReady(); i++) await wait(100);
 
   // Load a live target so the failure view does not mask the other surfaces.
-  appWindow.navigate(process.env.LOCALBROWSER_SNAPSHOT_TARGET ?? "http://localhost:4321");
+  appWindow.navigate(process.env.TLACHIALONI_SNAPSHOT_TARGET ?? "http://localhost:4321");
   await wait(1600);
   const mainTarget = appWindow.getState().target;
 
@@ -163,7 +163,7 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
   appWindow.setVariant("jade");
   const paletteResult = await appWindow.runCommand("palette.open");
   await wait(1200);
-  fs.writeFileSync(`${out}/localbrowser-palette.png`, (await shell.capturePage()).toPNG());
+  fs.writeFileSync(`${out}/tlachialoni-palette.png`, (await shell.capturePage()).toPNG());
   const paletteMounted = await probe(".palette");
 
   // Strip only.
@@ -171,7 +171,7 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
   await wait(300);
   await appWindow.runCommand("strip.toggle");
   await wait(500);
-  fs.writeFileSync(`${out}/localbrowser-strip.png`, (await shell.capturePage()).toPNG());
+  fs.writeFileSync(`${out}/tlachialoni-strip.png`, (await shell.capturePage()).toPNG());
   const stripMounted = await probe(".strip");
   const stripText = (await shell.executeJavaScript(
     "document.querySelector('.strip__host') ? document.querySelector('.strip__host').textContent : null",
@@ -180,13 +180,13 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
   // Light mode strip.
   appWindow.setColorMode("light");
   await wait(500);
-  fs.writeFileSync(`${out}/localbrowser-strip-light.png`, (await shell.capturePage()).toPNG());
+  fs.writeFileSync(`${out}/tlachialoni-strip-light.png`, (await shell.capturePage()).toPNG());
   appWindow.setColorMode("dark");
 
   // Failure view: point at a port with nothing listening.
   appWindow.navigate("http://localhost:4599");
   await wait(2200);
-  fs.writeFileSync(`${out}/localbrowser-failure.png`, (await shell.capturePage()).toPNG());
+  fs.writeFileSync(`${out}/tlachialoni-failure.png`, (await shell.capturePage()).toPNG());
   const failureMounted = await probe(".failure");
 
   process.stdout.write(

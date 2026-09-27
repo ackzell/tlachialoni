@@ -1,4 +1,4 @@
-# Quickstart Validation Guide: Chromeless Localhost Browser
+# Quickstart Validation Guide: Minimal Browser
 
 How to run the app and prove the feature works end to end. This is a validation
 guide, not an implementation guide; see `plan.md` for structure and `data-model.md`

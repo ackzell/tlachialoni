@@ -1,8 +1,8 @@
-# Implementation Plan: Chromeless Localhost Browser
+# Implementation Plan: Minimal Browser
 
-**Branch**: `001-chromeless-localhost-browser` | **Date**: 2026-09-25 | **Spec**: `specs/001-chromeless-localhost-browser/spec.md`
+**Branch**: `001-minimal-browser` | **Date**: 2026-09-25 | **Spec**: `specs/001-minimal-browser/spec.md`
 
-**Input**: Feature specification from `/specs/001-chromeless-localhost-browser/spec.md`
+**Input**: Feature specification from `/specs/001-minimal-browser/spec.md`
 
 ## Summary
 
@@ -75,7 +75,7 @@ Tracking.
 ### Documentation (this feature)
 
 ```text
-specs/001-chromeless-localhost-browser/
+specs/001-minimal-browser/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
@@ -88,7 +88,7 @@ specs/001-chromeless-localhost-browser/
 ### Source Code (repository root)
 
 ```text
-localbrowser/
+tlachialoni/
 ├── electron.vite.config.ts          # main / preload / renderer build config
 ├── package.json                     # scripts: dev, build, preview, check, test
 ├── tsconfig.json / tsconfig.node.json / tsconfig.web.json

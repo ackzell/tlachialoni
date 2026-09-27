@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-export interface LocalBrowserApi {
+export interface TlachialoniApi {
   getState(): Promise<unknown>;
   runCommand(id: string, arg?: unknown): Promise<{ ok: boolean; reason?: string }>;
   validateTarget(input: string): Promise<{ ok: boolean; url?: string; reason?: string }>;
@@ -15,6 +15,6 @@ export interface LocalBrowserApi {
 
 declare global {
   interface Window {
-    localbrowser: LocalBrowserApi;
+    tlachialoni: TlachialoniApi;
   }
 }

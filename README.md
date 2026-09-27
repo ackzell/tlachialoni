@@ -1,8 +1,9 @@
-# localbrowser
+# Tlachialoni
 
-A chromeless local browser for frontend development: one frameless window that
-renders a local dev server edge-to-edge with real Chromium DevTools docked inside
-the same window — and essentially no other browser chrome.
+Tlachialoni — from Nahuatl, "a device for viewing, for seeing" — is a minimal
+local browser for frontend development: one frameless window that renders a local
+dev server edge-to-edge with real Chromium DevTools docked inside the same window
+— and essentially no other browser chrome.
 
 The only UI is transient and keyboard-first:
 
@@ -41,8 +42,8 @@ This project is built spec-first with [Spec Kit](https://github.com/github/spec-
 See:
 
 - `.specify/memory/constitution.md` — project principles
-- `specs/001-chromeless-localhost-browser/spec.md` — the feature specification
-- `specs/001-chromeless-localhost-browser/plan.md` and `tasks.md`
+- `specs/001-minimal-browser/spec.md` — the feature specification
+- `specs/001-minimal-browser/plan.md` and `tasks.md`
 
 ## License
 

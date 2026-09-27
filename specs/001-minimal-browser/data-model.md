@@ -1,4 +1,4 @@
-# Phase 1 Data Model: Chromeless Localhost Browser
+# Phase 1 Data Model: Minimal Browser
 
 All persisted state lives in one JSON document (see `contracts/state.schema.json`).
 Entities below describe fields, validation, and transitions. Values are
