@@ -25,11 +25,11 @@ npm run dev
 | S6 | Reload / hard reload / back / forward + editable guard | FR-010, FR-011 | PASS *(manual)* | `⌘R` reloads; `⇧⌘R` bypasses cache (normal reload served `200 (from service worker)`, hard reload hit the network `304`); `⌘←/⌘→` move through history; `⌘←/⌘→` move the caret inside a focused page field. Findings: the loading veil is now a target-load indicator only, so page-initiated reloads/link clicks never cover the view (see Handoff); mouse back/forward thumb buttons navigate history (macOS delivers them as `swipe` events, Windows/Linux via `app-command`). |
 | S7 | Theming: 8 variants, system dark/light + override, DevTools follow | FR-016–FR-018, SC-006 | PASS *(manual)* | Checks 1–6 PASS. All 8 variants re-skin every shell surface instantly from the palette (no restart, <1s); the mode row shows the engaged mode and cycles `system → dark → light`, persisted across relaunch with DevTools matching. Live OS follow while in `system` mode was fixed with a `nativeTheme` "updated" listener. Typography is bundled Source Code Pro (`out/renderer/assets/*.woff2`, no network). Findings: palette now live-previews a highlighted theme row and restores the persisted variant on dismiss; the strip shows host + path plus an http/https lock; `--lb-fg-subtle` is blended 15% toward `--lb-fg` for legibility and the active palette row's meta lifts to `--lb-fg-muted`. |
 | S8 | Loading + failure view with Retry / Edit URL | FR-019, FR-021 | PASS *(manual)* | Checks 1–5 PASS. A slow-but-alive target shows the themed veil naming the target being loaded (no white flash) and never trips the failure view; an unreachable target shows the themed failure view naming it with a readable reason ("Connection refused"). Retry shows the veil then renders once the server is up. Findings/fixes: the veil now names the incoming target (not the last loaded); Edit URL prefills the failed target; a target load clears the failure view; added **Go Back** to return to the last working target (shown only when one differs). |
-| S9 | Local-only policy: reject public URLs, external links/popups to system browser | FR-001, FR-006, FR-015 | pending | |
+| S9 | Local-only policy: reject public URLs, external links/popups to system browser | FR-001, FR-006, FR-015 | PASS *(manual)* | Checks 1–5 PASS. The palette rejects public addresses and disallowed schemes with feedback and leaves the target unchanged; internal links navigate in-view; off-host links and `target="_blank"`/`window.open` open in the system browser with the view unchanged. Finding: added a main-frame `will-redirect` guard so a local target can no longer server-redirect the view to a public URL. Subframes are intentionally left alone (an iframe's initial load would otherwise open the browser for ordinary embeds). |
 | S10 | Multiple instances: independent windows, merged recents, shared prefs | FR-023, FR-004 | pending | |
 | S11 | Checks: `npm run check`, `npm run test` | constitution (workflow) | PASS *(auto)* | `vp check` clean (44 formatted, 0 lint); `vp test` 30 passed; production build green |
 
-**Overall**: in progress — S0, S11 verified automatically; S1–S8 passed; S9–S10 pending.
+**Overall**: in progress — S0, S11 verified automatically; S1–S9 passed; S10 pending.
 
 ## Handoff — resuming validation
 
@@ -67,9 +67,13 @@ stays quiet.
   failure view on a target load
 - `src/renderer/src/utils/target.ts` — shared strip/veil URL formatter
 
+**S9 fix landed** (this change):
+- `src/main/shell/site-view.ts` — main-frame `will-redirect` to a non-local URL is
+  prevented and opened in the system browser (closes a local-only bypass)
+
 **To rebuild before testing**: `npm run dev`
 
-**Next up**: S9 (local-only policy), S10 (multi-instance).
+**Next up**: S10 (multi-instance).
 
 **Reminder**: keep app-menu accelerators as the shortcut mechanism (they work
 while DevTools has focus); dock shortcuts are `⌘1`/`⌘2`/`⌘3`.
