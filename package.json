@@ -3,11 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "description": "A chromeless localhost browser with docked Chromium DevTools",
+  "author": {
+    "name": "Axel Uriel Martínez Castillo",
+    "url": "https://ackzell.dev"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --mac",
+    "package:mac": "electron-builder --mac",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:preload": "tsc --noEmit -p tsconfig.preload.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
@@ -25,6 +31,7 @@
     "@types/node": "^26.6.2",
     "@vitejs/plugin-vue": "^6.0.9",
     "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",
@@ -36,5 +43,6 @@
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true,
     "electron@44.4.5": true
-  }
+  },
+  "productName": "Tlachialoni"
 }

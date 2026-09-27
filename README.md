@@ -36,6 +36,29 @@ npm run test       # unit tests (Vitest)
 
 The default target is `http://localhost:3000`.
 
+## Packaging
+
+```sh
+npm run package    # build a standalone macOS app into release/
+```
+
+This produces `release/mac-arm64/Tlachialoni.app` plus a `.dmg` and a `.zip`.
+Copy the `.app` to `/Applications` and launch it like any other Mac app — no
+repository or terminal required.
+
+The build is unsigned (ad-hoc) for local use, so macOS blocks the first launch of
+a copy that carries a quarantine flag. To open it, right-click the app → **Open**,
+or run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Tlachialoni.app
+```
+
+The icon is generated from committed artwork by `scripts/build-icons.sh`
+(`resources/logo.svg` → `resources/icon.png` → `resources/icon.icns`). Developer ID
+signing and notarization are intentionally deferred; `electron-builder.yml` leaves
+room for them.
+
 ## Design docs
 
 This project is built spec-first with [Spec Kit](https://github.com/github/spec-kit).
@@ -44,6 +67,7 @@ See:
 - `.specify/memory/constitution.md` — project principles
 - `specs/001-minimal-browser/spec.md` — the feature specification
 - `specs/001-minimal-browser/plan.md` and `tasks.md`
+- `specs/003-standalone-packaging/spec.md` — standalone app packaging
 
 ## License
 

@@ -269,7 +269,9 @@ renders.
 ## Assumptions
 
 - The primary platform is macOS on Apple silicon; other platforms are out of scope for this version.
-- The tool runs from source through the project's development command; packaging, signing, and distribution are deferred.
+- The tool runs from source through the project's development command. (Packaging,
+  signing, and distribution were deferred for this feature; packaging is now in
+  scope — see `specs/003-standalone-packaging/`.)
 - Users are developers running local http/https development servers, commonly on ports such as 3000 or 5173. The tool serves only local targets (loopback, private network ranges, and dev hostnames); public internet addresses are out of scope.
 - Applications under development bring their own framework-specific DevTools (for example, a Vue integration); the tool does not bundle or inject any.
 - The repository is MIT-licensed with a README; the project is named `tlachialoni` and may be renamed later.

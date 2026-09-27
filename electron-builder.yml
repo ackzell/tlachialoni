@@ -1,0 +1,36 @@
+# electron-builder configuration for tlachialoni.
+# See specs/003-standalone-packaging/ for the spec, plan, and contracts.
+#
+# Packaging builds the electron-vite `out/` output into a standalone macOS app.
+# The icon is generated from committed artwork by scripts/build-icons.sh; keep
+# artwork under resources/ (electron-builder's default build/ is gitignored).
+
+appId: com.ackzell.tlachialoni
+copyright: Copyright © 2026 Axel Uriel Martínez Castillo
+
+directories:
+  output: release
+
+files:
+  - out/**
+  - package.json
+  # electron-vite treats resources/ as the main-process public dir: referenced
+  # relative to out/main, not copied. Ship the runtime icon so its path resolves
+  # inside the asar as well as in development.
+  - resources/icon.png
+
+asar: true
+
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  # Unsigned (ad-hoc) build for local use. Remove this line (and add signing
+  # config) to enable Developer ID signing and notarization later.
+  identity: null

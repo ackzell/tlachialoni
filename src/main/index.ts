@@ -1,11 +1,28 @@
 import { app, Menu } from "electron";
 import os from "node:os";
 import path from "node:path";
+import icon from "../../resources/icon.png?asset";
 import { COMMANDS, type Accelerator } from "@shared/commands";
 import { AppWindow } from "./shell/window";
 import { runDockSelfTest, runUiSnapshot } from "./dock-test";
 
 let mainWindow: AppWindow | null = null;
+
+/**
+ * App identity. The development Dock icon and the About panel use the same
+ * committed artwork as the packaged bundle (see
+ * specs/003-standalone-packaging/contracts/app-identity.md). The product name is
+ * declared once in package.json; `app.getName()` resolves `productName`.
+ */
+function configureAppIdentity(): void {
+  if (process.platform === "darwin") app.dock?.setIcon(icon);
+  app.setAboutPanelOptions({
+    applicationName: app.getName(),
+    applicationVersion: app.getVersion(),
+    version: app.getVersion(),
+    iconPath: icon,
+  });
+}
 
 // Keep automated checks away from the user's real state.
 if (process.env.TLACHIALONI_DOCK_TEST === "1" || process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
@@ -65,6 +82,7 @@ function installMenu(): void {
 
 app.whenReady().then(async () => {
   installMenu();
+  configureAppIdentity();
   mainWindow = new AppWindow();
   mainWindow.show();
 
