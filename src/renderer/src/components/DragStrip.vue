@@ -112,14 +112,14 @@ function close(): void {
   width: 13px;
   height: 13px;
   flex: none;
-  color: var(--tb-fg-muted);
+  color: var(--tb-fg-subtle);
 }
 
 .strip__host {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--tb-fg);
+  color: var(--tb-fg-muted);
   font-size: 12px;
 }
 

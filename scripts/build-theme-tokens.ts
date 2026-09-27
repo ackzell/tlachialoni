@@ -88,7 +88,7 @@ function blend(from: string, to: string, ratio: number): string {
  * background, so we blend it toward the foreground: brighter in dark modes,
  * darker in light modes, still dimmer than `--tb-fg-muted`.
  */
-const SUBTLE_FG_MIX = 0.15;
+const SUBTLE_FG_MIX = 0.1;
 
 function tokensFor(colors: Colors): Record<string, string> {
   const out: Record<string, string> = {};
