@@ -191,7 +191,7 @@ override) applied to every shell surface and to DevTools.
 - [x] T047 [P] Add a state-concurrency unit test: two writers merge recents without loss and scalars are last-writer-wins. File: tests/unit/store-concurrency.test.ts
 - [x] T048 [P] Finalize README (run instructions, Tlapalli thanks) and NOTICE (MIT attribution). Files: README.md, NOTICE
 - [x] T049 Run `npm run check` and `npm run test` (scripts in package.json) and fix all failures
-- [ ] T050 Execute quickstart.md scenarios S0–S11 in order, timing launch-to-first-paint against SC-001's 3-second budget, and record the results in specs/001-chromeless-localhost-browser/validation.md
+- [x] T050 Execute quickstart.md scenarios S0–S11 in order, timing launch-to-first-paint against SC-001's 3-second budget, and record the results in specs/001-chromeless-localhost-browser/validation.md
 
 ---
 
