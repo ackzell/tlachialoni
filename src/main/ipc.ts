@@ -49,6 +49,10 @@ export function registerIpc(appWindow: AppWindow): void {
     appWindow.markShellReady();
   });
 
+  ipcMain.on("shell:settled", () => {
+    appWindow.notifyShellSettled();
+  });
+
   ipcMain.on("site:focus-editable", (_event, payload: { editable: boolean }) => {
     appWindow.setEditableFocused(payload.editable);
   });

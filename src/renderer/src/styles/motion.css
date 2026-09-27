@@ -1,0 +1,31 @@
+/*
+ * Motion vocabulary for the shell (004-shell-motion).
+ * Timing and transforms only — every color stays a Tlapalli token. Values are
+ * fixed by specs/004-shell-motion/contracts/motion-tokens.md.
+ */
+:root {
+  --tb-motion-fast: 160ms;
+  --tb-motion-base: 220ms;
+  --tb-motion-slow: 300ms;
+  --tb-motion-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --tb-motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --tb-motion-stagger: 36ms;
+  --tb-motion-stagger-cap: 6;
+  --tb-motion-shift: 4px;
+  --tb-motion-scale: 0.96;
+}
+
+/*
+ * Reduced motion: collapse everything to an instant change. The durations stay
+ * just above zero so transition events (and the settle ack) still fire.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tb-motion-fast: 0.01ms;
+    --tb-motion-base: 0.01ms;
+    --tb-motion-slow: 0.01ms;
+    --tb-motion-stagger: 0ms;
+    --tb-motion-shift: 0px;
+    --tb-motion-scale: 1;
+  }
+}

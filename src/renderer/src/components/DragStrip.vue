@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useShell } from "../composables/useShell";
-import { describeTarget } from "../utils/target";
+import { describeTarget, splitTargetLabel } from "../utils/target";
 
 const api = window.tlachialoni;
 const { state, devtools } = useShell();
 
 const target = computed(() => state.value?.target ?? "");
 const display = computed(() => describeTarget(target.value));
+const segments = computed(() => splitTargetLabel(display.value.label));
 
 function reload(): void {
   void api.runCommand("view.reload");
@@ -69,19 +70,37 @@ function close(): void {
           stroke-width="1.3"
         />
       </svg>
-      <span class="strip__host">{{ display.label }}</span>
+      <TransitionGroup name="strip-seg" tag="span" class="strip__host" appear>
+        <span
+          v-for="(segment, index) in segments"
+          :key="`${target}|${index}`"
+          class="strip__seg"
+          :style="{ '--i': index }"
+          >{{ segment }}</span
+        >
+      </TransitionGroup>
     </div>
     <div class="strip__actions">
-      <button class="strip__btn" title="Reload" @click="reload">⟳</button>
+      <button class="strip__btn" :style="{ '--i': segments.length }" title="Reload" @click="reload">
+        ⟳
+      </button>
       <button
         class="strip__btn"
         :class="{ 'is-active': devtools.open }"
+        :style="{ '--i': segments.length + 1 }"
         title="Toggle DevTools"
         @click="toggleDevtools"
       >
         ⌥
       </button>
-      <button class="strip__btn" title="Close" @click="close">✕</button>
+      <button
+        class="strip__btn"
+        :style="{ '--i': segments.length + 2 }"
+        title="Close"
+        @click="close"
+      >
+        ✕
+      </button>
     </div>
   </header>
 </template>
@@ -100,6 +119,26 @@ function close(): void {
   app-region: drag;
 }
 
+/* The strip surface eases in from just above; leaving reverses fast (004). */
+.strip-enter-active {
+  transition:
+    opacity var(--tb-motion-base) var(--tb-motion-ease-out),
+    transform var(--tb-motion-base) var(--tb-motion-ease-out);
+}
+
+.strip-leave-active {
+  transition:
+    opacity var(--tb-motion-fast) var(--tb-motion-ease-in),
+    transform var(--tb-motion-fast) var(--tb-motion-ease-in);
+  pointer-events: none;
+}
+
+.strip-enter-from,
+.strip-leave-to {
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--tb-motion-shift)));
+}
+
 .strip__target {
   display: flex;
   align-items: center;
@@ -112,15 +151,30 @@ function close(): void {
   width: 13px;
   height: 13px;
   flex: none;
-  color: var(--tb-fg-subtle);
+  color: var(--tb-fg-muted);
 }
 
 .strip__host {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
   color: var(--tb-fg-muted);
   font-size: 12px;
+}
+
+.strip__seg {
+  display: inline-block;
+}
+
+/* Each reveal unit fades in with a capped stagger (004-shell-motion). */
+.strip-seg-enter-active {
+  transition: opacity var(--tb-motion-base) var(--tb-motion-ease-out);
+  transition-delay: calc(min(var(--i, 0), var(--tb-motion-stagger-cap)) * var(--tb-motion-stagger));
+}
+
+.strip-seg-enter-from {
+  opacity: 0;
 }
 
 .strip__actions {
@@ -141,6 +195,19 @@ function close(): void {
   color: var(--tb-fg-muted);
   cursor: pointer;
   font-size: 0.8rem;
+  animation: strip-control-in var(--tb-motion-fast) var(--tb-motion-ease-out) backwards;
+  animation-delay: calc(min(var(--i, 0), var(--tb-motion-stagger-cap)) * var(--tb-motion-stagger));
+  transition:
+    background-color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    border-color var(--tb-motion-fast) var(--tb-motion-ease-out);
+}
+
+@keyframes strip-control-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--tb-motion-shift)));
+  }
 }
 
 .strip__btn:hover {

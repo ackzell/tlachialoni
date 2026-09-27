@@ -9,6 +9,7 @@ export interface TlachialoniApi {
   previewVariant(variant: string | null): Promise<unknown>;
   setPaletteVisible(open: boolean): void;
   ready(): void;
+  settled(): void;
   closeWindow(): Promise<unknown>;
   on(channel: string, callback: (payload: unknown) => void): () => void;
 }

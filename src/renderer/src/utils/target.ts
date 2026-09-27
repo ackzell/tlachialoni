@@ -19,3 +19,22 @@ export function describeTarget(url: string | null | undefined): TargetDisplay {
     return { label: url, secure: false };
   }
 }
+
+/**
+ * Splits a display label into reveal units for the strip's staggered entrance.
+ * `:` and `/` separate units and stay attached to the word they follow, so
+ * concatenating the units reproduces the label exactly; a leading separator
+ * becomes its own unit. Presentation only — never used for navigation.
+ */
+export function splitTargetLabel(label: string): string[] {
+  const parts = label.split(/([:/]+)/u).filter((part) => part.length > 0);
+  const units: string[] = [];
+  for (const part of parts) {
+    if (/^[:/]+$/u.test(part) && units.length > 0) {
+      units[units.length - 1] += part;
+    } else {
+      units.push(part);
+    }
+  }
+  return units.length > 0 ? units : [label];
+}

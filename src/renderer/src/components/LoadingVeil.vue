@@ -26,6 +26,21 @@ const label = computed(() => describeTarget(loadingTarget.value).label);
   background: var(--tb-bg);
 }
 
+/* The veil fades away slowly to reveal the page, and never traps input (004). */
+.veil-enter-active {
+  transition: opacity var(--tb-motion-base) var(--tb-motion-ease-in);
+}
+
+.veil-leave-active {
+  transition: opacity var(--tb-motion-slow) var(--tb-motion-ease-out);
+  pointer-events: none;
+}
+
+.veil-enter-from,
+.veil-leave-to {
+  opacity: 0;
+}
+
 .veil__spinner::before {
   width: 100%;
   height: 100%;

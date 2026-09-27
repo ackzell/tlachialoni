@@ -29,6 +29,7 @@ const api = {
     ipcRenderer.invoke("theme:previewVariant", { variant }),
   setPaletteVisible: (open: boolean) => ipcRenderer.send("palette:visibility", { open }),
   ready: () => ipcRenderer.send("shell:ready"),
+  settled: () => ipcRenderer.send("shell:settled"),
   closeWindow: () => ipcRenderer.invoke("window:close"),
   on: subscribe,
 };

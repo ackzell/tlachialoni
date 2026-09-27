@@ -38,6 +38,46 @@ const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bo
 
 let initialised = false;
 
+let leavingSurfaces = 0;
+let settleFallback: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * The main process holds the shell-view collapse until the renderer reports its
+ * leave transitions finished (contracts/settle-protocol.md). The fallback timer
+ * guarantees a report even when a lifecycle hook is missed; it must exceed the
+ * slowest leave (200ms) and stay under main's 400ms safety timeout.
+ */
+export function markSurfaceLeaving(): void {
+  leavingSurfaces += 1;
+  if (settleFallback) clearTimeout(settleFallback);
+  settleFallback = setTimeout(() => {
+    settleFallback = null;
+    leavingSurfaces = 0;
+    api.settled();
+  }, 300);
+}
+
+/** A surface's leave finished; report once every concurrent leave is done. */
+export function markSurfaceLeft(): void {
+  if (leavingSurfaces > 0) leavingSurfaces -= 1;
+  if (leavingSurfaces > 0) return;
+  if (settleFallback) {
+    clearTimeout(settleFallback);
+    settleFallback = null;
+  }
+  api.settled();
+}
+
+/** A leave was interrupted by a re-show; no report is owed for it. */
+export function markSurfaceLeaveCancelled(): void {
+  if (leavingSurfaces > 0) leavingSurfaces -= 1;
+  if (leavingSurfaces > 0) return;
+  if (settleFallback) {
+    clearTimeout(settleFallback);
+    settleFallback = null;
+  }
+}
+
 function init(): void {
   if (initialised) return;
   initialised = true;
@@ -88,6 +128,13 @@ function init(): void {
 
 export function closePalette(): void {
   paletteOpen.value = false;
+  // Main keeps the shell view full-window until the leave completes; the
+  // palette's after-leave reports back through notifyPaletteClosed().
+}
+
+/** Palette leave finished: release the overlay in main, then report the settle. */
+export function notifyPaletteClosed(): void {
+  markSurfaceLeft();
   api.setPaletteVisible(false);
 }
 

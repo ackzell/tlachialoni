@@ -22,6 +22,14 @@ import { registerIpc } from "../ipc";
 
 export const STRIP_HEIGHT = 36;
 
+/** How long main waits for the renderer settle ack before collapsing anyway. */
+const SHELL_SETTLE_TIMEOUT_MS = 500;
+
+type ShellMode = "full" | "strip" | "hidden";
+
+/** Bigger modes win when deciding whether a collapse needs the settle wait. */
+const SHELL_MODE_RANK: Record<ShellMode, number> = { hidden: 0, strip: 1, full: 2 };
+
 export type { CommandResult };
 
 export class AppWindow {
@@ -37,6 +45,9 @@ export class AppWindow {
   private failed = false;
   private failedUrl: string | null = null;
   private paletteOpen = false;
+  private shellMode: ShellMode = "hidden";
+  private pendingSettle = false;
+  private settleTimer: NodeJS.Timeout | null = null;
   private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
   private shellLoaded = false;
@@ -114,6 +125,7 @@ export class AppWindow {
       this.store.setDevtoolsOpen(this.devtools.isOpen());
     });
     this.win.on("closed", () => {
+      this.clearPendingSettle();
       this.devtools.dispose();
       this.detachDevToolsInput();
       nativeTheme.removeListener("updated", this.handleNativeThemeUpdated);
@@ -327,7 +339,6 @@ export class AppWindow {
   private handleReady(url: string): void {
     this.showLoading = false;
     this.failed = false;
-    this.relayout();
     if (url) {
       this.currentUrl = url;
       this.store.setTarget(url);
@@ -336,6 +347,8 @@ export class AppWindow {
     this.reportLoading(false);
     this.sendToShell("viewport:ready", { url });
     this.broadcastState();
+    // The veil's fade-out happens in the renderer; hold the collapse for it.
+    this.relayout(true);
   }
 
   /**
@@ -408,8 +421,10 @@ export class AppWindow {
   private toggleStrip(): void {
     const visible = !this.store.get().stripVisible;
     this.store.setStripVisible(visible);
-    this.relayout();
+    // Broadcast first so the renderer can play its leave, then hold the
+    // collapse for it when hiding (contracts/settle-protocol.md).
     this.broadcastState();
+    this.relayout(!visible);
   }
 
   private readonly handleNativeThemeUpdated = (): void => {
@@ -486,20 +501,76 @@ export class AppWindow {
     this.pickerDisarm();
   }
 
-  private relayout(): void {
+  /**
+   * The renderer reports that all surface leave transitions have finished, so a
+   * deferred collapse may now be applied (contracts/settle-protocol.md).
+   */
+  notifyShellSettled(): void {
+    if (!this.pendingSettle) return;
+    this.clearPendingSettle();
+    this.applyShellMode(this.desiredShellMode());
+  }
+
+  private desiredShellMode(): ShellMode {
+    if (this.paletteOpen || this.showLoading || this.failed) return "full";
+    if (this.store.get().stripVisible) return "strip";
+    return "hidden";
+  }
+
+  /**
+   * Applies view bounds. A deferred, smaller mode keeps the current bounds
+   * until the renderer's leave settles or the safety timeout fires, so exit
+   * animations are never cut; motion is best-effort and never blocks state.
+   */
+  private relayout(defer = false): void {
     const { width, height } = this.win.getContentBounds();
     this.siteView.setBounds({ x: 0, y: 0, width, height });
 
-    // toggle this to true when you want to work on the loadingveil
-    const overlayActive = this.paletteOpen || this.showLoading || this.failed;
-    if (overlayActive) {
+    const desired = this.desiredShellMode();
+    const collapsing =
+      SHELL_MODE_RANK[desired] < SHELL_MODE_RANK[this.shellMode] && (defer || this.pendingSettle);
+
+    if (collapsing && this.shellLoaded) {
+      this.armSettleTimeout();
+      // A resize during the wait keeps the current mode at the new size.
+      if (!defer) this.applyShellMode(this.shellMode);
+      return;
+    }
+
+    this.clearPendingSettle();
+    this.applyShellMode(desired);
+  }
+
+  private applyShellMode(mode: ShellMode): void {
+    const { width, height } = this.win.getContentBounds();
+    if (mode === "full") {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
       this.shellView.setVisible(true);
-    } else if (this.store.get().stripVisible) {
+    } else if (mode === "strip") {
       this.shellView.setBounds({ x: 0, y: 0, width, height: STRIP_HEIGHT });
       this.shellView.setVisible(true);
     } else {
       this.shellView.setVisible(false);
+    }
+    this.shellMode = mode;
+  }
+
+  private armSettleTimeout(): void {
+    this.pendingSettle = true;
+    if (this.settleTimer) return;
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = null;
+      if (!this.pendingSettle) return;
+      this.pendingSettle = false;
+      this.applyShellMode(this.desiredShellMode());
+    }, SHELL_SETTLE_TIMEOUT_MS);
+  }
+
+  private clearPendingSettle(): void {
+    this.pendingSettle = false;
+    if (this.settleTimer) {
+      clearTimeout(this.settleTimer);
+      this.settleTimer = null;
     }
   }
 }

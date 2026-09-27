@@ -68,6 +68,7 @@ See:
 - `specs/001-minimal-browser/spec.md` — the feature specification
 - `specs/001-minimal-browser/plan.md` and `tasks.md`
 - `specs/003-standalone-packaging/spec.md` — standalone app packaging
+- `specs/004-shell-motion/spec.md` — motion for the transient shell surfaces
 
 ## License
 

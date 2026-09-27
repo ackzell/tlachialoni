@@ -44,6 +44,29 @@ function goBack(): void {
   background: var(--tb-bg);
 }
 
+/* Failure arrives with a small card lift; leaving is fast (004-shell-motion). */
+.failure-enter-active {
+  transition: opacity var(--tb-motion-base) var(--tb-motion-ease-out);
+}
+
+.failure-enter-active .failure__card {
+  transition: transform var(--tb-motion-base) var(--tb-motion-ease-out);
+}
+
+.failure-leave-active {
+  transition: opacity var(--tb-motion-fast) var(--tb-motion-ease-in);
+  pointer-events: none;
+}
+
+.failure-enter-from,
+.failure-leave-to {
+  opacity: 0;
+}
+
+.failure-enter-from .failure__card {
+  transform: translateY(var(--tb-motion-shift));
+}
+
 .failure__card {
   display: flex;
   flex-direction: column;
@@ -90,6 +113,10 @@ function goBack(): void {
   border-radius: 6px;
   color: var(--tb-fg);
   cursor: pointer;
+  transition:
+    background-color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    border-color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    color var(--tb-motion-fast) var(--tb-motion-ease-out);
 }
 
 .failure__btn:hover {

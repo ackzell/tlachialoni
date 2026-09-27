@@ -135,6 +135,44 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: 8px;
   box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
   overflow: hidden;
+  transform-origin: top center;
+}
+
+/* Entrance grows the panel in; exit shrinks it away (004-shell-motion). */
+.palette-backdrop.palette-enter-active {
+  transition: opacity var(--tb-motion-base) var(--tb-motion-ease-out);
+}
+
+.palette-backdrop.palette-leave-active {
+  transition: opacity var(--tb-motion-fast) var(--tb-motion-ease-in);
+  pointer-events: none;
+}
+
+.palette-backdrop.palette-enter-active .palette {
+  transition:
+    opacity var(--tb-motion-base) var(--tb-motion-ease-out),
+    transform var(--tb-motion-base) var(--tb-motion-ease-out);
+  will-change: transform, opacity;
+}
+
+.palette-backdrop.palette-leave-active .palette {
+  transition:
+    opacity var(--tb-motion-fast) var(--tb-motion-ease-in),
+    transform var(--tb-motion-fast) var(--tb-motion-ease-in);
+  will-change: transform, opacity;
+}
+
+.palette-backdrop.palette-enter-from,
+.palette-backdrop.palette-leave-to {
+  opacity: 0;
+}
+
+.palette-backdrop.palette-enter-from .palette {
+  transform: scale(var(--tb-motion-scale));
+}
+
+.palette-backdrop.palette-leave-to .palette {
+  transform: scale(0.98);
 }
 
 .palette__input {
@@ -161,12 +199,17 @@ function onKeydown(event: KeyboardEvent): void {
   font-size: 12px;
 }
 
+/* Rows are a plain v-for list: adding matches is instant and, crucially, rows
+   cannot accumulate (a TransitionGroup leave lifecycle left duplicates behind
+   here). The list keeps a fixed ceiling and a reserved scrollbar gutter so
+   typing never resizes or reflows the container. */
 .palette__list {
   margin: 0;
   padding: 6px;
   list-style: none;
   max-height: 46vh;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .palette__row {
@@ -178,6 +221,9 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: 6px;
   color: var(--tb-fg-muted);
   cursor: default;
+  transition:
+    background-color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    color var(--tb-motion-fast) var(--tb-motion-ease-out);
 }
 
 .palette__row.is-selected {
