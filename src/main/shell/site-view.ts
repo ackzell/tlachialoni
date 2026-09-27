@@ -71,6 +71,17 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
     }
   });
 
+  // A local target that server-redirects to a public URL must not render here
+  // (FR-001). Subframes are intentionally left alone: their initial loads would
+  // otherwise open the system browser for ordinary embeds.
+  wc.on("will-redirect", (details) => {
+    if (!details.isMainFrame) return;
+    if (!isAllowedUrl(details.url)) {
+      details.preventDefault();
+      openExternal(details.url);
+    }
+  });
+
   wc.on("did-start-loading", () => {
     failedUrl = null;
     events.onLoading(true);
