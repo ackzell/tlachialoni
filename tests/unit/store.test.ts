@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   MAX_RECENTS,
   defaultState,
+  mergeRecentLists,
   mergeRecents,
   sanitizeState,
 } from "../../src/main/state/schema";
@@ -65,6 +66,24 @@ describe("mergeRecents", () => {
   });
 });
 
+describe("mergeRecentLists", () => {
+  it("unions two instances, keeping the newest timestamp per URL", () => {
+    const a = [
+      { url: "http://localhost:3000/", lastOpenedAt: 1 },
+      { url: "http://localhost:5173/", lastOpenedAt: 5 },
+    ];
+    const b = [
+      { url: "http://localhost:3000/", lastOpenedAt: 9 },
+      { url: "http://localhost:8080/", lastOpenedAt: 2 },
+    ];
+    expect(mergeRecentLists(a, b)).toEqual([
+      { url: "http://localhost:3000/", lastOpenedAt: 9 },
+      { url: "http://localhost:5173/", lastOpenedAt: 5 },
+      { url: "http://localhost:8080/", lastOpenedAt: 2 },
+    ]);
+  });
+});
+
 describe("StateStore", () => {
   it("round-trips state and merges recents across instances", () => {
     const file = tmpFile();
@@ -88,6 +107,31 @@ describe("StateStore", () => {
     a.setVariant("jade");
     b.setVariant("gold");
     expect(new StateStore(file).get().variant).toBe("gold");
+  });
+
+  it("keeps another instance's recents when a scalar is written", () => {
+    const file = tmpFile();
+    const a = new StateStore(file);
+    a.recordRecent("http://localhost:3000/");
+    const b = new StateStore(file); // starts with [3000]
+    a.recordRecent("http://localhost:5173/"); // a now has [5173, 3000]
+    b.setVariant("jade"); // must not clobber 5173 from disk
+
+    const state = new StateStore(file).get();
+    expect(state.variant).toBe("jade");
+    expect(state.recents.map((r) => r.url).sort()).toEqual([
+      "http://localhost:3000/",
+      "http://localhost:5173/",
+    ]);
+  });
+
+  it("refreshes recents from disk without writing", () => {
+    const file = tmpFile();
+    const a = new StateStore(file);
+    const b = new StateStore(file);
+    a.recordRecent("http://localhost:5173/");
+    expect(b.get().recents).toEqual([]);
+    expect(b.refreshRecents().recents.map((r) => r.url)).toEqual(["http://localhost:5173/"]);
   });
 
   it("recovers from a corrupt file", () => {

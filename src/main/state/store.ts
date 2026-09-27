@@ -13,6 +13,7 @@ import {
   type ColorMode,
   type VariantSlug,
   defaultState,
+  mergeRecentLists,
   mergeRecents,
   sanitizeState,
 } from "./schema";
@@ -57,8 +58,14 @@ export class StateStore {
     return this.state;
   }
 
+  /**
+   * Applies a patch to this window's state, unioning recents with whatever is on
+   * disk so a scalar write never drops a target another instance recorded.
+   */
   update(patch: Partial<PersistedState>): PersistedState {
-    return this.commit({ ...this.state, ...patch });
+    const onDisk = this.readFromDisk();
+    const recents = mergeRecentLists(onDisk.recents, this.state.recents);
+    return this.commit({ ...this.state, ...patch, recents });
   }
 
   setTarget(target: string): PersistedState {
@@ -97,5 +104,16 @@ export class StateStore {
     const onDisk = this.readFromDisk();
     const recents = mergeRecents(onDisk.recents, url, Date.now());
     return this.commit({ ...this.state, recents });
+  }
+
+  /**
+   * Refreshes in-memory recents from disk without writing, so the palette shows
+   * targets opened in other instances (FR-004). Never touches target/bounds.
+   */
+  refreshRecents(): PersistedState {
+    const onDisk = this.readFromDisk();
+    const recents = mergeRecentLists(onDisk.recents, this.state.recents);
+    this.state = { ...this.state, recents };
+    return this.state;
   }
 }

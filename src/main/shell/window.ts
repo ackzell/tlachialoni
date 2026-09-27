@@ -319,7 +319,9 @@ export class AppWindow {
     this.requestedTarget = url;
     this.relayout();
     this.reportLoading(true);
-    void this.siteView.webContents.loadURL(url);
+    // did-fail-load drives the failure view; swallow the rejection so a refused
+    // connection is not reported as an unhandled promise.
+    void this.siteView.webContents.loadURL(url).catch(() => {});
   }
 
   private handleReady(url: string): void {
@@ -388,7 +390,10 @@ export class AppWindow {
 
   private openPalette(initial: string): void {
     this.paletteOpen = true;
+    // Pull in targets other instances recorded since our last read (FR-004).
+    this.store.refreshRecents();
     this.relayout();
+    this.broadcastState();
     this.sendToShell("palette:open", { initial });
     this.shellView.webContents.focus();
   }

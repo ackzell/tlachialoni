@@ -146,3 +146,17 @@ export function mergeRecents(existing: RecentEntry[], url: string, now: number):
   const without = existing.filter((entry) => entry.url !== url);
   return [{ url, lastOpenedAt: now }, ...without].slice(0, MAX_RECENTS);
 }
+
+/**
+ * Unions two recents lists from concurrent instances: dedupe by URL keeping the
+ * newest timestamp, newest first, capped. Used so a scalar write never drops a
+ * target another instance recorded (FR-004).
+ */
+export function mergeRecentLists(a: RecentEntry[], b: RecentEntry[]): RecentEntry[] {
+  const byUrl = new Map<string, RecentEntry>();
+  for (const entry of [...a, ...b]) {
+    const seen = byUrl.get(entry.url);
+    if (!seen || entry.lastOpenedAt > seen.lastOpenedAt) byUrl.set(entry.url, entry);
+  }
+  return [...byUrl.values()].sort((x, y) => y.lastOpenedAt - x.lastOpenedAt).slice(0, MAX_RECENTS);
+}
