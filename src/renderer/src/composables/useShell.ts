@@ -1,4 +1,5 @@
 import { readonly, ref } from "vue";
+import type { ExtensionStatus, InstalledExtension } from "@shared/extensions";
 import { applyTheme, type ResolvedMode } from "../theme/apply";
 
 export type DockMode = "bottom" | "right" | "left";
@@ -18,6 +19,7 @@ export interface ShellState {
   stripVisible: boolean;
   variant: string;
   colorMode: ColorMode;
+  extensions: InstalledExtension[];
 }
 
 export interface Failure {
@@ -35,6 +37,7 @@ const failed = ref<Failure | null>(null);
 const paletteOpen = ref(false);
 const paletteInitial = ref("");
 const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bottom" });
+const extensionStatus = ref<ExtensionStatus | null>(null);
 
 let initialised = false;
 
@@ -109,6 +112,9 @@ function init(): void {
   api.on("devtools:changed", (payload) => {
     devtools.value = payload as { open: boolean; mode: DockMode };
   });
+  api.on("extension:status", (payload) => {
+    extensionStatus.value = (payload as ExtensionStatus | null) ?? null;
+  });
   api.on("palette:open", (payload) => {
     paletteInitial.value = (payload as { initial?: string }).initial ?? "";
     paletteOpen.value = true;
@@ -147,6 +153,7 @@ export function useShell() {
     paletteOpen: readonly(paletteOpen),
     paletteInitial: readonly(paletteInitial),
     devtools: readonly(devtools),
+    extensionStatus: readonly(extensionStatus),
     closePalette,
   };
 }

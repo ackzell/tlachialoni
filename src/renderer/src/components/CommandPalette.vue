@@ -19,6 +19,7 @@ const rows = computed<Row[]>(() =>
     state.value?.recents ?? [],
     undefined,
     state.value ? { variant: state.value.variant, colorMode: state.value.colorMode } : undefined,
+    state.value?.extensions ?? [],
   ),
 );
 
@@ -90,6 +91,14 @@ function labelParts(row: Row): LabelPart[] {
 async function activate(row?: Row): Promise<void> {
   const chosen = row ?? rows.value[selected.value];
   if (!chosen) return;
+
+  // Extension rows report their progress on the status surface, so the palette
+  // gets out of the way immediately instead of waiting for the install.
+  if (chosen.kind === "extension") {
+    void api.runCommand(chosen.id, chosen.arg);
+    closePalette();
+    return;
+  }
 
   if (chosen.kind === "command") {
     await api.runCommand(chosen.id);

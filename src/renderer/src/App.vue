@@ -2,6 +2,7 @@
 import CommandPalette from "./components/CommandPalette.vue";
 import DragStrip from "./components/DragStrip.vue";
 import FailureView from "./components/FailureView.vue";
+import InstallStatus from "./components/InstallStatus.vue";
 import LoadingVeil from "./components/LoadingVeil.vue";
 import {
   markSurfaceLeaveCancelled,
@@ -11,7 +12,7 @@ import {
   useShell,
 } from "./composables/useShell";
 
-const { state, loading, failed, paletteOpen, paletteInitial } = useShell();
+const { state, loading, failed, paletteOpen, paletteInitial, extensionStatus } = useShell();
 </script>
 
 <template>
@@ -55,6 +56,15 @@ const { state, loading, failed, paletteOpen, paletteInitial } = useShell();
       @leave-cancelled="markSurfaceLeaveCancelled"
     >
       <CommandPalette v-if="paletteOpen" :initial="paletteInitial" />
+    </Transition>
+
+    <Transition
+      name="status"
+      @leave="markSurfaceLeaving"
+      @after-leave="markSurfaceLeft"
+      @leave-cancelled="markSurfaceLeaveCancelled"
+    >
+      <InstallStatus v-if="extensionStatus" />
     </Transition>
   </div>
 </template>

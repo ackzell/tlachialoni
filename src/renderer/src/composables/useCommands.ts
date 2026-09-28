@@ -4,6 +4,8 @@
  */
 
 import { PALETTE_COMMANDS, type CommandDef } from "@shared/commands";
+import { parseExtensionId } from "@shared/extension-id";
+import type { InstalledExtension } from "@shared/extensions";
 
 export interface FuzzyMatch {
   /** Higher is better; 0 means the query is not a subsequence of the text. */
@@ -42,7 +44,7 @@ export function fuzzyScore(query: string, text: string): number {
 }
 
 export interface Row {
-  kind: "target" | "command" | "recent";
+  kind: "target" | "command" | "recent" | "extension";
   id: string;
   /**
    * Stable DOM identity for the row. Unlike `id`, this never collides across
@@ -68,18 +70,33 @@ export function buildRows(
   recents: readonly { url: string }[],
   commands: CommandDef[] = PALETTE_COMMANDS,
   theme?: ThemeFlags,
+  extensions: readonly InstalledExtension[] = [],
 ): Row[] {
   const rows: Row[] = [];
   const trimmed = query.trim();
 
   if (trimmed) {
-    rows.push({
-      kind: "target",
-      id: "target.navigate",
-      key: "target.typed",
-      label: `Open ${trimmed}`,
-      detail: "navigate",
-    });
+    // A pasted store URL or ID becomes the install row itself, instead of a
+    // useless (and rejected) "Open <url>" target row, so Enter installs it.
+    const storeId = parseExtensionId(trimmed);
+    if (storeId) {
+      rows.push({
+        kind: "extension",
+        id: "extensions.install",
+        key: "extension.install",
+        label: `Install extension ${storeId}`,
+        detail: "from Chrome Web Store",
+        arg: storeId,
+      });
+    } else {
+      rows.push({
+        kind: "target",
+        id: "target.navigate",
+        key: "target.typed",
+        label: `Open ${trimmed}`,
+        detail: "navigate",
+      });
+    }
   } else {
     for (const recent of recents) {
       rows.push({
@@ -90,6 +107,54 @@ export function buildRows(
         detail: "recent",
         arg: recent.url,
       });
+    }
+  }
+
+  // Installed extensions: a toggle row always, a remove row always, and an
+  // update row only for store installs matched by the query.
+  for (const extension of extensions) {
+    const toggleLabel = `Extension: ${extension.name}`;
+    const toggle = fuzzyMatch(trimmed, toggleLabel);
+    if (!trimmed || toggle.score > 0) {
+      rows.push({
+        kind: "extension",
+        id: "extensions.toggle",
+        key: `extension:toggle:${extension.slug}`,
+        label: toggleLabel,
+        matches: toggle.indices,
+        detail: extension.enabled ? "enabled" : "disabled",
+        arg: extension.slug,
+      });
+    }
+
+    const removeLabel = `Remove Extension: ${extension.name}`;
+    const remove = fuzzyMatch(trimmed, removeLabel);
+    if (!trimmed || remove.score > 0) {
+      rows.push({
+        kind: "extension",
+        id: "extensions.remove",
+        key: `extension:remove:${extension.slug}`,
+        label: removeLabel,
+        matches: remove.indices,
+        detail: "remove",
+        arg: extension.slug,
+      });
+    }
+
+    if (extension.source === "store") {
+      const updateLabel = `Update Extension: ${extension.name}`;
+      const update = fuzzyMatch(trimmed, updateLabel);
+      if (trimmed && update.score > 0) {
+        rows.push({
+          kind: "extension",
+          id: "extensions.update",
+          key: `extension:update:${extension.slug}`,
+          label: updateLabel,
+          matches: update.indices,
+          detail: "store",
+          arg: extension.slug,
+        });
+      }
     }
   }
 

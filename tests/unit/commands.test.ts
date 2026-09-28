@@ -27,6 +27,13 @@ describe("command catalog", () => {
   it("exposes the focus toggle in the palette", () => {
     expect(PALETTE_COMMANDS.some((entry) => entry.id === "focus.toggle")).toBe(true);
   });
+
+  it("keeps the store install command out of the palette", () => {
+    // A store install is offered only when the input is a store URL/ID, so a
+    // standalone entry would be a confusing dead row.
+    expect(COMMANDS.some((entry) => entry.id === "extensions.install")).toBe(true);
+    expect(PALETTE_COMMANDS.some((entry) => entry.id === "extensions.install")).toBe(false);
+  });
 });
 
 describe("palette rows", () => {
@@ -71,6 +78,58 @@ describe("palette rows", () => {
     const row = buildRows("reload", []).find((entry) => entry.id === "view.reload");
     const hit = row?.matches?.map((i) => row.label[i]).join("");
     expect(hit?.toLowerCase()).toBe("reload");
+  });
+});
+
+describe("extension rows", () => {
+  const id = "fmkadmapgofadopljbjfkapdkoienihi";
+  const extension = {
+    slug: id,
+    id,
+    name: "React Developer Tools",
+    version: "8.0.0",
+    source: "store" as const,
+    enabled: true,
+    installedAt: 1,
+  };
+
+  it("makes the store install the default row for a pasted store URL", () => {
+    const rows = buildRows(`https://chromewebstore.google.com/detail/react-devtools/${id}`, []);
+    expect(rows[0]).toMatchObject({ kind: "extension", id: "extensions.install", arg: id });
+    // The useless (and non-local) target row is not offered for a store URL.
+    expect(rows.some((row) => row.key === "target.typed")).toBe(false);
+  });
+
+  it("makes the store install the default row for a raw id", () => {
+    expect(buildRows(id, [])[0]).toMatchObject({ id: "extensions.install", arg: id });
+  });
+
+  it("offers no store-install row for a non-store query", () => {
+    expect(buildRows("install", []).some((row) => row.id === "extensions.install")).toBe(false);
+  });
+
+  it("keeps the typed-target row for ordinary input", () => {
+    expect(buildRows(":5173", [])[0]).toMatchObject({
+      id: "target.navigate",
+      key: "target.typed",
+    });
+  });
+
+  it("lists toggle and remove rows for an installed extension", () => {
+    const rows = buildRows("react", [], undefined, undefined, [extension]);
+    expect(rows.find((row) => row.id === "extensions.toggle")).toMatchObject({
+      arg: id,
+      detail: "enabled",
+    });
+    expect(rows.find((row) => row.id === "extensions.remove")).toMatchObject({ arg: id });
+  });
+
+  it("namespaces extension row keys so they cannot collide", () => {
+    const rows = buildRows("", [], undefined, undefined, [extension]);
+    const keys = rows.filter((row) => row.kind === "extension").map((row) => row.key);
+    expect(keys).toContain(`extension:toggle:${id}`);
+    expect(keys).toContain(`extension:remove:${id}`);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 
