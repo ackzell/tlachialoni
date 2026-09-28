@@ -73,6 +73,31 @@ export function normalizeTarget(raw: string): TargetResolution {
   return finalize(hasScheme ? input : `http://${input}`);
 }
 
+/** True when two URLs share a scheme, host, and port. Unparseable input is never same-origin. */
+export function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a target load should raise the loading veil. The veil is a "switching
+ * sites" indicator, not a per-load one: Chromium keeps the painted page on screen
+ * until the next document commits, so a same-origin path change needs no cover.
+ * A site switch, a cold start (nothing painted yet), or a load from the failure
+ * view still does.
+ */
+export function shouldVeilTarget(options: {
+  shownUrl: string | null;
+  nextUrl: string;
+  failed: boolean;
+}): boolean {
+  if (options.failed || !options.shownUrl) return true;
+  return !sameOrigin(options.shownUrl, options.nextUrl);
+}
+
 /** True when an already-normalized URL is still allowed (used to guard navigation). */
 export function isAllowedUrl(url: string): boolean {
   try {

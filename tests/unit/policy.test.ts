@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedUrl, isLocalHostname, normalizeTarget } from "../../src/main/nav/policy";
+import {
+  isAllowedUrl,
+  isLocalHostname,
+  normalizeTarget,
+  sameOrigin,
+  shouldVeilTarget,
+} from "../../src/main/nav/policy";
 
 describe("normalizeTarget", () => {
   it("resolves the :port shorthand to localhost", () => {
@@ -69,5 +75,61 @@ describe("isAllowedUrl", () => {
     expect(isAllowedUrl("https://example.com/")).toBe(false);
     expect(isAllowedUrl("file:///tmp/x")).toBe(false);
     expect(isAllowedUrl("not a url")).toBe(false);
+  });
+});
+
+describe("sameOrigin", () => {
+  it("ignores path, query, and hash", () => {
+    expect(sameOrigin("http://localhost:5173/a", "http://localhost:5173/b")).toBe(true);
+    expect(sameOrigin("http://localhost:5173/a?x=1", "http://localhost:5173/a#top")).toBe(true);
+    expect(sameOrigin("http://localhost:5173", "http://localhost:5173/")).toBe(true);
+  });
+
+  it("distinguishes port, scheme, and host", () => {
+    expect(sameOrigin("http://localhost:5173/", "http://localhost:3000/")).toBe(false);
+    expect(sameOrigin("http://localhost:5173/", "https://localhost:5173/")).toBe(false);
+    expect(sameOrigin("http://localhost:5173/", "http://127.0.0.1:5173/")).toBe(false);
+  });
+
+  it("treats unparseable input as not same-origin", () => {
+    expect(sameOrigin("not a url", "http://localhost:5173/")).toBe(false);
+  });
+});
+
+describe("shouldVeilTarget", () => {
+  it("skips the veil for a same-origin path change over a painted page", () => {
+    expect(
+      shouldVeilTarget({
+        shownUrl: "http://localhost:5173/a",
+        nextUrl: "http://localhost:5173/b",
+        failed: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("veils a site switch", () => {
+    expect(
+      shouldVeilTarget({
+        shownUrl: "http://localhost:5173/",
+        nextUrl: "http://localhost:3000/",
+        failed: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("always veils on a cold start", () => {
+    expect(
+      shouldVeilTarget({ shownUrl: null, nextUrl: "http://localhost:5173/", failed: false }),
+    ).toBe(true);
+  });
+
+  it("always veils when the failure view is up", () => {
+    expect(
+      shouldVeilTarget({
+        shownUrl: "http://localhost:5173/",
+        nextUrl: "http://localhost:5173/",
+        failed: true,
+      }),
+    ).toBe(true);
   });
 });

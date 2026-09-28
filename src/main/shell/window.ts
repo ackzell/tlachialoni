@@ -10,7 +10,7 @@ import {
   type ColorMode,
   type VariantSlug,
 } from "../state/schema";
-import { normalizeTarget } from "../nav/policy";
+import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS } from "@shared/commands";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
@@ -55,6 +55,12 @@ export class AppWindow {
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
   private currentUrl: string;
+  /**
+   * The URL of the document actually committed to the view, or null before the
+   * first paint. Unlike `currentUrl` it is never seeded from persisted state, so
+   * a cold start reads as "nothing painted" and still veils (see loadTarget).
+   */
+  private shownUrl: string | null = null;
 
   constructor() {
     this.store = new StateStore(path.join(app.getPath("userData"), "state.json"));
@@ -325,22 +331,34 @@ export class AppWindow {
   // ---- internals -------------------------------------------------------
 
   private loadTarget(url: string): void {
+    // A same-origin path change over an already-painted page is the site
+    // navigating itself; it needs no veil (the old frame stays until commit).
+    // Read `failed` before clearing it: a load from the failure view always veils.
+    const veil = shouldVeilTarget({
+      shownUrl: this.shownUrl,
+      nextUrl: url,
+      failed: this.failed,
+    });
     this.failed = false;
     this.failedUrl = null;
-    this.showLoading = true;
+    this.showLoading = veil;
     this.requestedTarget = url;
     this.relayout();
-    this.reportLoading(true);
+    if (veil) this.reportLoading(true);
     // did-fail-load drives the failure view; swallow the rejection so a refused
     // connection is not reported as an unhandled promise.
     void this.siteView.webContents.loadURL(url).catch(() => {});
   }
 
   private handleReady(url: string): void {
+    // Only a raised veil owes a renderer leave; without one there is nothing to
+    // wait for before collapsing the shell.
+    const veilWasUp = this.showLoading;
     this.showLoading = false;
     this.failed = false;
     if (url) {
       this.currentUrl = url;
+      this.shownUrl = url;
       this.store.setTarget(url);
       this.store.recordRecent(url);
     }
@@ -348,7 +366,7 @@ export class AppWindow {
     this.sendToShell("viewport:ready", { url });
     this.broadcastState();
     // The veil's fade-out happens in the renderer; hold the collapse for it.
-    this.relayout(true);
+    this.relayout(veilWasUp);
   }
 
   /**
@@ -360,6 +378,7 @@ export class AppWindow {
     this.picker.invalidate();
     if (!url || url === this.currentUrl) return;
     this.currentUrl = url;
+    this.shownUrl = url;
     this.store.setTarget(url);
     this.broadcastState();
   }
@@ -385,9 +404,9 @@ export class AppWindow {
   }
 
   private setLoading(loading: boolean): void {
-    // The veil is a target-load indicator only (raised by loadTarget/retry).
-    // Spinner activity from the page itself — reloads, link clicks, iframe
-    // loads — never covers the view: the old frame stays visible until the new
+    // The veil is raised only for a site switch (or a cold start / failure load).
+    // Link clicks and iframe loads never cover the view, and neither does a
+    // same-origin palette navigation: the old frame stays visible until the new
     // one commits, so there is no white flash to hide (matches Chrome).
     if (!loading) this.showLoading = false;
     this.relayout();
