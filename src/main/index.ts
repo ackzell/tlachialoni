@@ -2,7 +2,7 @@ import { app, Menu, session } from "electron";
 import os from "node:os";
 import path from "node:path";
 import icon from "../../resources/icon.png?asset";
-import { COMMANDS, type Accelerator } from "@shared/commands";
+import { COMMANDS, THEME_VARIANTS, type Accelerator } from "@shared/commands";
 import { formatReleaseDate } from "@shared/release";
 import { StateStore } from "./state/store";
 import { ExtensionManager } from "./extensions/manager";
@@ -42,21 +42,99 @@ if (
   app.setPath("userData", path.join(os.tmpdir(), `tlachialoni-docktest-${process.pid}`));
 }
 
-/** Commands whose accelerators live on the menu so they work from any panel. */
-const MENU_COMMAND_IDS = [
-  "palette.open",
-  "palette.editUrl",
-  "palette.openTheme",
-  "strip.toggle",
-  "view.reload",
-  "view.hardReload",
-  "devtools.toggle",
-  "devtools.dock.bottom",
-  "devtools.dock.right",
-  "devtools.dock.left",
-  "focus.toggle",
-  "picker.toggle",
+/**
+ * Menu-bar groups, in order, as a Chrome/Safari-style set of app-specific
+ * top-level menus (Apple HIG: custom menus sit between View and Window). A
+ * `null` entry is a separator. Every item is a catalog command id, so labels and
+ * accelerators stay sourced from `COMMANDS`.
+ *
+ * These menus are static: state such as the active theme or recents is
+ * intentionally not shown (it would need a rebuild on every change).
+ */
+const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
+  {
+    label: "View",
+    items: [
+      "palette.open",
+      "palette.openTheme",
+      null,
+      "view.reload",
+      "view.hardReload",
+      null,
+      "strip.toggle",
+    ],
+  },
+  {
+    label: "History",
+    items: ["view.back", "view.forward", null, "palette.editUrl"],
+  },
+  {
+    label: "DevTools",
+    items: [
+      "devtools.toggle",
+      null,
+      "devtools.dock.bottom",
+      "devtools.dock.right",
+      "devtools.dock.left",
+      null,
+      "focus.toggle",
+      "picker.toggle",
+    ],
+  },
+  {
+    label: "Theme",
+    items: [
+      ...THEME_VARIANTS.map((variant) => `theme.variant.${variant.slug}`),
+      null,
+      "theme.cycleMode",
+    ],
+  },
+  {
+    label: "Extensions",
+    items: ["extensions.installFolder", "extensions.reload", "extensions.revealFolder"],
+  },
 ];
+
+/**
+ * Commands that must never carry an OS accelerator: macOS would then swallow
+ * `⌘←`/`⌘→` app-wide and break native text navigation in editable fields. They
+ * remain clickable menu items; the page-level dispatcher owns the keyboard path
+ * and yields the keys to focused inputs.
+ */
+const NO_OS_ACCELERATOR = new Set(["view.back", "view.forward"]);
+
+function menuItemFor(commandId: string): Electron.MenuItemConstructorOptions {
+  const command = COMMANDS.find((entry) => entry.id === commandId);
+  if (!command) throw new Error(`Unknown menu command: ${commandId}`);
+  // A "Theme: Jade" row reads fine in the palette; inside the Theme menu the
+  // prefix is redundant.
+  const label = command.id.startsWith("theme.variant.")
+    ? command.label.replace(/^Theme: /, "")
+    : command.label;
+  const accelerator =
+    command.accelerator && !NO_OS_ACCELERATOR.has(command.id)
+      ? toElectronAccelerator(command.accelerator)
+      : undefined;
+  return {
+    label,
+    accelerator,
+    click: () => {
+      void mainWindow?.runCommand(command.id);
+    },
+  };
+}
+
+function buildSection(section: {
+  label: string;
+  items: Array<string | null>;
+}): Electron.MenuItemConstructorOptions {
+  return {
+    label: section.label,
+    submenu: section.items.map((id): Electron.MenuItemConstructorOptions =>
+      id === null ? { type: "separator" } : menuItemFor(id),
+    ),
+  };
+}
 
 function toElectronAccelerator(accelerator: Accelerator): string {
   const parts: string[] = [];
@@ -76,20 +154,21 @@ function installMenu(): void {
   // Menu accelerators are handled by the OS menu, so these shortcuts keep working
   // even while focus is inside the DevTools panel (where the page's
   // before-input-event never fires). The window still shows no chrome.
-  const viewItems = COMMANDS.filter(
-    (command) => command.accelerator && MENU_COMMAND_IDS.includes(command.id),
-  ).map((command) => ({
-    label: command.label,
-    accelerator: toElectronAccelerator(command.accelerator as Accelerator),
-    click: () => {
-      void mainWindow?.runCommand(command.id);
-    },
-  }));
-
   const template: Electron.MenuItemConstructorOptions[] = [
     { role: "appMenu" },
     { role: "editMenu" },
-    { label: "View", submenu: viewItems },
+    ...MENU_SECTIONS.map(buildSection),
+    {
+      label: "Window",
+      submenu: [
+        menuItemFor("window.close"),
+        { type: "separator" },
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        { role: "front" },
+      ],
+    },
   ];
 
   // Development-only: keep a transient shell surface on screen to style it
