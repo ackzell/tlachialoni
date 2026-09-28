@@ -4,7 +4,7 @@
   "private": true,
   "description": "A chromeless localhost browser with docked Chromium DevTools",
   "author": {
-    "name": "Axel Uriel Martínez Castillo",
+    "name": "ackzell",
     "url": "https://ackzell.dev"
   },
   "main": "./out/main/index.js",
