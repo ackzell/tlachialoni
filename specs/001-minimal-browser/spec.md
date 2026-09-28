@@ -46,7 +46,8 @@ the window and confirm both reflow. Delivers standalone value on its own.
 ### User Story 2 - Navigate with the command palette (Priority: P2)
 
 The developer presses `⌘P` to open a top-centered command palette, centered
-horizontally near the top of the window. With an empty input it lists available
+horizontally near the top of the window, and presses it again to dismiss. With an
+empty input it lists available
 commands and recent targets. Typing a URL, or a shorthand such as `:5173`,
 `5173`, or `localhost:5173`, navigates the view.
 Pressing `⌘L` opens the palette prefilled with the current target for editing.
@@ -70,6 +71,7 @@ offered in recents.
 7. **Given** the palette is open, **When** the developer presses `Esc` or clicks outside it, **Then** the palette closes and keyboard focus returns to the page.
 8. **Given** the palette is open, **When** the developer types a query that fuzzy-matches a command, **Then** the matched characters in that row's label are emphasized (bolder, in the theme accent) without altering the label text.
 9. **Given** the palette is open with more matches than fit the visible list, **When** the developer moves the highlight with the arrow keys past the visible window, **Then** the list scrolls to keep the highlighted row in view.
+10. **Given** the palette is open, **When** the developer presses `⌘P` again, **Then** the palette dismisses and keyboard focus returns to the page.
 
 ---
 
@@ -229,7 +231,7 @@ renders.
 - **FR-002**: The system MUST provide genuine Chromium DevTools docked within the same window as the page, on a selectable side (bottom, right, or left).
 - **FR-003**: On first launch, the system MUST open DevTools docked at the bottom.
 - **FR-004**: The system MUST persist across launches: the current target, recents, DevTools dock side and open state, strip visibility, window size and position, theme variant, and color mode. Across instances, global preferences (theme variant, color mode, dock side and open state, strip visibility) and recents are shared — recents merge so targets opened in any instance are retained — while the persisted current target and window bounds are last-writer-wins.
-- **FR-005**: The system MUST open a command palette on `⌘P` that lists commands and recents when the input is empty and filters both as the developer types.
+- **FR-005**: The system MUST toggle a command palette on `⌘P` — opening it when closed and dismissing it when open — listing commands and recents when the input is empty and filtering both as the developer types.
 - **FR-006**: The system MUST normalize target shorthand: `:5173`, `5173`, and `localhost:5173` resolve to `http://localhost:5173`; well-formed local http/https URLs pass through unchanged; all other schemes and non-local addresses are rejected with visible feedback.
 - **FR-007**: The system MUST provide `⌘L` to open the palette prefilled with the current target.
 - **FR-008**: The system MUST provide `⌘⇧J` to toggle DevTools and `⌘⇧1` / `⌘⇧2` / `⌘⇧3` to dock bottom / right / left, with equivalent palette commands for each.

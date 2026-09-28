@@ -44,7 +44,8 @@ isolation active).
 
 ### S2 — Palette (Story 2; FR-005–FR-007, FR-022, FR-026, FR-027)
 
-`⌘P` opens a centered palette listing commands and recents. Type `:5173` and
+`⌘P` opens a centered palette listing commands and recents, and `⌘P` again
+dismisses it. Type `:5173` and
 submit → the view navigates to `http://localhost:5173`. Submit `file:///etc` → it is
 rejected with feedback and the target is unchanged. Type a command query such as
 `reload` → the matching characters are emphasized in each matched row's label.

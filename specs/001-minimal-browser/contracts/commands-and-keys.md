@@ -9,7 +9,7 @@ focus, then dispatched through `command:run` semantics.
 
 | Command id             | Palette label                | Accelerator           | Notes                                                 |
 | ---------------------- | ---------------------------- | --------------------- | ----------------------------------------------------- |
-| `palette.open`         | Show Command Palette         | `⌘P`                  | Opens empty; recents + commands listed                |
+| `palette.open`         | Toggle Command Palette       | `⌘P`                  | Toggles; opens empty with recents + commands listed   |
 | `palette.editUrl`      | Edit Current URL             | `⌘L`                  | Opens palette prefilled with the current target       |
 | `target.navigate`      | Go to…                       | (palette input)       | Validated against the local-target policy             |
 | `strip.toggle`         | Toggle Window Controls       | `⌘B`                  | Explicit toggle; overlay, does not move the page      |

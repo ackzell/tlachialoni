@@ -42,7 +42,7 @@ export const THEME_VARIANTS = [
 export const COMMANDS: CommandDef[] = [
   {
     id: "palette.open",
-    label: "Show Command Palette",
+    label: "Toggle Command Palette",
     acceleratorLabel: "⌘P",
     accelerator: { meta: true, code: "KeyP" },
     palette: false,

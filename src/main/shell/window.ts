@@ -202,7 +202,7 @@ export class AppWindow {
 
   private registerCommands(): void {
     const { commands } = this;
-    commands.register("palette.open", () => this.openPalette(""));
+    commands.register("palette.open", () => this.togglePalette());
     commands.register("palette.close", () => this.closePalette());
     commands.register("palette.editUrl", (arg) =>
       this.openPalette(typeof arg === "string" && arg.trim() ? arg : this.currentUrl),
@@ -429,6 +429,19 @@ export class AppWindow {
     this.broadcastState();
     this.sendToShell("palette:open", { initial });
     this.shellView.webContents.focus();
+  }
+
+  /**
+   * `⌘P` toggles the palette: it opens empty when closed and dismisses when it
+   * is already open, so the same key that summons it also puts it away. Closing
+   * mirrors `Esc` — the renderer plays its leave and returns focus to the page.
+   */
+  private togglePalette(): void {
+    if (this.paletteOpen) {
+      this.closePalette();
+      return;
+    }
+    this.openPalette("");
   }
 
   private closePalette(): void {
