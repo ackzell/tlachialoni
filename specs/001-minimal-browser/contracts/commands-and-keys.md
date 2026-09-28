@@ -73,7 +73,28 @@ are derived from `COMMAND_GROUPS` in `src/shared/commands.ts` (FR-020).
 3. **Editable focus**: when `site:focus-editable` reports an editable element,
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
-5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators (the macOS **View** menu) and fire app-wide, wherever focus is. This only helps for chords DevTools does not itself bind: `⌘P`, for example, is consumed by the DevTools front-end when it is focused, so `⌘J` (`focus.toggle`) exists to move keyboard focus back to the page without the mouse.
+5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators and fire app-wide, wherever focus is. This only helps for chords DevTools does not itself bind: `⌘P`, for example, is consumed by the DevTools front-end when it is focused, so `⌘J` (`focus.toggle`) exists to move keyboard focus back to the page without the mouse.
+
+## OS menu bar
+
+The application menu is a set of Chrome/Safari-style **domain menus** built from
+the same catalog (011-grouped-os-menu). It is static — the active theme, recents,
+and per-extension state are not mirrored, since that would require rebuilding the
+menu on every change.
+
+| Menu | Items |
+| ---- | ----- |
+| View | Toggle Command Palette `⌘P`, Browse Themes `⌘T` · Reload `⌘R`, Hard Reload `⇧⌘R` · Toggle Window Strip `⌘B` |
+| History | Back, Forward · Edit Current Target `⌘L` |
+| DevTools | Toggle DevTools `⌘⌥J` · Dock Bottom/Right/Left `⌘1/2/3` · Toggle Focus `⌘J`, Inspect Element `⌘⇧C` |
+| Theme | the eight variants · Cycle Color Mode |
+| Extensions | Install from Folder, Reload Extensions, Reveal Extensions Folder |
+| Window | Close Window · Minimize, Zoom, Front (standard roles) |
+
+`view.back` / `view.forward` are deliberately listed **without** OS accelerators:
+a menu key equivalent would be swallowed app-wide and break native `⌘←` / `⌘→`
+text navigation (rule 3 above). Dev builds append a separate **Developer** menu of
+surface previews (008-surface-preview).
 6. **Mouse / swipe history**: the mouse's back/forward thumb buttons navigate history — on macOS mouse drivers deliver them as synthesized `swipe` events (`left` → back, `right` → forward); on Windows/Linux as `app-command` `browser-backward` / `browser-forward`.
 
 ## Guard rails

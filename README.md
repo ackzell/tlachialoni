@@ -137,6 +137,7 @@ See:
 - `specs/008-surface-preview/spec.md` — previewing transient shell surfaces in development
 - `specs/009-macos-traffic-lights/spec.md` — native window controls bound to the strip
 - `specs/010-palette-groups/spec.md` — grouped command palette and host-grouped recents
+- `specs/011-grouped-os-menu/spec.md` — domain-grouped application menu
 
 ## License
 
