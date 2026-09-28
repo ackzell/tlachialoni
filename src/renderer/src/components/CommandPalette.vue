@@ -11,6 +11,7 @@ const query = ref(props.initial);
 const selected = ref(0);
 const error = ref("");
 const input = ref<HTMLInputElement | null>(null);
+const list = ref<HTMLElement | null>(null);
 
 const rows = computed<Row[]>(() =>
   buildRows(
@@ -48,6 +49,18 @@ function move(delta: number): void {
   if (!count) return;
   selected.value = (selected.value + delta + count) % count;
 }
+
+/**
+ * Keep the highlighted row on screen as the arrow keys walk the list. `nearest`
+ * scrolls only when the row has crossed an edge of the visible window, so a
+ * hover, or a row that is already in view, never nudges the list.
+ */
+watch(selected, async (index) => {
+  await nextTick();
+  list.value
+    ?.querySelector<HTMLElement>(`[data-index="${index}"]`)
+    ?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+});
 
 interface LabelPart {
   text: string;
@@ -218,7 +231,7 @@ function onLeave(el: Element, done: () => void): void {
         @keydown="onKeydown"
       />
       <p v-if="error" class="palette__error">{{ error }}</p>
-      <ul class="palette__list">
+      <ul ref="list" class="palette__list">
         <TransitionGroup
           name="palette-row"
           :css="false"
