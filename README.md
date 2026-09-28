@@ -52,6 +52,27 @@ npm run test       # unit tests (Vitest)
 
 The default target is `http://localhost:3000`.
 
+### Surface previews
+
+The transient shell surfaces are hard to trigger on demand (a slow server for
+the loading veil, a dead one for the failure view, a real download for the
+install status). In a dev build, the **Developer** menu puts each one into a
+representative state and holds it there so you can style it with live HMR:
+
+- **Preview Loading Veil**
+- **Preview Failure View**
+- **Preview Extension Install** (loops every phase, including progress)
+- **Stop Preview**
+
+The extension preview can also start with the app:
+
+```sh
+TLACHIALONI_DEMO_STATUS=1 npm run dev
+```
+
+The Developer menu is absent from packaged builds. See
+`specs/008-surface-preview/spec.md`.
+
 ## Packaging
 
 ```sh
@@ -111,6 +132,7 @@ See:
 - `specs/004-shell-motion/spec.md` — motion for the transient shell surfaces
 - `specs/006-release-versioning-about/spec.md` — release versioning and the About panel
 - `specs/007-extension-support/spec.md` — installing and managing extensions
+- `specs/008-surface-preview/spec.md` — previewing transient shell surfaces in development
 
 ## License
 

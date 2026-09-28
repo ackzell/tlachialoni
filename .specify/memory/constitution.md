@@ -141,6 +141,11 @@ it is now proven, so shipping is part of the product.
 - Risk retirement is spike-first. The docked-DevTools-in-a-frameless-window
   proof MUST succeed before UI is built on top of the architecture. If the
   architecture assumption fails, the fallback is documented before proceeding.
+- Transient shell surfaces MUST be previewable in development builds so their
+  look and motion can be iterated with live reload; such affordances are
+  dev-only, MUST be absent from packaged builds, and are exempt from the
+  palette-listing principle because they are not shipped capabilities (see
+  `specs/008-surface-preview/`).
 - The repository is MIT-licensed. The app runs from source (`npm run dev`)
   during development and MUST also be packageable into a standalone artifact
   (see Packaging & Distribution).
@@ -158,4 +163,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-28
+**Version**: 2.2.1 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-28
