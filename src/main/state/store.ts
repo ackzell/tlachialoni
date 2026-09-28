@@ -6,6 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import type { InstalledExtension } from "@shared/extensions";
 import {
   type PersistedState,
   type Bounds,
@@ -94,6 +95,14 @@ export class StateStore {
 
   setColorMode(colorMode: ColorMode): PersistedState {
     return this.update({ colorMode });
+  }
+
+  /**
+   * Replaces the installed extension list. Membership is last-writer-wins, like
+   * the other scalar preferences (FR-004).
+   */
+  setExtensions(extensions: InstalledExtension[]): PersistedState {
+    return this.update({ extensions });
   }
 
   /**

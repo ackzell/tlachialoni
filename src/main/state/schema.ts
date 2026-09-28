@@ -4,6 +4,7 @@
  */
 
 import { isLocalHostname } from "../nav/policy";
+import type { ExtensionSource, InstalledExtension } from "@shared/extensions";
 
 export type DockMode = "bottom" | "right" | "left";
 export type ColorMode = "system" | "dark" | "light";
@@ -43,11 +44,13 @@ export interface PersistedState {
   bounds: Bounds | null;
   variant: VariantSlug;
   colorMode: ColorMode;
+  extensions: InstalledExtension[];
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const DEFAULT_TARGET = "http://localhost:3000";
 export const MAX_RECENTS = 10;
+export const MAX_EXTENSIONS = 32;
 export const MIN_WIDTH = 480;
 export const MIN_HEIGHT = 360;
 export const DEFAULT_WIDTH = 1440;
@@ -55,6 +58,7 @@ export const DEFAULT_HEIGHT = 900;
 
 const DOCK_MODES: DockMode[] = ["bottom", "right", "left"];
 const COLOR_MODES: ColorMode[] = ["system", "dark", "light"];
+const EXTENSION_SOURCES: ExtensionSource[] = ["store", "folder"];
 
 export function defaultState(): PersistedState {
   return {
@@ -67,6 +71,7 @@ export function defaultState(): PersistedState {
     bounds: null,
     variant: "obsidian",
     colorMode: "system",
+    extensions: [],
   };
 }
 
@@ -138,7 +143,43 @@ export function sanitizeState(raw: unknown): PersistedState {
     bounds,
     variant,
     colorMode,
+    extensions: sanitizeExtensions(input.extensions),
   };
+}
+
+/**
+ * Coerces the persisted extension list, dropping malformed records and duplicate
+ * slugs while keeping every valid one (FR-015). A dropped record never
+ * invalidates the rest of the state.
+ */
+export function sanitizeExtensions(raw: unknown): InstalledExtension[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const extensions: InstalledExtension[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.slug !== "string" || !record.slug) continue;
+    if (typeof record.id !== "string") continue;
+    if (typeof record.name !== "string" || !record.name) continue;
+    if (typeof record.version !== "string") continue;
+    if (!EXTENSION_SOURCES.includes(record.source as ExtensionSource)) continue;
+    if (typeof record.enabled !== "boolean") continue;
+    if (typeof record.installedAt !== "number" || !Number.isFinite(record.installedAt)) continue;
+    if (seen.has(record.slug)) continue;
+    seen.add(record.slug);
+    extensions.push({
+      slug: record.slug,
+      id: record.id,
+      name: record.name,
+      version: record.version,
+      source: record.source as ExtensionSource,
+      enabled: record.enabled,
+      installedAt: record.installedAt,
+    });
+    if (extensions.length >= MAX_EXTENSIONS) break;
+  }
+  return extensions;
 }
 
 /** Merges a newly loaded target into recents: dedupe, newest first, capped. */
