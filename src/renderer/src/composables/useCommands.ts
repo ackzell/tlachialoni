@@ -25,6 +25,12 @@ export function fuzzyScore(query: string, text: string): number {
 export interface Row {
   kind: "target" | "command" | "recent";
   id: string;
+  /**
+   * Stable DOM identity for the row. Unlike `id`, this never collides across
+   * row kinds and never changes while the row persists — the typed-target row
+   * keeps one key for the whole typing session even though its label changes.
+   */
+  key: string;
   label: string;
   detail?: string;
   accelerator?: string;
@@ -49,6 +55,7 @@ export function buildRows(
     rows.push({
       kind: "target",
       id: "target.navigate",
+      key: "target.typed",
       label: `Open ${trimmed}`,
       detail: "navigate",
     });
@@ -57,6 +64,7 @@ export function buildRows(
       rows.push({
         kind: "recent",
         id: "target.navigate",
+        key: `target.recent:${recent.url}`,
         label: recent.url,
         detail: "recent",
         arg: recent.url,
@@ -79,6 +87,7 @@ export function buildRows(
     rows.push({
       kind: "command",
       id: command.id,
+      key: `command:${command.id}`,
       label: command.label,
       accelerator: command.acceleratorLabel,
       detail,

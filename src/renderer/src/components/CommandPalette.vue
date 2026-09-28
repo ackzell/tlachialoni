@@ -83,6 +83,97 @@ function onKeydown(event: KeyboardEvent): void {
     void activate();
   }
 }
+
+// ---- row motion (Vue docs: TransitionGroup + JS hooks) --------------------
+//
+// Timings read from the same motion tokens as the CSS surfaces, with fallbacks
+// for the JSDOM-free unit runs. `prefersReduced()` collapses everything to a
+// snap so reduced-motion users get the end state immediately.
+
+interface MotionTiming {
+  fast: number;
+  stagger: number;
+  cap: number;
+}
+
+function motionTiming(): MotionTiming {
+  const styles = getComputedStyle(document.documentElement);
+  const ms = (name: string, fallback: number): number => {
+    const value = parseFloat(styles.getPropertyValue(name));
+    return Number.isFinite(value) ? value : fallback;
+  };
+  return {
+    fast: ms("--tb-motion-fast", 160),
+    stagger: ms("--tb-motion-stagger", 36),
+    cap: ms("--tb-motion-stagger-cap", 6),
+  };
+}
+
+const reducedMotion = (): boolean =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+/** Delay for a row currently rendered at `data-index`. */
+function delayFor(el: Element): number {
+  if (reducedMotion()) return 0;
+  const { stagger, cap } = motionTiming();
+  const index = Number((el as HTMLElement).dataset.index ?? 0);
+  return Math.min(Number.isFinite(index) ? index : 0, cap) * stagger;
+}
+
+/**
+ * The row animates with the Web Animations API. `done` releases the transition,
+ * so a mid-flight interruption still completes cleanly.
+ */
+function animateRow(
+  el: Element,
+  keyframes: Keyframe[],
+  duration: number,
+  delay: number,
+  done: () => void,
+): void {
+  const animation = el.animate(keyframes, {
+    duration,
+    delay,
+    easing: "cubic-bezier(0.2, 0, 0, 1)",
+    fill: "both",
+  });
+  animation.finished.then(done, done);
+}
+
+function onBeforeEnter(el: Element): void {
+  (el as HTMLElement).style.opacity = "0";
+}
+
+function onEnter(el: Element, done: () => void): void {
+  const { fast } = motionTiming();
+  // Height eases from 0 so the list unfolds rather than jumping, as in the
+  // Vue staggering example; the row's own height is fixed, so the target is a
+  // constant and nothing is measured while typing.
+  animateRow(
+    el,
+    [
+      { opacity: 0, height: "0px" },
+      { opacity: 1, height: "var(--palette-row-height, 34px)" },
+    ],
+    reducedMotion() ? 1 : fast,
+    delayFor(el),
+    done,
+  );
+}
+
+function onLeave(el: Element, done: () => void): void {
+  const { fast } = motionTiming();
+  animateRow(
+    el,
+    [
+      { opacity: 1, height: "var(--palette-row-height, 34px)" },
+      { opacity: 0, height: "0px" },
+    ],
+    reducedMotion() ? 1 : fast,
+    0,
+    done,
+  );
+}
 </script>
 
 <template>
@@ -98,18 +189,27 @@ function onKeydown(event: KeyboardEvent): void {
       />
       <p v-if="error" class="palette__error">{{ error }}</p>
       <ul class="palette__list">
-        <li
-          v-for="(row, index) in rows"
-          :key="row.id + row.label"
-          class="palette__row"
-          :class="{ 'is-selected': index === selected }"
-          @mouseenter="selected = index"
-          @click="activate(row)"
+        <TransitionGroup
+          name="palette-row"
+          :css="false"
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @leave="onLeave"
         >
-          <span class="palette__label">{{ row.label }}</span>
-          <span class="palette__meta">{{ row.accelerator ?? row.detail }}</span>
-        </li>
-        <li v-if="!rows.length" class="palette__empty">No matches</li>
+          <li
+            v-for="(row, index) in rows"
+            :key="row.key"
+            :data-index="index"
+            class="palette__row"
+            :class="{ 'is-selected': index === selected }"
+            @mouseenter="selected = index"
+            @click="activate(row)"
+          >
+            <span class="palette__label">{{ row.label }}</span>
+            <span class="palette__meta">{{ row.accelerator ?? row.detail }}</span>
+          </li>
+          <li v-if="!rows.length" key="palette-empty" class="palette__empty">No matches</li>
+        </TransitionGroup>
       </ul>
     </div>
   </div>
@@ -212,6 +312,16 @@ function onKeydown(event: KeyboardEvent): void {
   scrollbar-gutter: stable;
 }
 
+/*
+ * Row motion is driven from JavaScript (Vue docs: TransitionGroup with
+ * `:css="false"` and enter/leave hooks), so the rows carry no CSS transition
+ * classes of their own. Timings come from the same motion tokens as the rest of
+ * the shell, read at runtime in the component.
+ *
+ * Row height is fixed so the hooks animate toward a constant instead of
+ * measuring the DOM on every keystroke, and so a long label can never reflow
+ * the list.
+ */
 .palette__row {
   display: flex;
   align-items: center;
@@ -221,6 +331,11 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: 6px;
   color: var(--tb-fg-muted);
   cursor: default;
+  /* One line, always: rows never change height, so the list height is a pure
+     function of the row count and a long label can never reflow it. */
+  height: var(--palette-row-height, 34px);
+  box-sizing: border-box;
+  overflow: hidden;
   transition:
     background-color var(--tb-motion-fast) var(--tb-motion-ease-out),
     color var(--tb-motion-fast) var(--tb-motion-ease-out);
@@ -232,6 +347,9 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .palette__label {
+  /* min-width: 0 lets this flex child shrink below its content width so the
+     ellipsis engages instead of the text overflowing or wrapping. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -241,6 +359,7 @@ function onKeydown(event: KeyboardEvent): void {
   color: var(--tb-fg-subtle);
   font-size: 12px;
   flex: none;
+  white-space: nowrap;
 }
 
 /* The hover fill lands near --tb-fg-subtle, so lift the meta on the active row. */
