@@ -19,6 +19,21 @@ The only UI is transient and keyboard-first:
 Everything is themed with [Tlapalli](https://tlapalli.ackzell.dev) (eight mineral
 variants, dark/light following the system) in Source Code Pro.
 
+## Extensions
+
+Chrome extensions can be installed at runtime from the command palette — nothing
+is bundled. Paste a Chrome Web Store link or extension ID and choose **Install
+extension …**, or choose **Install Extension from Folder** for an unpacked
+extension. Installs show a transient status surface with a spinner, the current
+stage, and a download progress bar; each installed extension also appears in the
+palette as a row you can enable, disable, update, or remove.
+
+Extensions load only into the guest page, never into the shell UI. Electron
+supports a subset of extension APIs (content scripts, DevTools pages, and
+Manifest V2 backgrounds — not Manifest V3 background service workers), so some
+store extensions run only partially. See
+`specs/007-extension-support/spec.md` for the details and limits.
+
 ## Requirements
 
 - macOS 13+ (Apple silicon)
@@ -95,6 +110,7 @@ See:
 - `specs/003-standalone-packaging/spec.md` — standalone app packaging
 - `specs/004-shell-motion/spec.md` — motion for the transient shell surfaces
 - `specs/006-release-versioning-about/spec.md` — release versioning and the About panel
+- `specs/007-extension-support/spec.md` — installing and managing extensions
 
 ## License
 

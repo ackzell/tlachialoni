@@ -19,13 +19,18 @@ the developer already has.
 
 The developer's site (the guest page) renders in an isolated, sandboxed context
 with no privileged runtime access. The shell MUST NOT persistently modify the
-guest page's DOM, styles, or scripts. The single sanctioned exception is the
-armed element picker's transient overlay, which MUST be removed on selection,
-cancel, or navigation.
+guest page's DOM, styles, or scripts. Two exceptions are sanctioned, both
+explicit and never implicit: the armed element picker's transient overlay, which
+MUST be removed on selection, cancel, or navigation; and extensions the
+developer chooses to install, which MAY modify the page by their own design.
+Extensions are loaded only into the guest page's session and are never bundled,
+pre-installed, or injected by the tool itself.
 
 Rationale: the tool inspects an application under development. Polluting that
 application with the tool's own code would corrupt the very thing being
-debugged and invalidate frontend work.
+debugged and invalidate frontend work. Developer-installed extensions are a
+deliberate exception: they are the developer's own tooling, chosen and auditable
+by them, and they belong to the inspected page rather than to the shell.
 
 ### III. Keyboard-First Ergonomics
 
@@ -99,6 +104,14 @@ source keeps the small UI coherent without a design system of its own.
   inside the tool.
 - Transient picker injection MUST clean up on selection, cancel, or navigation;
   no residual listeners or elements may remain.
+- Extensions MUST load only into the guest page's session; the shell MUST remain
+  outside every extension's reach (FR-028 of `specs/007-extension-support/`).
+- Extensions are installed only by explicit developer action. The tool MUST NOT
+  bundle, pre-install, or silently install any extension, and MUST load only
+  unpacked extension folders the developer installed through the palette.
+- A developer-installed extension is arbitrary code with access to local
+  development servers; the tool MUST treat installation as an explicit,
+  visible action and MUST surface load failures rather than fail silently.
 
 ## Packaging & Distribution
 
@@ -145,4 +158,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.1.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-27
+**Version**: 2.2.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-28
