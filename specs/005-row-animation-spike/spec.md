@@ -10,7 +10,9 @@ See `spikes/row-animation/results.md`.
 **Outcome**: The volatile `Open <query>` row key was the cause, not the engine.
 With a stable `Row.key`, every candidate technique passes with zero duplicates.
 Shipped: the Vue-docs JS-hook technique (`TransitionGroup` + `:css="false"`) with a
-staggered enter, a shrink-and-fade leave, and a fixed row height.
+staggered enter, an opacity-only leave, and a fixed row height. Leaving rows
+animate opacity only because animating their height reflowed the list every frame
+and read as choppiness during fast typing.
 
 **Input**: User description: "Let's give row animation another shot, or create a spike to see what technique is the best here."
 

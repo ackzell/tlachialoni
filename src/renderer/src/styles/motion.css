@@ -13,6 +13,15 @@
   --tb-motion-stagger-cap: 6;
   --tb-motion-shift: 4px;
   --tb-motion-scale: 0.96;
+  /*
+   * Rows leave faster than they arrive and stagger less: with enter and leave
+   * overlapping during fast typing, a long leave widens the window where both
+   * are on screen, which reads as choppiness. Exit is quick, entry keeps the
+   * unfold.
+   */
+  --tb-motion-row-leave: 90ms;
+  --tb-motion-row-stagger: 20ms;
+  --tb-motion-row-stagger-cap: 5;
 }
 
 /*
@@ -27,5 +36,7 @@
     --tb-motion-stagger: 0ms;
     --tb-motion-shift: 0px;
     --tb-motion-scale: 1;
+    --tb-motion-row-leave: 0.01ms;
+    --tb-motion-row-stagger: 0ms;
   }
 }

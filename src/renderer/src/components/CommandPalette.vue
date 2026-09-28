@@ -49,6 +49,31 @@ function move(delta: number): void {
   selected.value = (selected.value + delta + count) % count;
 }
 
+interface LabelPart {
+  text: string;
+  hit: boolean;
+}
+
+/**
+ * Splits a row label into plain and matched segments so the fuzzy match can be
+ * emphasized. `row.matches` holds ascending indices into the label; the original
+ * casing is preserved because we slice `row.label`, not a lowercased copy.
+ */
+function labelParts(row: Row): LabelPart[] {
+  const matches = row.matches;
+  if (!matches?.length) return [{ text: row.label, hit: false }];
+
+  const parts: LabelPart[] = [];
+  let cursor = 0;
+  for (const index of matches) {
+    if (index > cursor) parts.push({ text: row.label.slice(cursor, index), hit: false });
+    parts.push({ text: row.label[index] ?? "", hit: true });
+    cursor = index + 1;
+  }
+  if (cursor < row.label.length) parts.push({ text: row.label.slice(cursor), hit: false });
+  return parts;
+}
+
 async function activate(row?: Row): Promise<void> {
   const chosen = row ?? rows.value[selected.value];
   if (!chosen) return;
@@ -92,8 +117,9 @@ function onKeydown(event: KeyboardEvent): void {
 
 interface MotionTiming {
   fast: number;
-  stagger: number;
-  cap: number;
+  rowLeave: number;
+  rowStagger: number;
+  rowCap: number;
 }
 
 function motionTiming(): MotionTiming {
@@ -104,8 +130,9 @@ function motionTiming(): MotionTiming {
   };
   return {
     fast: ms("--tb-motion-fast", 160),
-    stagger: ms("--tb-motion-stagger", 36),
-    cap: ms("--tb-motion-stagger-cap", 6),
+    rowLeave: ms("--tb-motion-row-leave", 90),
+    rowStagger: ms("--tb-motion-row-stagger", 20),
+    rowCap: ms("--tb-motion-row-stagger-cap", 5),
   };
 }
 
@@ -115,14 +142,16 @@ const reducedMotion = (): boolean =>
 /** Delay for a row currently rendered at `data-index`. */
 function delayFor(el: Element): number {
   if (reducedMotion()) return 0;
-  const { stagger, cap } = motionTiming();
+  const { rowStagger, rowCap } = motionTiming();
   const index = Number((el as HTMLElement).dataset.index ?? 0);
-  return Math.min(Number.isFinite(index) ? index : 0, cap) * stagger;
+  return Math.min(Number.isFinite(index) ? index : 0, rowCap) * rowStagger;
 }
 
 /**
  * The row animates with the Web Animations API. `done` releases the transition,
- * so a mid-flight interruption still completes cleanly.
+ * so a mid-flight interruption still completes cleanly. Only compositor-friendly
+ * properties are animated (`opacity`, `height`); a transform is never used here
+ * because the list is a flow layout and moving a row would need a reflow anyway.
  */
 function animateRow(
   el: Element,
@@ -162,14 +191,15 @@ function onEnter(el: Element, done: () => void): void {
 }
 
 function onLeave(el: Element, done: () => void): void {
-  const { fast } = motionTiming();
+  // Leaving animates opacity only. Animating height here forced a layout pass on
+  // every frame for each departing row, which is what made fast typing choppy:
+  // entering and leaving rows overlapped and the list reflowed continuously.
+  // The row keeps its slot for the duration of the fade, so nothing jumps; the
+  // list height settles when Vue unmounts it.
   animateRow(
     el,
-    [
-      { opacity: 1, height: "var(--palette-row-height, 34px)" },
-      { opacity: 0, height: "0px" },
-    ],
-    reducedMotion() ? 1 : fast,
+    [{ opacity: 1 }, { opacity: 0 }],
+    reducedMotion() ? 1 : motionTiming().rowLeave,
     0,
     done,
   );
@@ -205,7 +235,12 @@ function onLeave(el: Element, done: () => void): void {
             @mouseenter="selected = index"
             @click="activate(row)"
           >
-            <span class="palette__label">{{ row.label }}</span>
+            <span class="palette__label">
+              <template v-for="(part, partIndex) in labelParts(row)" :key="partIndex">
+                <strong v-if="part.hit" class="palette__match">{{ part.text }}</strong>
+                <template v-else>{{ part.text }}</template>
+              </template>
+            </span>
             <span class="palette__meta">{{ row.accelerator ?? row.detail }}</span>
           </li>
           <li v-if="!rows.length" key="palette-empty" class="palette__empty">No matches</li>
@@ -286,6 +321,7 @@ function onLeave(el: Element, done: () => void): void {
   color: var(--tb-fg);
   font: inherit;
   font-size: 14px;
+  caret-shape: block;
 }
 
 .palette__input::placeholder {
@@ -353,6 +389,14 @@ function onLeave(el: Element, done: () => void): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Fuzzy-match emphasis: the characters the query matched go bold in the theme
+   accent, so the hit reads at a glance. Inline elements only, so the label's
+   single-line ellipsis behavior is unaffected. */
+.palette__match {
+  font-weight: 600;
+  color: var(--tb-accent);
 }
 
 .palette__meta {

@@ -56,8 +56,9 @@ npm run typecheck  # explicit TS pass across node/preload/web
 1. Open the palette and type a query that changes the fuzzy result set. Newly
    matching rows unfold in with a staggered height-and-fade; rows that stay put do
    not re-animate.
-2. Delete characters so rows drop out. Departing rows shrink and fade where they
-   sit; the list does not grow, and the row under the pointer does not jump.
+2. Delete characters so rows drop out. Departing rows fade where they sit; the
+   list does not grow, and the row under the pointer does not jump. Exits are
+   quick (90 ms) and never animate height, so fast typing stays smooth.
 3. Type quickly (a burst of characters). No queued animation trail, no duplicates,
    and the settled row count always equals the number of matches.
 4. Type a long target (for example `localhost:5173/api/users?tab=1&sort=desc`).
