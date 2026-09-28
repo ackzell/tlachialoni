@@ -6,7 +6,9 @@
 # artwork under resources/ (electron-builder's default build/ is gitignored).
 
 appId: com.ackzell.tlachialoni
-copyright: Copyright © 2026 Axel Uriel Martínez Castillo
+# No `copyright` here on purpose: electron-builder derives the bundle copyright
+# (NSHumanReadableCopyright, shown in the macOS About panel) from package.json's
+# `author.name`, so the author is declared in exactly one place.
 
 directories:
   output: release
