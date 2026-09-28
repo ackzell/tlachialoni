@@ -8,13 +8,15 @@ dev server edge-to-edge with real Chromium DevTools docked inside the same windo
 The only UI is transient and keyboard-first:
 
 - `⌘P` — toggle the command palette (type a target like `:5173`, or run a command)
+- `⌘L` — edit the current target, with recent pages listed and grouped by origin
+- `⌘T` — jump to the theme picker
+- `Tab` / `Shift+Tab` — cycle the palette's groups (Location, DevTools, View, Theme, Extensions, Other)
 - `⌘B` — show/hide the draggable window strip (and, with it, the macOS window controls)
 - `⌘⌥J` — toggle DevTools; `⌘1/2/3` dock it bottom/right/left
 - `⌘J` — toggle keyboard focus between the page and DevTools
 - `⌘⇧C` — element picker with hover highlight
 - `⌘R` / `⇧⌘R` — reload / hard reload
 - `⌘←` / `⌘→` — back / forward (native text behavior inside inputs)
-- `⌘L` — edit the current target
 
 Everything is themed with [Tlapalli](https://tlapalli.ackzell.dev) (eight mineral
 variants, dark/light following the system) in Source Code Pro.
@@ -134,6 +136,7 @@ See:
 - `specs/007-extension-support/spec.md` — installing and managing extensions
 - `specs/008-surface-preview/spec.md` — previewing transient shell surfaces in development
 - `specs/009-macos-traffic-lights/spec.md` — native window controls bound to the strip
+- `specs/010-palette-groups/spec.md` — grouped command palette and host-grouped recents
 
 ## License
 

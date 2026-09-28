@@ -21,7 +21,7 @@ There are two bridges: the **shell** preload (Vue surfaces) and the **site** pre
 | `shell:ready` | send → | — | The renderer has mounted and subscribed; main flushes queued messages |
 | `state:changed` | ← on | `PersistedState` | Main pushes the full state (includes recents) |
 | `theme:apply` | ← on | `{ variant, colorMode, resolved }` | Main tells the shell which tokens to apply |
-| `palette:open` | ← on | `{ initial: string }` | Main asks the shell to show the palette (prefilled) |
+| `palette:open` | ← on | `{ initial: string; scope: Scope }` | Main asks the shell to show the palette (prefilled and scoped) |
 | `palette:close` | ← on | — | Main asks the shell to dismiss the palette |
 | `viewport:loading` | ← on | `{ loading: boolean }` | Drives the loading veil (FR-021) |
 | `viewport:ready` | ← on | `{ url: string }` | First successful content signal |

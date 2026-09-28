@@ -63,7 +63,9 @@ with feedback and the current target is unchanged.
 | `lastOpenedAt` | Ordering key (newest first) |
 
 Recorded only after a target loads successfully. Merged (not overwritten) when
-multiple instances write, so no instance's history is lost.
+multiple instances write, so no instance's history is lost. Bounded at 30 overall
+and 5 per origin (`010-palette-groups`); the palette groups entries by origin
+(`scheme://host:port`) and expands one origin's pages on demand.
 
 ## Entity: PickerSession
 

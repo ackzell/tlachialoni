@@ -7,31 +7,58 @@ focus, then dispatched through `command:run` semantics.
 
 ## Command catalog
 
-| Command id             | Palette label                | Accelerator           | Notes                                                 |
-| ---------------------- | ---------------------------- | --------------------- | ----------------------------------------------------- |
-| `palette.open`         | Toggle Command Palette       | `⌘P`                  | Toggles; opens empty with recents + commands listed   |
-| `palette.editUrl`      | Edit Current URL             | `⌘L`                  | Opens palette prefilled with the current target       |
-| `target.navigate`      | Go to…                       | (palette input)       | Validated against the local-target policy             |
-| `strip.toggle`         | Toggle Window Controls       | `⌘B`                  | Explicit toggle; overlay, does not move the page      |
-| `view.reload`          | Reload                       | `⌘R`                  |                                                       |
-| `view.hardReload`      | Hard Reload                  | `⇧⌘R`                 | Bypasses cache                                        |
-| `view.back`            | Back                         | `⌘←`                  | Disabled with no history; yields in editable fields   |
-| `view.forward`         | Forward                      | `⌘→`                  | Disabled with no history; yields in editable fields   |
-| `devtools.toggle`      | Toggle DevTools              | `⌘⌥J`                 | Reopens on the persisted side; `⌥` avoids the `⇧` slot macOS leans on |
-| `devtools.dock.bottom` | Dock DevTools Bottom | `⌘1` | Plain Command+number; `⇧⌘3/4/5` are macOS screenshots |
-| `devtools.dock.right` | Dock DevTools Right | `⌘2` |  |
-| `devtools.dock.left` | Dock DevTools Left | `⌘3` |  |
-| `focus.toggle`        | Toggle Focus (Page / DevTools) | `⌘J` | Moves keyboard focus between the page and the docked DevTools |
-| `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | Hover highlight; click selects in DevTools            |
-| `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | Eight commands, one per mineral variant               |
-| `theme.cycleMode`      | Cycle Color Mode             | —                     | `system → dark → light`, persisted                    |
-| `failure.retry`        | Retry                        | (failure view button) | Shown only while the target is unreachable            |
-| `failure.dismiss`      | Go Back to Last Target       | (failure view button) | Returns to the last working target; hidden when none  |
-| `window.close`         | Close Window                 | —                     | Strip close button; no accelerator to avoid accidents |
-| `app.quit`             | Quit                         | `⌘Q`                  | OS-standard                                           |
+Every command declares a `group`; the palette's group order and its `Tab` order
+are derived from `COMMAND_GROUPS` in `src/shared/commands.ts` (FR-020).
+
+| Command id             | Palette label                | Accelerator           | Group       | Notes                                                 |
+| ---------------------- | ---------------------------- | --------------------- | ----------- | ----------------------------------------------------- |
+| `palette.open`         | Toggle Command Palette       | `⌘P`                  | other       | Toggles; opens in All with every group listed         |
+| `palette.editUrl`      | Edit Current Target          | `⌘L`                  | other       | Opens scoped to Location, prefilled with the target, recents below |
+| `palette.openTheme`    | Browse Themes                | `⌘T`                  | other       | Opens scoped to Theme; the active variant is highlighted |
+| `target.navigate`      | Go to…                       | (palette input)       | location    | Validated against the local-target policy             |
+| `strip.toggle`         | Toggle Window Strip          | `⌘B`                  | other       | Overlay; does not move the page                       |
+| `view.reload`          | Reload                       | `⌘R`                  | view        |                                                       |
+| `view.hardReload`      | Hard Reload                  | `⇧⌘R`                | view        | Bypasses cache                                        |
+| `view.back`            | Back                         | `⌘←`                  | view        | Disabled with no history; yields in editable fields   |
+| `view.forward`         | Forward                      | `⌘→`                  | view        | Disabled with no history; yields in editable fields   |
+| `devtools.toggle`      | Toggle DevTools              | `⌘⌥J`                 | devtools    | Reopens on the persisted side; `⌥` avoids the `⇧` slot macOS leans on |
+| `devtools.dock.bottom` | Dock DevTools Bottom | `⌘1` | devtools | Plain Command+number; `⇧⌘3/4/5` are macOS screenshots |
+| `devtools.dock.right` | Dock DevTools Right | `⌘2` | devtools |  |
+| `devtools.dock.left` | Dock DevTools Left | `⌘3` | devtools |  |
+| `focus.toggle`        | Toggle Focus (Page / DevTools) | `⌘J` | devtools | Moves keyboard focus between the page and the docked DevTools |
+| `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | devtools    | Hover highlight; click selects in DevTools            |
+| `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | theme       | Eight commands, one per mineral variant               |
+| `theme.cycleMode`      | Cycle Color Mode             | —                     | theme       | `system → dark → light`, persisted                    |
+| `extensions.install`   | Install extension …          | —                     | extensions  | Contextual: offered when the input is a store URL/ID  |
+| `extensions.installFolder` | Install Extension from Folder | —                 | extensions  |                                                       |
+| `extensions.reload`    | Reload Extensions            | —                     | extensions  |                                                       |
+| `extensions.revealFolder` | Reveal Extensions Folder  | —                     | extensions  |                                                       |
+| `failure.retry`        | Retry                        | (failure view button) | other       | Shown only while the target is unreachable            |
+| `failure.dismiss`      | Go Back to Last Target       | (failure view button) | other       | Returns to the last working target; hidden when none  |
+| `window.close`         | Close Window                 | —                     | other       | Strip close button; no accelerator to avoid accidents |
+| `app.quit`             | Quit                         | `⌘Q`                  | —           | OS-standard (app menu), not in the palette catalog    |
 
 `VariantSlug` ∈ `obsidian`, `gold`, `turquoise`, `quartz`, `lapis-lazuli`,
 `amethyst`, `jade`, `fire-opal`.
+
+## Palette groups and scopes
+
+- **Scopes** are All plus each group (`COMMAND_GROUPS`), in declaration order.
+  `Tab` / `Shift+Tab` on the input cycle them, wrapping. The active scope shows
+  as a chip and constrains the listed rows.
+- **`⌘L` → Location**: the current target is prefilled and *selected* but is not
+  an active filter until edited, so recents stay listed. Recents collapse to one
+  row per **origin** (`scheme://host:port`); `→` expands an origin's pages, `←`
+  collapses it (from a page, `←` collapses its parent in one press), and `Enter`
+  opens the newest page for an origin.
+- **`⌘T` → Theme**: entering the group highlights the active variant; clearing a
+  typed query restores that highlight. Arrow keys live-preview; `Enter` commits
+  and dismisses; `Space` with an empty query commits and keeps the palette open.
+- **Scoped with fallback**: a query with no in-group match widens to all groups
+  and the palette says so. The typed-target row is offered only in Location/All,
+  and a pasted store URL only in Extensions/All (or via fallback).
+- **Recents bound**: at most `MAX_RECENTS` (30) overall and
+  `MAX_RECENTS_PER_HOST` (5) per origin, so one dev server cannot evict the rest.
 
 ## Dispatch and precedence
 
@@ -39,7 +66,10 @@ focus, then dispatched through `command:run` semantics.
    overlay (clicks select rather than reach the page).
 2. **Palette open**: the palette owns keyboard input; `Esc` closes it and returns
    focus to the page; `↑` / `↓` move the highlight, scrolling the list to keep it
-   in view; `Enter` runs the highlighted command or navigates.
+   in view; `Tab` / `Shift+Tab` cycle the group scope; `→` / `←` expand and
+   collapse a host's recent pages; `Enter` runs the highlighted command or
+   navigates; `Space` with an empty query runs it without dismissing (so a
+   highlighted theme commits in place).
 3. **Editable focus**: when `site:focus-editable` reports an editable element,
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
@@ -55,3 +85,6 @@ focus, then dispatched through `command:run` semantics.
   matches what a browser dev expects.
 - The palette shows the accelerator next to each command; the catalog is the single
   source of truth for those labels.
+- Recents are bounded at 30 total and 5 per origin so one dev server cannot evict
+  the rest (010-palette-groups); `⌘T` is free because the app forbids tabs
+  (constitution V).

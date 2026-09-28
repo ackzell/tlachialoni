@@ -67,11 +67,13 @@ offered in recents.
 3. **Given** the palette is open, **When** the developer submits a full local `http(s)://` URL, **Then** the view navigates to that URL unchanged.
 4. **Given** the palette is open, **When** the developer submits text that is neither a valid target nor a command, **Then** no navigation occurs and feedback indicates no match.
 5. **Given** a target loaded successfully, **When** the palette is reopened, **Then** that target appears in recents, deduplicated, newest first.
-6. **Given** the tool is showing a target, **When** the developer presses `⌘L`, **Then** the palette opens prefilled with the current target.
+6. **Given** the tool is showing a target, **When** the developer presses `⌘L`, **Then** the palette opens scoped to Location, prefilled with the current target, and lists the recent origins.
 7. **Given** the palette is open, **When** the developer presses `Esc` or clicks outside it, **Then** the palette closes and keyboard focus returns to the page.
 8. **Given** the palette is open, **When** the developer types a query that fuzzy-matches a command, **Then** the matched characters in that row's label are emphasized (bolder, in the theme accent) without altering the label text.
 9. **Given** the palette is open with more matches than fit the visible list, **When** the developer moves the highlight with the arrow keys past the visible window, **Then** the list scrolls to keep the highlighted row in view.
 10. **Given** the palette is open, **When** the developer presses `⌘P` again, **Then** the palette dismisses and keyboard focus returns to the page.
+11. **Given** the palette is open, **When** the developer presses `Tab`, **Then** the active group scope advances (wrapping through All and every group) and the list shows only that group's rows.
+12. **Given** the developer presses `⌘T`, **Then** the palette opens scoped to Theme with the active variant highlighted.
 
 ---
 
@@ -231,9 +233,9 @@ renders.
 - **FR-002**: The system MUST provide genuine Chromium DevTools docked within the same window as the page, on a selectable side (bottom, right, or left).
 - **FR-003**: On first launch, the system MUST open DevTools docked at the bottom.
 - **FR-004**: The system MUST persist across launches: the current target, recents, DevTools dock side and open state, strip visibility, window size and position, theme variant, and color mode. Across instances, global preferences (theme variant, color mode, dock side and open state, strip visibility) and recents are shared — recents merge so targets opened in any instance are retained — while the persisted current target and window bounds are last-writer-wins.
-- **FR-005**: The system MUST toggle a command palette on `⌘P` — opening it when closed and dismissing it when open — listing commands and recents when the input is empty and filtering both as the developer types.
+- **FR-005**: The system MUST toggle a command palette on `⌘P` — opening it when closed and dismissing it when open — listing commands and recents when the input is empty and filtering both as the developer types. Commands MUST be grouped (Location, DevTools, View, Theme, Extensions, Other) and the palette MUST support `Tab` / `Shift+Tab` scope cycling and a `⌘T` Theme scope (`010-palette-groups`).
 - **FR-006**: The system MUST normalize target shorthand: `:5173`, `5173`, and `localhost:5173` resolve to `http://localhost:5173`; well-formed local http/https URLs pass through unchanged; all other schemes and non-local addresses are rejected with visible feedback.
-- **FR-007**: The system MUST provide `⌘L` to open the palette prefilled with the current target.
+- **FR-007**: The system MUST provide `⌘L` to open the palette scoped to Location, prefilled with the current target and listing recent origins.
 - **FR-008**: The system MUST provide `⌘⇧J` to toggle DevTools and `⌘⇧1` / `⌘⇧2` / `⌘⇧3` to dock bottom / right / left, with equivalent palette commands for each.
 - **FR-009**: The system MUST provide `⌘B` as an explicit toggle for a top drag strip, and the strip MUST expose reload, toggle-DevTools, and close controls while remaining draggable outside those controls. The strip MUST overlay the page without changing the page's layout or viewport size.
 - **FR-010**: The system MUST provide `⌘R` to reload and `⇧⌘R` to reload bypassing the cache.
@@ -256,7 +258,7 @@ renders.
 ### Key Entities _(include if feature involves data)_
 
 - **Target**: the single local http/https address currently rendered; stored in normalized form.
-- **Recents**: an ordered, deduplicated list of **RecentEntry** records (a successfully loaded target URL plus its last-opened time), newest first, at most ten entries.
+- **Recents**: an ordered, deduplicated list of **RecentEntry** records (a successfully loaded target URL plus its last-opened time), newest first, bounded at 30 overall and 5 per origin (`010-palette-groups`).
 - **Preferences (PersistedState)**: the single persisted record — current target, recents, DevTools dock side, DevTools open state, strip visibility, window bounds, theme variant, and color mode.
 - **Picker session**: the transient armed/disarmed state of element picking and the lifecycle of its highlight overlay.
 
