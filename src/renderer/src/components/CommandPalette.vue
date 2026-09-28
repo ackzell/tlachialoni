@@ -1,30 +1,124 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { SCOPES, nextScope, scopeLabel, type Scope } from "@shared/commands";
 import { buildRows, type Row } from "../composables/useCommands";
 import { closePalette, useShell } from "../composables/useShell";
 
-const props = defineProps<{ initial: string }>();
+const props = defineProps<{ initial: string; scope: Scope }>();
 const api = window.tlachialoni;
 const { state } = useShell();
 
 const query = ref(props.initial);
+/**
+ * The prefill from `⌘L` is a selected value, not an active filter, until the
+ * developer edits it — so opening Location still lists recent pages.
+ */
+const edited = ref(false);
+const effectiveQuery = computed(() => (edited.value ? query.value : ""));
+const activeScope = ref<Scope>(props.scope);
+const expandedHosts = ref<Set<string>>(new Set());
 const selected = ref(0);
 const error = ref("");
 const input = ref<HTMLInputElement | null>(null);
 const list = ref<HTMLElement | null>(null);
 
-const rows = computed<Row[]>(() =>
-  buildRows(
-    query.value,
-    state.value?.recents ?? [],
-    undefined,
-    state.value ? { variant: state.value.variant, colorMode: state.value.colorMode } : undefined,
-    state.value?.extensions ?? [],
-  ),
+/**
+ * When entering the Theme group we want the *active* variant highlighted, not
+ * the first row. This stays armed until a current row appears (theme state may
+ * arrive after mount) or the developer types.
+ */
+let focusCurrentPending = props.scope === "theme";
+
+/**
+ * Group switches and fallback swaps replace the whole list at once; playing the
+ * staggered row motion there reads as rows piling up. Suppressing it (the hooks
+ * no-op and `done()` immediately) makes those deliberate jumps instant, while
+ * incremental typing keeps its motion.
+ */
+let suppressMotion = false;
+
+function focusCurrentRow(): void {
+  if (activeScope.value !== "theme") return;
+  const index = rows.value.findIndex((row) => row.detail === "current");
+  if (index >= 0) {
+    selected.value = index;
+    focusCurrentPending = false;
+  }
+}
+
+// A `palette:open` arriving while the palette is already open (⌘P toggle aside,
+// this happens for ⌘L / ⌘T) resets to the newly requested target and scope.
+watch(
+  () => [props.initial, props.scope] as const,
+  ([initial, nextScopeValue]) => {
+    suppressMotion = true;
+    query.value = initial;
+    activeScope.value = nextScopeValue;
+    edited.value = false;
+    expandedHosts.value = new Set();
+    selected.value = 0;
+    focusCurrentPending = nextScopeValue === "theme";
+    focusCurrentRow();
+    error.value = "";
+    void nextTick(() => {
+      suppressMotion = false;
+    });
+  },
 );
 
-watch(rows, () => {
+const themeFlags = computed(() =>
+  state.value ? { variant: state.value.variant, colorMode: state.value.colorMode } : undefined,
+);
+
+function rowsFor(targetScope: Scope): Row[] {
+  return buildRows(
+    effectiveQuery.value,
+    state.value?.recents ?? [],
+    undefined,
+    themeFlags.value,
+    state.value?.extensions ?? [],
+    { scope: targetScope, expandedHosts: [...expandedHosts.value] },
+  );
+}
+
+const scopedRows = computed(() => rowsFor(activeScope.value));
+/** Scoped with fallback: a query with no in-group match widens to every group. */
+const usingFallback = computed(
+  () =>
+    activeScope.value !== "all" &&
+    effectiveQuery.value.trim() !== "" &&
+    scopedRows.value.length === 0,
+);
+const rows = computed(() => (usingFallback.value ? rowsFor("all") : scopedRows.value));
+
+watch(effectiveQuery, () => {
+  if (effectiveQuery.value === "" && activeScope.value === "theme") {
+    // Clearing the theme query returns the highlight to the active variant.
+    focusCurrentPending = true;
+    focusCurrentRow();
+    return;
+  }
+  focusCurrentPending = false;
   selected.value = 0;
+});
+watch(activeScope, () => {
+  suppressMotion = true;
+  selected.value = 0;
+  focusCurrentPending = activeScope.value === "theme";
+  focusCurrentRow();
+  void nextTick(() => {
+    suppressMotion = false;
+  });
+});
+watch(rows, () => {
+  if (focusCurrentPending) focusCurrentRow();
+});
+watch(usingFallback, () => {
+  suppressMotion = true;
+  selected.value = 0;
+  void nextTick(() => {
+    suppressMotion = false;
+  });
 });
 watch(query, () => {
   error.value = "";
@@ -43,12 +137,42 @@ onMounted(async () => {
   await nextTick();
   input.value?.focus();
   input.value?.select();
+  if (focusCurrentPending) focusCurrentRow();
 });
 
 function move(delta: number): void {
   const count = rows.value.length;
   if (!count) return;
   selected.value = (selected.value + delta + count) % count;
+}
+
+function chooseScope(next: Scope): void {
+  activeScope.value = next;
+  void nextTick(() => input.value?.focus());
+}
+
+function toggleExpanded(row: Row, open: boolean): void {
+  if (!row.host) return;
+  const next = new Set(expandedHosts.value);
+  if (open) next.add(row.host);
+  else next.delete(row.host);
+  expandedHosts.value = next;
+  // Expanding reflows the list; keep the toggled host highlighted.
+  void nextTick(() => {
+    const index = rows.value.findIndex((entry) => entry.key === row.key);
+    if (index >= 0) selected.value = index;
+  });
+}
+
+/** Collapses a host's pages and puts the highlight back on the host row. */
+function collapseHost(host: string): void {
+  const next = new Set(expandedHosts.value);
+  next.delete(host);
+  expandedHosts.value = next;
+  void nextTick(() => {
+    const index = rows.value.findIndex((entry) => entry.key === `host:${host}`);
+    if (index >= 0) selected.value = index;
+  });
 }
 
 /**
@@ -88,7 +212,7 @@ function labelParts(row: Row): LabelPart[] {
   return parts;
 }
 
-async function activate(row?: Row): Promise<void> {
+async function activate(row?: Row, close = true): Promise<void> {
   const chosen = row ?? rows.value[selected.value];
   if (!chosen) return;
 
@@ -102,7 +226,9 @@ async function activate(row?: Row): Promise<void> {
 
   if (chosen.kind === "command") {
     await api.runCommand(chosen.id);
-    closePalette();
+    // Space runs a command in place (e.g. commits the highlighted theme);
+    // Enter runs it and dismisses.
+    if (close) closePalette();
     return;
   }
 
@@ -119,15 +245,36 @@ function onKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     event.preventDefault();
     closePalette();
+  } else if (event.key === "Tab") {
+    event.preventDefault();
+    chooseScope(nextScope(activeScope.value, event.shiftKey ? -1 : 1));
   } else if (event.key === "ArrowDown") {
     event.preventDefault();
     move(1);
   } else if (event.key === "ArrowUp") {
     event.preventDefault();
     move(-1);
+  } else if (event.key === "ArrowRight") {
+    const row = rows.value[selected.value];
+    if (row?.expandable && !row.expanded) {
+      event.preventDefault();
+      toggleExpanded(row, true);
+    }
+  } else if (event.key === "ArrowLeft") {
+    // A page, or an already-expanded host: collapse it in one press.
+    const row = rows.value[selected.value];
+    if (row?.host && (row.depth || row.expanded)) {
+      event.preventDefault();
+      collapseHost(row.host);
+    }
   } else if (event.key === "Enter") {
     event.preventDefault();
     void activate();
+  } else if (event.key === " " && query.value === "") {
+    // Space commits the highlighted row in place (no dismissal) while the query
+    // is empty; once typing, it is a literal space like any text field.
+    event.preventDefault();
+    void activate(undefined, false);
   }
 }
 
@@ -192,10 +339,15 @@ function animateRow(
 }
 
 function onBeforeEnter(el: Element): void {
+  if (suppressMotion) return;
   (el as HTMLElement).style.opacity = "0";
 }
 
 function onEnter(el: Element, done: () => void): void {
+  if (suppressMotion) {
+    done();
+    return;
+  }
   const { fast } = motionTiming();
   // Height eases from 0 so the list unfolds rather than jumping, as in the
   // Vue staggering example; the row's own height is fixed, so the target is a
@@ -213,6 +365,10 @@ function onEnter(el: Element, done: () => void): void {
 }
 
 function onLeave(el: Element, done: () => void): void {
+  if (suppressMotion) {
+    done();
+    return;
+  }
   // Leaving animates opacity only. Animating height here forced a layout pass on
   // every frame for each departing row, which is what made fast typing choppy:
   // entering and leaving rows overlapped and the list reflowed continuously.
@@ -237,8 +393,26 @@ function onLeave(el: Element, done: () => void): void {
         class="palette__input"
         placeholder="Type a target (e.g. :5173) or a command"
         spellcheck="false"
+        aria-label="Search targets and commands"
+        @input="edited = true"
         @keydown="onKeydown"
       />
+      <div class="palette__groups" role="group" aria-label="Command group">
+        <button
+          v-for="s in SCOPES"
+          :key="s"
+          type="button"
+          class="palette__chip"
+          :class="{ 'is-active': s === activeScope }"
+          :aria-pressed="s === activeScope"
+          @mousedown.prevent="chooseScope(s)"
+        >
+          {{ scopeLabel(s) }}
+        </button>
+      </div>
+      <p v-if="usingFallback" class="palette__hint" aria-live="polite">
+        No {{ scopeLabel(activeScope) }} matches — showing all groups
+      </p>
       <p v-if="error" class="palette__error">{{ error }}</p>
       <ul ref="list" class="palette__list">
         <TransitionGroup
@@ -253,17 +427,32 @@ function onLeave(el: Element, done: () => void): void {
             :key="row.key"
             :data-index="index"
             class="palette__row"
-            :class="{ 'is-selected': index === selected }"
+            :class="{ 'is-selected': index === selected, 'is-child': Boolean(row.depth) }"
             @mouseenter="selected = index"
             @click="activate(row)"
           >
-            <span class="palette__label">
+            <span
+              class="palette__label"
+              :style="row.depth ? { paddingLeft: `${row.depth * 1.1}rem` } : undefined"
+            >
+              <span
+                v-if="row.expandable"
+                class="palette__chevron"
+                @click.stop="toggleExpanded(row, !row.expanded)"
+              >
+                {{ row.expanded ? "▾" : "▸" }}
+              </span>
               <template v-for="(part, partIndex) in labelParts(row)" :key="partIndex">
                 <strong v-if="part.hit" class="palette__match">{{ part.text }}</strong>
-                <template v-else>{{ part.text }}</template>
+                <template v-else
+                  ><span class="palette__label__part">{{ part.text }}</span></template
+                >
               </template>
             </span>
             <div class="palette__meta">
+              <span v-if="usingFallback" class="palette__group-tag">{{
+                scopeLabel(row.group)
+              }}</span>
               <div
                 class="palette__meta__key"
                 v-for="(char, i) in row.accelerator?.split('')"
@@ -279,6 +468,7 @@ function onLeave(el: Element, done: () => void): void {
           <li v-if="!rows.length" key="palette-empty" class="palette__empty">No matches</li>
         </TransitionGroup>
       </ul>
+      <div class="palette__footer">Tab switches group · ↑↓ move · ↵ select · esc close</div>
     </div>
   </div>
 </template>
@@ -355,10 +545,73 @@ function onLeave(el: Element, done: () => void): void {
   font: inherit;
   font-size: 14px;
   caret-shape: block;
+  caret-color: var(--tb-fg-muted);
+  caret-animation: manual;
+  animation: custom-caret-animation infinite linear alternate 0.95s;
+}
+
+@keyframes custom-caret-animation {
+  from {
+    caret-color: transparent;
+  }
+
+  to {
+    caret-color: var(--tb-fg-muted);
+  }
 }
 
 .palette__input::placeholder {
   color: var(--tb-fg-subtle);
+}
+
+/* Group chips: the only grouping cue for now (section headers can come later).
+   Tab cycles them; clicking is the mouse accelerator. */
+.palette__groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tb-border);
+}
+
+.palette__chip {
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tb-fg-subtle);
+  font: inherit;
+  font-size: 12px;
+  cursor: default;
+  transition:
+    background-color var(--tb-motion-fast) var(--tb-motion-ease-out),
+    color var(--tb-motion-fast) var(--tb-motion-ease-out);
+}
+
+.palette__chip:hover {
+  color: var(--tb-fg-muted);
+}
+
+.palette__chip.is-active {
+  background: var(--tb-bg);
+  /* border-col or: var(--tb-fg-subtle); */
+  color: var(--tb-fg);
+}
+
+.palette__hint {
+  margin: 0;
+  padding: 8px 16px 0;
+  color: var(--tb-fg-subtle);
+  font-size: 12px;
+}
+
+.palette__group-tag {
+  align-self: center;
+  padding: 0 6px;
+  border: 1px solid var(--tb-border);
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .palette__error {
@@ -416,6 +669,10 @@ function onLeave(el: Element, done: () => void): void {
   color: var(--tb-fg);
 }
 
+.palette__row.is-child {
+  color: var(--tb-fg-subtle);
+}
+
 .palette__label {
   /* min-width: 0 lets this flex child shrink below its content width so the
      ellipsis engages instead of the text overflowing or wrapping. */
@@ -423,6 +680,14 @@ function onLeave(el: Element, done: () => void): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--tb-fg);
+}
+
+.palette__chevron {
+  display: inline-block;
+  width: 1em;
+  margin-right: 4px;
+  color: var(--tb-fg-muted);
 }
 
 /* Fuzzy-match emphasis: the characters the query matched go bold in the theme
@@ -466,5 +731,13 @@ function onLeave(el: Element, done: () => void): void {
 
 .palette__accelerator__modifier {
   font-size: 1.35rem;
+}
+
+.palette__footer {
+  padding: 6px 12px;
+  border-top: 1px solid var(--tb-border);
+  color: var(--tb-fg-subtle);
+  font-size: 11px;
+  text-align: center;
 }
 </style>

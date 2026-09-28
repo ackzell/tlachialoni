@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { COMMANDS, PALETTE_COMMANDS, commandForInput } from "@shared/commands";
+import {
+  COMMANDS,
+  COMMAND_GROUPS,
+  PALETTE_COMMANDS,
+  SCOPES,
+  commandForInput,
+  nextScope,
+  scopeLabel,
+} from "@shared/commands";
 import { buildRows, fuzzyMatch, fuzzyScore } from "../../src/renderer/src/composables/useCommands";
 
 describe("command catalog", () => {
@@ -33,6 +41,130 @@ describe("command catalog", () => {
     // standalone entry would be a confusing dead row.
     expect(COMMANDS.some((entry) => entry.id === "extensions.install")).toBe(true);
     expect(PALETTE_COMMANDS.some((entry) => entry.id === "extensions.install")).toBe(false);
+  });
+
+  it("binds ⌘T to the theme palette command", () => {
+    const command = COMMANDS.find((entry) => entry.id === "palette.openTheme");
+    expect(command).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘T",
+      accelerator: { meta: true, code: "KeyT" },
+    });
+    const input = {
+      type: "keyDown",
+      meta: true,
+      shift: false,
+      alt: false,
+      control: false,
+      code: "KeyT",
+    };
+    expect(commandForInput(input)?.id).toBe("palette.openTheme");
+  });
+
+  it("assigns every command a declared group", () => {
+    const ids = new Set(COMMAND_GROUPS.map((group) => group.id));
+    for (const command of COMMANDS) expect(ids.has(command.group)).toBe(true);
+  });
+});
+
+describe("palette scopes", () => {
+  it("orders scopes as All followed by the declared groups", () => {
+    expect(SCOPES[0]).toBe("all");
+    expect(SCOPES.slice(1)).toEqual(COMMAND_GROUPS.map((group) => group.id));
+  });
+
+  it("cycles scopes in declaration order and wraps", () => {
+    expect(nextScope("all")).toBe(COMMAND_GROUPS[0].id);
+    expect(nextScope(COMMAND_GROUPS[0].id, -1)).toBe("all");
+    expect(nextScope(SCOPES[SCOPES.length - 1]!)).toBe("all");
+  });
+
+  it("labels scopes", () => {
+    expect(scopeLabel("all")).toBe("All");
+    expect(scopeLabel("theme")).toBe("Theme");
+  });
+});
+
+describe("scoped rows", () => {
+  it("lists only the active group's rows when scoped", () => {
+    const rows = buildRows("", [], undefined, { variant: "jade", colorMode: "system" }, [], {
+      scope: "theme",
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.group === "theme")).toBe(true);
+  });
+
+  it("returns nothing for a query with no in-group match (so the palette falls back)", () => {
+    expect(buildRows("reload", [], undefined, undefined, [], { scope: "theme" })).toEqual([]);
+  });
+
+  it("offers the typed target row only in Location / All", () => {
+    expect(
+      buildRows(":5173", [], undefined, undefined, [], { scope: "location" })[0],
+    ).toMatchObject({ key: "target.typed" });
+    expect(buildRows(":5173", [], undefined, undefined, [], { scope: "view" })).toEqual([]);
+  });
+
+  it("offers a pasted store install only in Extensions / All", () => {
+    const id = "fmkadmapgofadopljbjfkapdkoienihi";
+    expect(buildRows(id, [], undefined, undefined, [], { scope: "extensions" })[0]).toMatchObject({
+      id: "extensions.install",
+    });
+    expect(buildRows(id, [], undefined, undefined, [], { scope: "location" })).toEqual([]);
+  });
+
+  it("orders All rows by the declared group order", () => {
+    const order = COMMAND_GROUPS.map((group) => group.id);
+    const rows = buildRows("", [], undefined, { variant: "jade", colorMode: "system" });
+    for (let i = 1; i < rows.length; i++) {
+      expect(order.indexOf(rows[i]!.group)).toBeGreaterThanOrEqual(
+        order.indexOf(rows[i - 1]!.group),
+      );
+    }
+  });
+});
+
+describe("host-grouped recents", () => {
+  const recent = (url: string, lastOpenedAt = 1) => ({ url, lastOpenedAt });
+
+  it("collapses one origin's pages into a single expandable host row", () => {
+    const rows = buildRows("", [
+      recent("http://localhost:5173/"),
+      recent("http://localhost:5173/dashboard", 2),
+      recent("http://localhost:3000/"),
+    ]);
+    const hosts = rows.filter((row) => row.kind === "recent" && !row.depth);
+    expect(hosts).toHaveLength(2);
+    expect(hosts[0]).toMatchObject({
+      host: "http://localhost:5173",
+      childCount: 2,
+      expandable: true,
+    });
+    expect(hosts[1]).toMatchObject({ childCount: 1, expandable: false });
+  });
+
+  it("lists an origin's pages as child rows when expanded", () => {
+    const expanded = buildRows(
+      "",
+      [recent("http://localhost:5173/"), recent("http://localhost:5173/dashboard", 2)],
+      undefined,
+      undefined,
+      [],
+      { expandedHosts: ["http://localhost:5173"] },
+    );
+    const children = expanded.filter((row) => row.depth === 1);
+    expect(children).toHaveLength(2);
+    expect(children.every((row) => row.host === "http://localhost:5173")).toBe(true);
+    expect(new Set(expanded.map((row) => row.key)).size).toBe(expanded.length);
+  });
+
+  it("searches pages flat while typing, without host rows", () => {
+    const rows = buildRows("5173", [
+      recent("http://localhost:5173/"),
+      recent("http://localhost:3000/"),
+    ]);
+    expect(rows.some((row) => row.kind === "recent" && row.childCount)).toBe(false);
+    expect(rows.some((row) => row.kind === "recent" && row.arg?.includes("5173"))).toBe(true);
   });
 });
 

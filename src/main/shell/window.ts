@@ -13,7 +13,7 @@ import {
   type VariantSlug,
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
-import { commandForInput, THEME_VARIANTS } from "@shared/commands";
+import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
 import { isStripSurfaceVisible } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
@@ -243,8 +243,9 @@ export class AppWindow {
     commands.register("palette.open", () => this.togglePalette());
     commands.register("palette.close", () => this.closePalette());
     commands.register("palette.editUrl", (arg) =>
-      this.openPalette(typeof arg === "string" && arg.trim() ? arg : this.currentUrl),
+      this.openPalette(typeof arg === "string" && arg.trim() ? arg : this.currentUrl, "location"),
     );
+    commands.register("palette.openTheme", () => this.openPalette("", "theme"));
     commands.register("target.navigate", (arg) => this.navigate(String(arg ?? "")));
     commands.register("strip.toggle", () => this.toggleStrip());
     commands.register("view.reload", () => this.siteView.webContents.reload());
@@ -636,13 +637,13 @@ export class AppWindow {
     });
   }
 
-  private openPalette(initial: string): void {
+  private openPalette(initial: string, scope: Scope = "all"): void {
     this.paletteOpen = true;
     // Pull in targets other instances recorded since our last read (FR-004).
     this.store.refreshRecents();
     this.relayout();
     this.broadcastState();
-    this.sendToShell("palette:open", { initial });
+    this.sendToShell("palette:open", { initial, scope });
     this.shellView.webContents.focus();
   }
 

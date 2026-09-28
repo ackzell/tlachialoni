@@ -49,7 +49,10 @@ export interface PersistedState {
 
 export const SCHEMA_VERSION = 2;
 export const DEFAULT_TARGET = "http://localhost:3000";
-export const MAX_RECENTS = 10;
+export const MAX_RECENTS = 30;
+/** How many recent pages a single origin may keep, so one busy server cannot
+ *  evict every other site from history. */
+export const MAX_RECENTS_PER_HOST = 5;
 export const MAX_EXTENSIONS = 32;
 export const MIN_WIDTH = 480;
 export const MIN_HEIGHT = 360;
@@ -182,10 +185,37 @@ export function sanitizeExtensions(raw: unknown): InstalledExtension[] {
   return extensions;
 }
 
+/** Origin key used to group recents ("http://localhost:5173" → itself). */
+export function recentHost(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Caps a newest-first list: at most `MAX_RECENTS_PER_HOST` pages per origin,
+ * then `MAX_RECENTS` overall. Applying the per-host cap first keeps history
+ * diverse instead of letting one dev server fill the whole list.
+ */
+export function capRecents(list: RecentEntry[]): RecentEntry[] {
+  const perHost = new Map<string, number>();
+  const kept: RecentEntry[] = [];
+  for (const entry of list) {
+    const host = recentHost(entry.url);
+    const count = perHost.get(host) ?? 0;
+    if (count >= MAX_RECENTS_PER_HOST) continue;
+    perHost.set(host, count + 1);
+    kept.push(entry);
+  }
+  return kept.slice(0, MAX_RECENTS);
+}
+
 /** Merges a newly loaded target into recents: dedupe, newest first, capped. */
 export function mergeRecents(existing: RecentEntry[], url: string, now: number): RecentEntry[] {
   const without = existing.filter((entry) => entry.url !== url);
-  return [{ url, lastOpenedAt: now }, ...without].slice(0, MAX_RECENTS);
+  return capRecents([{ url, lastOpenedAt: now }, ...without]);
 }
 
 /**
@@ -199,5 +229,6 @@ export function mergeRecentLists(a: RecentEntry[], b: RecentEntry[]): RecentEntr
     const seen = byUrl.get(entry.url);
     if (!seen || entry.lastOpenedAt > seen.lastOpenedAt) byUrl.set(entry.url, entry);
   }
-  return [...byUrl.values()].sort((x, y) => y.lastOpenedAt - x.lastOpenedAt).slice(0, MAX_RECENTS);
+  const sorted = [...byUrl.values()].sort((x, y) => y.lastOpenedAt - x.lastOpenedAt);
+  return capRecents(sorted);
 }

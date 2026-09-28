@@ -1,4 +1,5 @@
 import { readonly, ref } from "vue";
+import type { Scope } from "@shared/commands";
 import type { ExtensionStatus, InstalledExtension } from "@shared/extensions";
 import { applyTheme, type ResolvedMode } from "../theme/apply";
 
@@ -36,6 +37,7 @@ const loadingTarget = ref("");
 const failed = ref<Failure | null>(null);
 const paletteOpen = ref(false);
 const paletteInitial = ref("");
+const paletteScope = ref<Scope>("all");
 const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bottom" });
 const extensionStatus = ref<ExtensionStatus | null>(null);
 
@@ -116,7 +118,9 @@ function init(): void {
     extensionStatus.value = (payload as ExtensionStatus | null) ?? null;
   });
   api.on("palette:open", (payload) => {
-    paletteInitial.value = (payload as { initial?: string }).initial ?? "";
+    const { initial, scope } = payload as { initial?: string; scope?: Scope };
+    paletteInitial.value = initial ?? "";
+    paletteScope.value = scope ?? "all";
     paletteOpen.value = true;
   });
   api.on("palette:close", () => {
@@ -152,6 +156,7 @@ export function useShell() {
     failed: readonly(failed),
     paletteOpen: readonly(paletteOpen),
     paletteInitial: readonly(paletteInitial),
+    paletteScope: readonly(paletteScope),
     devtools: readonly(devtools),
     extensionStatus: readonly(extensionStatus),
     closePalette,

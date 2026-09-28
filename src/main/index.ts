@@ -46,6 +46,7 @@ if (
 const MENU_COMMAND_IDS = [
   "palette.open",
   "palette.editUrl",
+  "palette.openTheme",
   "strip.toggle",
   "view.reload",
   "view.hardReload",

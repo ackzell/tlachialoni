@@ -15,6 +15,39 @@ export interface Accelerator {
   code: string;
 }
 
+/**
+ * Palette groups. The order here is the order the palette lists groups in and
+ * the order `Tab` cycles through them (after the leading "all" scope).
+ */
+export const COMMAND_GROUPS = [
+  { id: "location", label: "Location" },
+  { id: "devtools", label: "DevTools" },
+  { id: "view", label: "View" },
+  { id: "theme", label: "Theme" },
+  { id: "extensions", label: "Extensions" },
+  { id: "other", label: "Other" },
+] as const;
+
+export type CommandGroup = (typeof COMMAND_GROUPS)[number]["id"];
+
+/** What the palette is scoped to: every group, or one of them. */
+export type Scope = "all" | CommandGroup;
+
+/** Tab order: "all" first, then each group in declaration order. */
+export const SCOPES: readonly Scope[] = ["all", ...COMMAND_GROUPS.map((group) => group.id)];
+
+export function scopeLabel(scope: Scope): string {
+  if (scope === "all") return "All";
+  return COMMAND_GROUPS.find((group) => group.id === scope)?.label ?? scope;
+}
+
+/** Cycles scopes, wrapping; `delta` is +1 for Tab and -1 for Shift+Tab. */
+export function nextScope(scope: Scope, delta = 1): Scope {
+  const index = SCOPES.indexOf(scope);
+  if (index < 0) return "all";
+  return SCOPES[(index + delta + SCOPES.length) % SCOPES.length];
+}
+
 export interface CommandDef {
   id: string;
   label: string;
@@ -24,6 +57,8 @@ export interface CommandDef {
   accelerator?: Accelerator;
   /** Whether the command is listed in the palette. */
   palette: boolean;
+  /** Which palette group the command belongs to. */
+  group: CommandGroup;
   /** Command takes the palette's typed text as an argument. */
   acceptsTargetInput?: boolean;
 }
@@ -46,6 +81,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘P",
     accelerator: { meta: true, code: "KeyP" },
     palette: false,
+    group: "other",
   },
   {
     id: "palette.editUrl",
@@ -53,11 +89,21 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘L",
     accelerator: { meta: true, code: "KeyL" },
     palette: true,
+    group: "other",
+  },
+  {
+    id: "palette.openTheme",
+    label: "Browse Themes",
+    acceleratorLabel: "⌘T",
+    accelerator: { meta: true, code: "KeyT" },
+    palette: true,
+    group: "other",
   },
   {
     id: "target.navigate",
     label: "Go to Target",
     palette: false,
+    group: "location",
     acceptsTargetInput: true,
   },
   {
@@ -66,6 +112,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘B",
     accelerator: { meta: true, code: "KeyB" },
     palette: true,
+    group: "other",
   },
   {
     id: "view.reload",
@@ -73,6 +120,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘R",
     accelerator: { meta: true, code: "KeyR" },
     palette: true,
+    group: "view",
   },
   {
     id: "view.hardReload",
@@ -80,6 +128,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⇧⌘R",
     accelerator: { meta: true, shift: true, code: "KeyR" },
     palette: true,
+    group: "view",
   },
   {
     id: "view.back",
@@ -87,6 +136,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘←",
     accelerator: { meta: true, code: "ArrowLeft" },
     palette: true,
+    group: "view",
   },
   {
     id: "view.forward",
@@ -94,6 +144,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘→",
     accelerator: { meta: true, code: "ArrowRight" },
     palette: true,
+    group: "view",
   },
   {
     id: "devtools.toggle",
@@ -101,6 +152,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘⌥J",
     accelerator: { meta: true, alt: true, code: "KeyJ" },
     palette: true,
+    group: "devtools",
   },
   {
     id: "devtools.dock.bottom",
@@ -108,6 +160,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘1",
     accelerator: { meta: true, code: "Digit1" },
     palette: true,
+    group: "devtools",
   },
   {
     id: "devtools.dock.right",
@@ -115,6 +168,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘2",
     accelerator: { meta: true, code: "Digit2" },
     palette: true,
+    group: "devtools",
   },
   {
     id: "devtools.dock.left",
@@ -122,6 +176,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘3",
     accelerator: { meta: true, code: "Digit3" },
     palette: true,
+    group: "devtools",
   },
   {
     id: "focus.toggle",
@@ -129,6 +184,7 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘J",
     accelerator: { meta: true, code: "KeyJ" },
     palette: true,
+    group: "devtools",
   },
   {
     id: "picker.toggle",
@@ -136,16 +192,19 @@ export const COMMANDS: CommandDef[] = [
     acceleratorLabel: "⌘⇧C",
     accelerator: { meta: true, shift: true, code: "KeyC" },
     palette: true,
+    group: "devtools",
   },
   ...THEME_VARIANTS.map((v): CommandDef => ({
     id: `theme.variant.${v.slug}`,
     label: `Theme: ${v.name}`,
     palette: true,
+    group: "theme",
   })),
   {
     id: "theme.cycleMode",
     label: "Cycle Color Mode",
     palette: true,
+    group: "theme",
   },
   {
     id: "extensions.install",
@@ -153,41 +212,49 @@ export const COMMANDS: CommandDef[] = [
     // Not listed on its own: a store install is offered as a row only when the
     // palette input is a store URL or ID, so there is no confusing dead entry.
     palette: false,
+    group: "extensions",
   },
   {
     id: "extensions.installFolder",
     label: "Install Extension from Folder",
     palette: true,
+    group: "extensions",
   },
   {
     id: "extensions.reload",
     label: "Reload Extensions",
     palette: true,
+    group: "extensions",
   },
   {
     id: "extensions.revealFolder",
     label: "Reveal Extensions Folder",
     palette: true,
+    group: "extensions",
   },
   {
     id: "extensions.dismissStatus",
     label: "Dismiss Extension Status",
     palette: false,
+    group: "extensions",
   },
   {
     id: "failure.retry",
     label: "Retry",
     palette: false,
+    group: "other",
   },
   {
     id: "failure.dismiss",
     label: "Go Back to Last Target",
     palette: false,
+    group: "other",
   },
   {
     id: "window.close",
     label: "Close Window",
     palette: true,
+    group: "other",
   },
 ];
 

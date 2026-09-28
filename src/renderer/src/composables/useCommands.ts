@@ -3,7 +3,13 @@
  * the palette can never drift from the keybinding registry (FR-020).
  */
 
-import { PALETTE_COMMANDS, type CommandDef } from "@shared/commands";
+import {
+  COMMAND_GROUPS,
+  PALETTE_COMMANDS,
+  type CommandDef,
+  type CommandGroup,
+  type Scope,
+} from "@shared/commands";
 import { parseExtensionId } from "@shared/extension-id";
 import type { InstalledExtension } from "@shared/extensions";
 
@@ -43,6 +49,11 @@ export function fuzzyScore(query: string, text: string): number {
   return fuzzyMatch(query, text).score;
 }
 
+export interface RecentLike {
+  url: string;
+  lastOpenedAt?: number;
+}
+
 export interface Row {
   kind: "target" | "command" | "recent" | "extension";
   id: string;
@@ -52,12 +63,24 @@ export interface Row {
    * keeps one key for the whole typing session even though its label changes.
    */
   key: string;
+  /** Palette group the row belongs to, for ordering and (later) headers. */
+  group: CommandGroup;
   label: string;
   /** Character indices in `label` matched by the query, for emphasis. */
   matches?: number[];
   detail?: string;
   accelerator?: string;
   arg?: string;
+  /** Host-grouped recent: the origin this row summarizes. */
+  host?: string;
+  /** Host-grouped recent: whether the row can expand into its pages. */
+  expandable?: boolean;
+  /** Host-grouped recent: whether the pages are currently shown below it. */
+  expanded?: boolean;
+  /** Host-grouped recent: number of pages under this origin. */
+  childCount?: number;
+  /** Indentation depth (0 for a host row, 1 for its pages). */
+  depth?: number;
 }
 
 export interface ThemeFlags {
@@ -65,103 +88,233 @@ export interface ThemeFlags {
   colorMode: string;
 }
 
-export function buildRows(
-  query: string,
-  recents: readonly { url: string }[],
-  commands: CommandDef[] = PALETTE_COMMANDS,
-  theme?: ThemeFlags,
-  extensions: readonly InstalledExtension[] = [],
-): Row[] {
-  const rows: Row[] = [];
-  const trimmed = query.trim();
+/** View state the palette supplies on top of the catalog. */
+export interface PaletteView {
+  /** Active scope; defaults to "all". */
+  scope?: Scope;
+  /** Origins whose recent pages are currently expanded. */
+  expandedHosts?: readonly string[];
+}
 
-  if (trimmed) {
-    // A pasted store URL or ID becomes the install row itself, instead of a
-    // useless (and rejected) "Open <url>" target row, so Enter installs it.
-    const storeId = parseExtensionId(trimmed);
-    if (storeId) {
-      rows.push({
-        kind: "extension",
-        id: "extensions.install",
-        key: "extension.install",
-        label: `Install extension ${storeId}`,
-        detail: "from Chrome Web Store",
-        arg: storeId,
-      });
-    } else {
-      rows.push({
-        kind: "target",
-        id: "target.navigate",
-        key: "target.typed",
-        label: `Open ${trimmed}`,
-        detail: "navigate",
-      });
+/** Group order used when flattening rows, so All lists groups in a fixed order. */
+const GROUP_ORDER: CommandGroup[] = COMMAND_GROUPS.map((group) => group.id);
+
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+}
+
+/** `host:port`, or the raw string when it does not parse. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+/** Path (plus query/hash) of a recent, or the raw string when it does not parse. */
+function pathOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Collapses recents into one row per origin (newest first), expanding a host's
+ * pages underneath it when requested. Grouping by origin — not hostname — keeps
+ * `localhost:3000` and `localhost:5173` apart, which is how dev servers differ.
+ */
+function recentRows(recents: readonly RecentLike[], expanded: ReadonlySet<string>): Row[] {
+  const order: string[] = [];
+  const groups = new Map<string, RecentLike[]>();
+  for (const recent of recents) {
+    const origin = originOf(recent.url);
+    let list = groups.get(origin);
+    if (!list) {
+      list = [];
+      groups.set(origin, list);
+      order.push(origin);
     }
-  } else {
-    for (const recent of recents) {
-      rows.push({
-        kind: "recent",
-        id: "target.navigate",
-        key: `target.recent:${recent.url}`,
-        label: recent.url,
-        detail: "recent",
-        arg: recent.url,
-      });
-    }
+    list.push(recent);
   }
 
-  // Installed extensions: a toggle row always, a remove row always, and an
-  // update row only for store installs matched by the query.
-  for (const extension of extensions) {
-    const toggleLabel = `Extension: ${extension.name}`;
-    const toggle = fuzzyMatch(trimmed, toggleLabel);
-    if (!trimmed || toggle.score > 0) {
-      rows.push({
-        kind: "extension",
-        id: "extensions.toggle",
-        key: `extension:toggle:${extension.slug}`,
-        label: toggleLabel,
-        matches: toggle.indices,
-        detail: extension.enabled ? "enabled" : "disabled",
-        arg: extension.slug,
-      });
-    }
-
-    const removeLabel = `Remove Extension: ${extension.name}`;
-    const remove = fuzzyMatch(trimmed, removeLabel);
-    if (!trimmed || remove.score > 0) {
-      rows.push({
-        kind: "extension",
-        id: "extensions.remove",
-        key: `extension:remove:${extension.slug}`,
-        label: removeLabel,
-        matches: remove.indices,
-        detail: "remove",
-        arg: extension.slug,
-      });
-    }
-
-    if (extension.source === "store") {
-      const updateLabel = `Update Extension: ${extension.name}`;
-      const update = fuzzyMatch(trimmed, updateLabel);
-      if (trimmed && update.score > 0) {
+  const rows: Row[] = [];
+  for (const origin of order) {
+    const list = groups.get(origin) ?? [];
+    const newest = list[0];
+    if (!newest) continue;
+    const isExpanded = expanded.has(origin);
+    rows.push({
+      kind: "recent",
+      id: "target.navigate",
+      key: `host:${origin}`,
+      group: "location",
+      label: hostOf(newest.url),
+      detail: pathOf(newest.url),
+      arg: newest.url,
+      host: origin,
+      expandable: list.length > 1,
+      expanded: isExpanded,
+      childCount: list.length,
+    });
+    if (isExpanded) {
+      for (const recent of list) {
         rows.push({
-          kind: "extension",
-          id: "extensions.update",
-          key: `extension:update:${extension.slug}`,
-          label: updateLabel,
-          matches: update.indices,
-          detail: "store",
-          arg: extension.slug,
+          kind: "recent",
+          id: "target.navigate",
+          key: `target.recent:${recent.url}`,
+          group: "location",
+          label: pathOf(recent.url),
+          detail: "recent",
+          arg: recent.url,
+          host: origin,
+          depth: 1,
         });
       }
     }
   }
+  return rows;
+}
 
+export function buildRows(
+  query: string,
+  recents: readonly RecentLike[],
+  commands: CommandDef[] = PALETTE_COMMANDS,
+  theme?: ThemeFlags,
+  extensions: readonly InstalledExtension[] = [],
+  view: PaletteView = {},
+): Row[] {
+  const scope: Scope = view.scope ?? "all";
+  const expanded = new Set(view.expandedHosts ?? []);
+  const trimmed = query.trim();
+  const inScope = (group: CommandGroup): boolean => scope === "all" || scope === group;
+
+  const buckets: Record<CommandGroup, Row[]> = {
+    location: [],
+    theme: [],
+    view: [],
+    devtools: [],
+    extensions: [],
+    other: [],
+  };
+
+  // ---- location: typed target + recents -----------------------------------
+  if (trimmed) {
+    const storeId = parseExtensionId(trimmed);
+    if (storeId) {
+      if (inScope("extensions")) {
+        buckets.extensions.push({
+          kind: "extension",
+          id: "extensions.install",
+          key: "extension.install",
+          group: "extensions",
+          label: `Install extension ${storeId}`,
+          detail: "from Chrome Web Store",
+          arg: storeId,
+        });
+      }
+    } else if (inScope("location")) {
+      buckets.location.push({
+        kind: "target",
+        id: "target.navigate",
+        key: "target.typed",
+        group: "location",
+        label: `Open ${trimmed}`,
+        detail: "navigate",
+      });
+      // History is searchable too: typing a port surfaces that recent page.
+      for (const recent of recents) {
+        const match = fuzzyMatch(trimmed, recent.url);
+        if (match.score > 0) {
+          buckets.location.push({
+            kind: "recent",
+            id: "target.navigate",
+            key: `target.recent:${recent.url}`,
+            group: "location",
+            label: recent.url,
+            matches: match.indices,
+            detail: "recent",
+            arg: recent.url,
+          });
+        }
+      }
+    }
+  } else if (inScope("location")) {
+    buckets.location.push(...recentRows(recents, expanded));
+  }
+
+  // ---- extensions (dynamic rows) ------------------------------------------
+  if (inScope("extensions")) {
+    // A toggle row always, a remove row always, and an update row only for store
+    // installs matched by the query.
+    for (const extension of extensions) {
+      const toggleLabel = `Extension: ${extension.name}`;
+      const toggle = fuzzyMatch(trimmed, toggleLabel);
+      if (!trimmed || toggle.score > 0) {
+        buckets.extensions.push({
+          kind: "extension",
+          id: "extensions.toggle",
+          key: `extension:toggle:${extension.slug}`,
+          group: "extensions",
+          label: toggleLabel,
+          matches: toggle.indices,
+          detail: extension.enabled ? "enabled" : "disabled",
+          arg: extension.slug,
+        });
+      }
+
+      const removeLabel = `Remove Extension: ${extension.name}`;
+      const remove = fuzzyMatch(trimmed, removeLabel);
+      if (!trimmed || remove.score > 0) {
+        buckets.extensions.push({
+          kind: "extension",
+          id: "extensions.remove",
+          key: `extension:remove:${extension.slug}`,
+          group: "extensions",
+          label: removeLabel,
+          matches: remove.indices,
+          detail: "remove",
+          arg: extension.slug,
+        });
+      }
+
+      if (extension.source === "store") {
+        const updateLabel = `Update Extension: ${extension.name}`;
+        const update = fuzzyMatch(trimmed, updateLabel);
+        if (trimmed && update.score > 0) {
+          buckets.extensions.push({
+            kind: "extension",
+            id: "extensions.update",
+            key: `extension:update:${extension.slug}`,
+            group: "extensions",
+            label: updateLabel,
+            matches: update.indices,
+            detail: "store",
+            arg: extension.slug,
+          });
+        }
+      }
+    }
+  }
+
+  // ---- commands, scoped and sorted by group then score --------------------
   const scored = commands
-    .map((command) => ({ command, match: fuzzyMatch(trimmed, command.label) }))
-    .filter((entry) => entry.match.score > 0)
-    .sort((a, b) => b.match.score - a.match.score);
+    .map((command, index) => ({ command, index, match: fuzzyMatch(trimmed, command.label) }))
+    .filter((entry) => entry.match.score > 0 && inScope(entry.command.group))
+    .sort((a, b) => {
+      const groupDelta =
+        GROUP_ORDER.indexOf(a.command.group) - GROUP_ORDER.indexOf(b.command.group);
+      if (groupDelta !== 0) return groupDelta;
+      if (b.match.score !== a.match.score) return b.match.score - a.match.score;
+      return a.index - b.index;
+    });
 
   for (const { command, match } of scored) {
     let detail: string | undefined;
@@ -170,10 +323,11 @@ export function buildRows(
     } else if (theme && command.id === `theme.variant.${theme.variant}`) {
       detail = "current";
     }
-    rows.push({
+    buckets[command.group].push({
       kind: "command",
       id: command.id,
       key: `command:${command.id}`,
+      group: command.group,
       label: command.label,
       matches: match.indices,
       accelerator: command.acceleratorLabel,
@@ -181,5 +335,5 @@ export function buildRows(
     });
   }
 
-  return rows;
+  return GROUP_ORDER.flatMap((group) => buckets[group]);
 }

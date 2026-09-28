@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   MAX_RECENTS,
+  MAX_RECENTS_PER_HOST,
+  capRecents,
   defaultState,
   mergeRecentLists,
   mergeRecents,
@@ -81,6 +83,36 @@ describe("mergeRecentLists", () => {
       { url: "http://localhost:5173/", lastOpenedAt: 5 },
       { url: "http://localhost:8080/", lastOpenedAt: 2 },
     ]);
+  });
+});
+
+describe("recents caps", () => {
+  it("keeps at most MAX_RECENTS_PER_HOST pages per origin", () => {
+    const list = Array.from({ length: MAX_RECENTS_PER_HOST + 3 }, (_, i) => ({
+      url: `http://localhost:5173/p${i}`,
+      lastOpenedAt: 100 - i,
+    }));
+    const capped = capRecents(list);
+    expect(capped).toHaveLength(MAX_RECENTS_PER_HOST);
+    expect(capped[0]?.url).toBe("http://localhost:5173/p0");
+  });
+
+  it("lets a different origin survive a busy host's history", () => {
+    const busy = Array.from({ length: MAX_RECENTS }, (_, i) => ({
+      url: `http://localhost:3000/p${i}`,
+      lastOpenedAt: MAX_RECENTS - i,
+    }));
+    const merged = mergeRecents(busy, "http://localhost:5173/", 1);
+    expect(merged).toHaveLength(MAX_RECENTS_PER_HOST + 1);
+    expect(merged[0]?.url).toBe("http://localhost:5173/");
+  });
+
+  it("caps the total list across many origins", () => {
+    const many = Array.from({ length: MAX_RECENTS + 10 }, (_, i) => ({
+      url: `http://localhost:${2000 + i}/`,
+      lastOpenedAt: i,
+    }));
+    expect(mergeRecentLists(many, [])).toHaveLength(MAX_RECENTS);
   });
 });
 
