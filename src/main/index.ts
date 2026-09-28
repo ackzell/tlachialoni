@@ -91,6 +91,33 @@ function installMenu(): void {
     { label: "View", submenu: viewItems },
   ];
 
+  // Development-only: keep a transient shell surface on screen to style it
+  // (specs/008-surface-preview).
+  if (!app.isPackaged) {
+    template.push({
+      label: "Developer",
+      submenu: [
+        {
+          label: "Preview Loading Veil",
+          click: () => mainWindow?.previewLoadingVeil(),
+        },
+        {
+          label: "Preview Failure View",
+          click: () => mainWindow?.previewFailureView(),
+        },
+        {
+          label: "Preview Extension Install",
+          click: () => mainWindow?.previewExtensionStatus(),
+        },
+        { type: "separator" },
+        {
+          label: "Stop Preview",
+          click: () => mainWindow?.stopSurfacePreview(),
+        },
+      ],
+    });
+  }
+
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
@@ -123,6 +150,11 @@ app.whenReady().then(async () => {
   installMenu();
   configureAppIdentity();
   mainWindow = await createWindow();
+
+  // Dev-only: start the looping install status so the surface can be styled.
+  if (!app.isPackaged && process.env.TLACHIALONI_DEMO_STATUS === "1") {
+    mainWindow.previewExtensionStatus();
+  }
 
   if (process.env.TLACHIALONI_DOCK_TEST === "1") {
     await runDockSelfTest(mainWindow);

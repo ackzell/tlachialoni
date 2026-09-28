@@ -62,6 +62,9 @@ export class AppWindow {
   private editableFocused = false;
   private shellLoaded = false;
   private extensionStatus: ExtensionStatus | null = null;
+  private statusDemoTimer: NodeJS.Timeout | null = null;
+  /** Dev-only: a transient shell surface being previewed (see specs/008). */
+  private devPreview: "loading" | "failure" | null = null;
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
@@ -153,6 +156,7 @@ export class AppWindow {
     });
     this.win.on("closed", () => {
       this.clearPendingSettle();
+      this.clearStatusDemo();
       this.devtools.dispose();
       this.detachDevToolsInput();
       nativeTheme.removeListener("updated", this.handleNativeThemeUpdated);
@@ -310,6 +314,146 @@ export class AppWindow {
     this.relayout(true);
   }
 
+  // ---- dev surface previews (specs/008-surface-preview) ----------------
+  //
+  // Development-only: put a single transient shell surface into a representative
+  // state and hold it there so it can be styled with live HMR. The surfaces that
+  // are easy to summon for real (the palette with ⌘P, the strip with ⌘B, the
+  // picker with ⌘⇧C) are intentionally not previewed.
+
+  /** Dev-only: shows the loading veil against a representative target. */
+  previewLoadingVeil(): void {
+    this.enterDevPreview();
+    this.devPreview = "loading";
+    this.sendToShell("viewport:loading", { loading: true, url: "http://localhost:5173" });
+    this.relayout();
+  }
+
+  /** Dev-only: shows the failure view with a representative target and reason. */
+  previewFailureView(): void {
+    this.enterDevPreview();
+    this.devPreview = "failure";
+    this.sendToShell("viewport:failed", {
+      url: "http://localhost:3000",
+      reason: "Connection refused",
+      previousUrl: "http://localhost:5173",
+    });
+    this.relayout();
+  }
+
+  /** Dev-only: starts the looping extension install status. */
+  previewExtensionStatus(): void {
+    this.enterDevPreview();
+    this.startExtensionStatusDemo();
+  }
+
+  /** Dev-only: clears whichever surface is being previewed. */
+  stopSurfacePreview(): void {
+    this.exitDevPreview();
+    this.clearStatusDemo();
+    this.dismissExtensionStatus();
+    this.relayout(true);
+  }
+
+  /** Drops any other preview before starting a new one (only one at a time). */
+  private enterDevPreview(): void {
+    this.exitDevPreview();
+    this.clearStatusDemo();
+    this.dismissExtensionStatus();
+  }
+
+  /** Restores the renderer signals a loading/failure preview overrode. */
+  private exitDevPreview(): void {
+    const preview = this.devPreview;
+    if (!preview) return;
+    this.devPreview = null;
+    if (preview === "loading") {
+      this.sendToShell("viewport:loading", {
+        loading: false,
+        url: this.requestedTarget ?? this.currentUrl,
+      });
+    } else {
+      this.sendToShell("viewport:ready", { url: this.currentUrl });
+    }
+  }
+
+  /**
+   * Dev-only: drives a looping, realistic install so `InstallStatus.vue` stays
+   * on screen to be styled with live HMR. Not reachable in a packaged build.
+   */
+  startExtensionStatusDemo(): void {
+    this.clearStatusDemo();
+    const total = 670658;
+    const frames: Array<{ hold: number; status: ExtensionStatus }> = [
+      {
+        hold: 800,
+        status: {
+          phase: "resolving",
+          name: "fmkadmapgofadopljbjfkapdkoienihi",
+          message: "Looking up the extension",
+        },
+      },
+      ...Array.from({ length: 24 }, (_, index): { hold: number; status: ExtensionStatus } => ({
+        hold: 110,
+        status: {
+          phase: "downloading",
+          name: "React Developer Tools",
+          message: "Downloading from the Chrome Web Store",
+          progress: { received: Math.round((total * (index + 1)) / 24), total },
+        },
+      })),
+      {
+        hold: 600,
+        status: {
+          phase: "verifying",
+          name: "React Developer Tools",
+          message: "Verifying the package",
+        },
+      },
+      {
+        hold: 800,
+        status: { phase: "extracting", name: "React Developer Tools", message: "Unpacking files" },
+      },
+      {
+        hold: 600,
+        status: { phase: "loading", name: "React Developer Tools", message: "Loading extension" },
+      },
+      {
+        hold: 1600,
+        status: {
+          phase: "done",
+          name: "React Developer Tools",
+          message: "Installed React Developer Tools",
+        },
+      },
+      {
+        hold: 2200,
+        status: {
+          phase: "error",
+          name: "React Developer Tools",
+          message: "Couldn't install React Developer Tools",
+          error: "The store returned HTTP 404",
+        },
+      },
+    ];
+
+    let index = 0;
+    const tick = (): void => {
+      const frame = frames[index % frames.length];
+      this.setExtensionStatus(frame.status);
+      index += 1;
+      this.statusDemoTimer = setTimeout(tick, frame.hold);
+    };
+    tick();
+  }
+
+  private clearStatusDemo(): void {
+    if (this.statusDemoTimer) {
+      clearTimeout(this.statusDemoTimer);
+      this.statusDemoTimer = null;
+    }
+  }
+
   async runCommand(id: string, arg?: unknown): Promise<CommandResult> {
     try {
       const result = await this.commands.run(id, arg);
@@ -394,6 +538,13 @@ export class AppWindow {
   // ---- internals -------------------------------------------------------
 
   private loadTarget(url: string): void {
+    // A real navigation owns the surfaces from here; drop any dev preview so the
+    // page stays interactive and the renderer follows the actual load.
+    this.devPreview = null;
+    if (this.statusDemoTimer) {
+      this.clearStatusDemo();
+      this.dismissExtensionStatus();
+    }
     // A same-origin path change over an already-painted page is the site
     // navigating itself; it needs no veil (the old frame stays until commit).
     // Read `failed` before clearing it: a load from the failure view always veils.
@@ -639,7 +790,15 @@ export class AppWindow {
   }
 
   private desiredShellMode(): ShellMode {
-    if (this.paletteOpen || this.showLoading || this.failed || this.extensionStatus) return "full";
+    if (
+      this.paletteOpen ||
+      this.showLoading ||
+      this.failed ||
+      this.extensionStatus ||
+      this.devPreview
+    ) {
+      return "full";
+    }
     if (this.store.get().stripVisible) return "strip";
     return "hidden";
   }

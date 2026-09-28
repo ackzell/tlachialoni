@@ -290,6 +290,21 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
   fs.writeFileSync(`${out}/tlachialoni-failure.png`, (await shell.capturePage()).toPNG());
   const failureMounted = await probe(".failure");
 
+  // Dev-only preview driver (008): capture a surface kept on screen for styling.
+  const preview = process.env.TLACHIALONI_SNAPSHOT_STATUS;
+  if (preview === "demo" || preview === "veil" || preview === "failure") {
+    if (preview === "demo") appWindow.startExtensionStatusDemo();
+    else if (preview === "veil") appWindow.previewLoadingVeil();
+    else appWindow.previewFailureView();
+    await wait(preview === "demo" ? 1600 : 700);
+    fs.writeFileSync(
+      `${out}/tlachialoni-preview-${preview}.png`,
+      (await shell.capturePage()).toPNG(),
+    );
+    appWindow.stopSurfacePreview();
+    await wait(300);
+  }
+
   // Extension status surface (007): a determinate download, then a terminal
   // error. The page's inner height must not change while it is visible.
   const siteHeight = () =>
