@@ -254,7 +254,18 @@ function onLeave(el: Element, done: () => void): void {
                 <template v-else>{{ part.text }}</template>
               </template>
             </span>
-            <span class="palette__meta">{{ row.accelerator ?? row.detail }}</span>
+            <div class="palette__meta">
+              <div
+                class="palette__meta__key"
+                v-for="(char, i) in row.accelerator?.split('')"
+                :key="i"
+              >
+                <div :class="{ palette__accelerator__modifier: !/[A-Za-z0-9]/.test(char.trim()) }">
+                  {{ char }}
+                </div>
+              </div>
+              <div>{{ row.detail }}</div>
+            </div>
           </li>
           <li v-if="!rows.length" key="palette-empty" class="palette__empty">No matches</li>
         </TransitionGroup>
@@ -359,6 +370,7 @@ function onLeave(el: Element, done: () => void): void {
   max-height: 46vh;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  outline: none;
 }
 
 /*
@@ -417,6 +429,12 @@ function onLeave(el: Element, done: () => void): void {
   font-size: 12px;
   flex: none;
   white-space: nowrap;
+
+  display: flex;
+  flex-direction: row;
+  gap: 0.65rem;
+  text-align: center;
+  line-height: 1.5rem;
 }
 
 /* The hover fill lands near --tb-fg-subtle, so lift the meta on the active row. */
@@ -428,5 +446,16 @@ function onLeave(el: Element, done: () => void): void {
   padding: 10px;
   color: var(--tb-fg-subtle);
   font-size: 12px;
+}
+
+.palette__meta__key {
+  border: 1px solid var(--tb-border);
+  border-radius: 3px;
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.palette__accelerator__modifier {
+  font-size: 1.35rem;
 }
 </style>
