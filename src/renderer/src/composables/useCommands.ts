@@ -5,10 +5,24 @@
 
 import { PALETTE_COMMANDS, type CommandDef } from "@shared/commands";
 
-export function fuzzyScore(query: string, text: string): number {
+export interface FuzzyMatch {
+  /** Higher is better; 0 means the query is not a subsequence of the text. */
+  score: number;
+  /** Indices into `text` of the matched characters, ascending. Empty for a blank query. */
+  indices: number[];
+}
+
+/**
+ * Case-insensitive subsequence match. Every character of `query` must appear in
+ * `text`, in order; adjacent hits score higher than scattered ones so prefix and
+ * contiguous matches rank first. Returns the matched indices too, so the palette
+ * can emphasize exactly the characters that matched.
+ */
+export function fuzzyMatch(query: string, text: string): FuzzyMatch {
   const q = query.toLowerCase().trim();
-  if (!q) return 1;
+  if (!q) return { score: 1, indices: [] };
   const t = text.toLowerCase();
+  const indices: number[] = [];
   let qi = 0;
   let score = 0;
   let last = -1;
@@ -16,10 +30,15 @@ export function fuzzyScore(query: string, text: string): number {
     if (t[ti] === q[qi]) {
       score += last === ti - 1 ? 3 : 1;
       last = ti;
+      indices.push(ti);
       qi++;
     }
   }
-  return qi === q.length ? score : 0;
+  return qi === q.length ? { score, indices } : { score: 0, indices: [] };
+}
+
+export function fuzzyScore(query: string, text: string): number {
+  return fuzzyMatch(query, text).score;
 }
 
 export interface Row {
@@ -32,6 +51,8 @@ export interface Row {
    */
   key: string;
   label: string;
+  /** Character indices in `label` matched by the query, for emphasis. */
+  matches?: number[];
   detail?: string;
   accelerator?: string;
   arg?: string;
@@ -73,11 +94,11 @@ export function buildRows(
   }
 
   const scored = commands
-    .map((command) => ({ command, score: fuzzyScore(trimmed, command.label) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .map((command) => ({ command, match: fuzzyMatch(trimmed, command.label) }))
+    .filter((entry) => entry.match.score > 0)
+    .sort((a, b) => b.match.score - a.match.score);
 
-  for (const { command } of scored) {
+  for (const { command, match } of scored) {
     let detail: string | undefined;
     if (command.id === "theme.cycleMode" && theme) {
       detail = `mode: ${theme.colorMode}`;
@@ -89,6 +110,7 @@ export function buildRows(
       id: command.id,
       key: `command:${command.id}`,
       label: command.label,
+      matches: match.indices,
       accelerator: command.acceleratorLabel,
       detail,
     });

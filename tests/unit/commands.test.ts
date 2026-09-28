@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRows, fuzzyScore } from "../../src/renderer/src/composables/useCommands";
+import { buildRows, fuzzyMatch, fuzzyScore } from "../../src/renderer/src/composables/useCommands";
 
 describe("palette rows", () => {
   it("lists every theme variant command", () => {
@@ -27,6 +27,22 @@ describe("palette rows", () => {
   it("scores fuzzy matches and rejects non-matches", () => {
     expect(fuzzyScore("theme", "Theme: Jade")).toBeGreaterThan(0);
     expect(fuzzyScore("zzz", "Theme: Jade")).toBe(0);
+  });
+
+  it("reports the indices of the characters a query matched", () => {
+    const match = fuzzyMatch("theme", "Theme: Jade");
+    expect(match.indices.map((i) => "Theme: Jade"[i])).toEqual(["T", "h", "e", "m", "e"]);
+  });
+
+  it("reports no indices for a non-match or a blank query", () => {
+    expect(fuzzyMatch("zzz", "Theme: Jade")).toEqual({ score: 0, indices: [] });
+    expect(fuzzyMatch("   ", "Theme: Jade")).toEqual({ score: 1, indices: [] });
+  });
+
+  it("carries match indices on command rows for emphasis, preserving casing", () => {
+    const row = buildRows("reload", []).find((entry) => entry.id === "view.reload");
+    const hit = row?.matches?.map((i) => row.label[i]).join("");
+    expect(hit?.toLowerCase()).toBe("reload");
   });
 });
 
