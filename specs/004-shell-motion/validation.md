@@ -45,20 +45,24 @@ Reading:
 
 | Scenario | Machine | Perceptual | Notes |
 | -------- | ------- | ---------- | ----- |
-| S1 palette grow/shrink | mounted | **pending** | Panel/backdrop scale and fade need human eyes; typing-immediacy also manual |
-| S2 strip choreography | **PASS** | **pending** | Label reconstruction and cut-free hide verified; segment/control stagger timing manual |
-| S3 row animation | mounted | **pending** | Rows render; "new rows animate, survivors still" is visual |
-| S4 veil fade-out | indirect | **pending** | Same gate proven on the strip path; the fade itself is visual |
-| S5 failure view | **PASS** | **pending** | Mounts with card and copy on a refused target; enter fade is visual |
-| S6 reduced motion | — | **pending** | Requires toggling System Settings → Accessibility → Display → Reduce Motion |
-| S7 interruption / zero chrome | **PASS** (zero chrome) | **pending** | Shell hidden after settle; rapid-toggle and pointer behavior are manual |
-| S8 automated checks | **PASS** | — | `npm run test` (39), `npm run check`, `npm run typecheck`, `npm run build` |
+| S1 palette grow/shrink | mounted | **PASS** | Grow-on-open / shrink-on-close confirmed by the developer |
+| S2 strip choreography | **PASS** | **PASS** | Label reconstruction and cut-free hide verified; segment/control stagger confirmed by the developer |
+| S3 row animation | mounted | **PASS** | Rows unfold in and shrink out; developer confirmed correct behaviour. Residual: mild choppiness during very fast typing (enter/leave overlap) |
+| S4 veil fade-out | indirect | **PASS** | Developer confirmed the surface transitions rather than cutting |
+| S5 failure view | **PASS** | **PASS** | Mounts with card and copy on a refused target; enter/leave confirmed |
+| S6 reduced motion | — | **PASS** | Reduce Motion ON: all four surfaces snap instantly. Toggled back off: motion resumes with no restart (FR-005, SC-004) |
+| S7 interruption / zero chrome | **PASS** (zero chrome) | **PASS** | Shell hidden after settle; developer confirmed no sticks or residue while toggling |
+| S8 automated checks | **PASS** | — | `npm run test` (45), `npm run check`, `npm run typecheck`, `npm run build` |
 
 ## Remaining manual pass
 
-Run the app (`npm run dev`) with a live target and a dead port, then walk
-`quickstart.md` S1–S7 with slow-motion capture for S1, S2, S4 and reduced motion
-for S6. Record the outcome here.
+None outstanding. Every scenario in `quickstart.md` S1–S8 is now either
+machine-verified or confirmed by the developer in `npm run dev`.
+
+The only known imperfection is the fast-typing choppiness on palette rows
+(enter/leave overlap), recorded under S3 and in
+`spikes/row-animation/results.md`. It is a tuning matter, not a defect: reduce
+`--tb-motion-fast` or `--tb-motion-stagger` to taste.
 
 ## Notes
 
@@ -70,9 +74,10 @@ for S6. Record the outcome here.
   every technique pass. The developer confirmed correct behaviour by hand and
   noted only mild choppiness during very fast typing, tunable via the motion
   tokens.
-- Remaining manual pass: `quickstart.md` S6 (system Reduce Motion) and slow-motion
-  captures for S1/S2/S4 have still not been recorded by a human. Everything
-  machine-checkable is in the table above.
+- All scenarios validated (2026-09-28): the developer walked S1–S7 in
+  `npm run dev` and confirmed the surfaces animate, rows behave, interruption is
+  clean, and reduced motion snaps every surface instantly then resumes without a
+  restart. Nothing is outstanding.
 - **Pacing amendment (2026-09-27)**: the developer judged the first cut too fast.
   The token set moved to 160/220/300 ms with a 36 ms stagger and a 0.96 palette
   scale, and the spec budgets were re-baselined to match (FR-002, SC-002,

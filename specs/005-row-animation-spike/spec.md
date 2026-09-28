@@ -4,8 +4,13 @@
 
 **Created**: 2026-09-27
 
-**Status**: Complete (2026-09-28) — the technique is chosen and shipped; see
-`spikes/row-animation/results.md`
+**Status**: Complete (2026-09-28) — the technique is chosen, shipped, and verified.
+See `spikes/row-animation/results.md`.
+
+**Outcome**: The volatile `Open <query>` row key was the cause, not the engine.
+With a stable `Row.key`, every candidate technique passes with zero duplicates.
+Shipped: the Vue-docs JS-hook technique (`TransitionGroup` + `:css="false"`) with a
+staggered enter, a shrink-and-fade leave, and a fixed row height.
 
 **Input**: User description: "Let's give row animation another shot, or create a spike to see what technique is the best here."
 
