@@ -148,6 +148,33 @@ export const COMMANDS: CommandDef[] = [
     palette: true,
   },
   {
+    id: "extensions.install",
+    label: "Install Extension from Chrome Web Store",
+    // Not listed on its own: a store install is offered as a row only when the
+    // palette input is a store URL or ID, so there is no confusing dead entry.
+    palette: false,
+  },
+  {
+    id: "extensions.installFolder",
+    label: "Install Extension from Folder",
+    palette: true,
+  },
+  {
+    id: "extensions.reload",
+    label: "Reload Extensions",
+    palette: true,
+  },
+  {
+    id: "extensions.revealFolder",
+    label: "Reveal Extensions Folder",
+    palette: true,
+  },
+  {
+    id: "extensions.dismissStatus",
+    label: "Dismiss Extension Status",
+    palette: false,
+  },
+  {
     id: "failure.retry",
     label: "Retry",
     palette: false,

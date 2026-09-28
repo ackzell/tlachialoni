@@ -1,5 +1,8 @@
-import { app } from "electron";
+import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import type { WebContentsView } from "electron";
 import type { AppWindow } from "./shell/window";
 
@@ -140,6 +143,104 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
 export type { WebContentsView };
 
 /**
+ * Verifies extension support end-to-end. Run with TLACHIALONI_EXTENSION_TEST=1;
+ * override the store target with TLACHIALONI_EXTENSION_URL / _ID.
+ *
+ * Two checks: (1) the store install command the palette dispatches actually
+ * downloads, loads, and persists; (2) an extension loaded into the guest session
+ * injects into the guest page but never into a page in the shell's session.
+ */
+export async function runExtensionSelfTest(appWindow: AppWindow): Promise<void> {
+  const id = process.env.TLACHIALONI_EXTENSION_ID ?? "fmkadmapgofadopljbjfkapdkoienihi";
+  const url =
+    process.env.TLACHIALONI_EXTENSION_URL ??
+    `https://chromewebstore.google.com/detail/react-developer-tools/${id}`;
+  const log: Record<string, unknown> = { url };
+  const cleanups: Array<() => void> = [];
+
+  try {
+    // (1) The exact command the palette dispatches for a store install.
+    const result = await appWindow.runCommand("extensions.install", id);
+    const record = appWindow.getState().extensions.find((entry) => entry.id === id) ?? null;
+    const guestLoaded = appWindow.siteView.webContents.session.extensions
+      .getAllExtensions()
+      .map((entry) => `${entry.name}@${entry.version}`);
+    log.install = { result, record, guestLoaded };
+
+    // (2) Injection isolation: a content-script extension loaded into the guest
+    // session must run in the guest but not in a page in the shell's session.
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tlachialoni-isolation-"));
+    fs.writeFileSync(
+      path.join(probeDir, "manifest.json"),
+      JSON.stringify({
+        manifest_version: 3,
+        name: "Isolation Probe",
+        version: "1.0.0",
+        content_scripts: [{ matches: ["http://127.0.0.1/*"], js: ["probe.js"] }],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(probeDir, "probe.js"),
+      "document.documentElement.setAttribute('data-tlachialoni-probe','1');",
+    );
+    cleanups.push(() => fs.rmSync(probeDir, { recursive: true, force: true }));
+
+    const guestSession = appWindow.siteView.webContents.session;
+    await guestSession.extensions.loadExtension(probeDir);
+
+    const server = http.createServer((_request, response) => {
+      response.setHeader("content-type", "text/html");
+      response.end("<h1>probe</h1>");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    cleanups.push(() => server.close());
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    const target = `http://127.0.0.1:${port}/`;
+
+    const guestWindow = new BrowserWindow({
+      show: false,
+      webPreferences: { session: guestSession },
+    });
+    cleanups.push(() => guestWindow.destroy());
+    await guestWindow.loadURL(target);
+    const guestInjected = await guestWindow.webContents.executeJavaScript(
+      "document.documentElement.getAttribute('data-tlachialoni-probe')",
+    );
+
+    const shellSession = appWindow.shellView.webContents.session;
+    const shellWindow = new BrowserWindow({
+      show: false,
+      webPreferences: { session: shellSession },
+    });
+    cleanups.push(() => shellWindow.destroy());
+    await shellWindow.loadURL(target);
+    const shellInjected = await shellWindow.webContents.executeJavaScript(
+      "document.documentElement.getAttribute('data-tlachialoni-probe')",
+    );
+
+    log.isolation = { guestInjected, shellInjected };
+    log.pass = Boolean(
+      result.ok && record?.enabled === true && guestInjected === "1" && shellInjected === null,
+    );
+  } catch (error) {
+    log.error = String(error);
+    log.pass = false;
+  } finally {
+    for (const cleanup of cleanups.reverse()) {
+      try {
+        cleanup();
+      } catch {
+        // best-effort teardown
+      }
+    }
+  }
+
+  process.stdout.write(`EXTENSION_TEST ${JSON.stringify(log)}\n`);
+  app.exit(0);
+}
+
+/**
  * Captures the shell surfaces to PNGs so the UI can be reviewed without a human
  * at the screen. Run with TLACHIALONI_UI_SNAPSHOT=1.
  */
@@ -189,6 +290,40 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
   fs.writeFileSync(`${out}/tlachialoni-failure.png`, (await shell.capturePage()).toPNG());
   const failureMounted = await probe(".failure");
 
+  // Extension status surface (007): a determinate download, then a terminal
+  // error. The page's inner height must not change while it is visible.
+  const siteHeight = () =>
+    appWindow.siteView.webContents.executeJavaScript("window.innerHeight") as Promise<number>;
+  const heightBeforeStatus = await siteHeight();
+  appWindow.extensions.onStatus?.({
+    phase: "downloading",
+    name: "React Developer Tools",
+    message: "Downloading from the Chrome Web Store",
+    progress: { received: 420000, total: 670658 },
+  });
+  await wait(700);
+  fs.writeFileSync(`${out}/tlachialoni-extension-status.png`, (await shell.capturePage()).toPNG());
+  const statusMounted = await probe(".status");
+  const statusTitle = (await shell.executeJavaScript(
+    "document.querySelector('.status__title')?.textContent ?? null",
+  )) as string | null;
+  const statusFill = (await shell.executeJavaScript(
+    "document.querySelector('.status__fill')?.style.width ?? null",
+  )) as string | null;
+  const heightDuringStatus = await siteHeight();
+
+  appWindow.extensions.onStatus?.({
+    phase: "error",
+    name: "React Developer Tools",
+    message: "Couldn't install React Developer Tools",
+    error: "The store returned HTTP 404",
+  });
+  await wait(400);
+  fs.writeFileSync(`${out}/tlachialoni-extension-error.png`, (await shell.capturePage()).toPNG());
+  await appWindow.runCommand("extensions.dismissStatus");
+  await wait(400);
+  const statusDismissed = !(await probe(".status"));
+
   process.stdout.write(
     `UI_SNAPSHOT ${JSON.stringify({
       dir: out,
@@ -198,6 +333,13 @@ export async function runUiSnapshot(appWindow: AppWindow): Promise<void> {
       failureMounted,
       mainTargetAfterNavigate: mainTarget,
       stripText,
+      extensionStatus: {
+        mounted: statusMounted,
+        title: statusTitle,
+        fill: statusFill,
+        dismissed: statusDismissed,
+        heightUnchanged: heightBeforeStatus === heightDuringStatus,
+      },
     })}\n`,
   );
 }

@@ -1,6 +1,8 @@
-import { app, BaseWindow, nativeTheme, webContents, type WebContentsView } from "electron";
+import { app, BaseWindow, nativeTheme, session, webContents, type WebContentsView } from "electron";
 import path from "node:path";
 import { StateStore } from "../state/store";
+import { ExtensionManager } from "../extensions/manager";
+import { isActivePhase, type ExtensionStatus } from "@shared/extensions";
 import {
   DEFAULT_HEIGHT,
   DEFAULT_TARGET,
@@ -32,9 +34,17 @@ const SHELL_MODE_RANK: Record<ShellMode, number> = { hidden: 0, strip: 1, full: 
 
 export type { CommandResult };
 
+export interface AppWindowOptions {
+  /** Shared state store; a window creates its own when omitted. */
+  store?: StateStore;
+  /** Extension manager; a window creates its own when omitted. */
+  extensions?: ExtensionManager;
+}
+
 export class AppWindow {
   readonly win: BaseWindow;
   readonly store: StateStore;
+  readonly extensions: ExtensionManager;
   readonly siteView: WebContentsView;
   readonly shellView: WebContentsView;
   readonly devtools: DevToolsController;
@@ -51,6 +61,7 @@ export class AppWindow {
   private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
   private shellLoaded = false;
+  private extensionStatus: ExtensionStatus | null = null;
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
@@ -62,8 +73,18 @@ export class AppWindow {
    */
   private shownUrl: string | null = null;
 
-  constructor() {
-    this.store = new StateStore(path.join(app.getPath("userData"), "state.json"));
+  constructor(options: AppWindowOptions = {}) {
+    this.store = options.store ?? new StateStore(path.join(app.getPath("userData"), "state.json"));
+    this.extensions =
+      options.extensions ??
+      new ExtensionManager({
+        store: this.store,
+        session: session.defaultSession,
+        root: path.join(app.getPath("userData"), "extensions"),
+      });
+    this.extensions.onChange = () => this.broadcastState();
+    this.extensions.onStatus = (status) => this.setExtensionStatus(status);
+
     const state = this.store.get();
     this.currentUrl = state.target ?? DEFAULT_TARGET;
 
@@ -174,6 +195,17 @@ export class AppWindow {
       this.picker.disarm();
       return;
     }
+    // Esc clears a finished extension status; an install in flight is not
+    // cancellable, so it is left alone.
+    if (
+      input.code === "Escape" &&
+      this.extensionStatus &&
+      !isActivePhase(this.extensionStatus.phase)
+    ) {
+      event.preventDefault();
+      this.dismissExtensionStatus();
+      return;
+    }
     const command = commandForInput(input);
     if (!command) return;
     if ((command.id === "view.back" || command.id === "view.forward") && this.editableFocused) {
@@ -240,12 +272,42 @@ export class AppWindow {
     });
     commands.register("failure.dismiss", () => this.dismissFailure());
     commands.register("window.close", () => this.win.close());
+
+    commands.register("extensions.install", (arg) =>
+      this.extensions.installFromStore(String(arg ?? "")),
+    );
+    commands.register("extensions.installFolder", () => this.extensions.installFromFolder());
+    commands.register("extensions.reload", () => this.extensions.reloadAll());
+    commands.register("extensions.revealFolder", () => this.extensions.revealRoot());
+    commands.register("extensions.toggle", (arg) => this.extensions.toggle(String(arg ?? "")));
+    commands.register("extensions.remove", (arg) => this.extensions.remove(String(arg ?? "")));
+    commands.register("extensions.update", (arg) => this.extensions.update(String(arg ?? "")));
+    commands.register("extensions.dismissStatus", () => this.dismissExtensionStatus());
   }
 
   // ---- public API used by IPC and the dock self-test -------------------
 
   getState() {
     return this.store.get();
+  }
+
+  /**
+   * Shows the extension status surface. The window stays full-window while a
+   * status is present so the surface is never clipped; the renderer dismisses a
+   * finished one through `extensions.dismissStatus`.
+   */
+  private setExtensionStatus(status: ExtensionStatus): void {
+    this.extensionStatus = status;
+    this.sendToShell("extension:status", status);
+    this.relayout();
+  }
+
+  /** Clears a finished (`done`/`error`) status and defers the collapse to its leave. */
+  dismissExtensionStatus(): void {
+    if (!this.extensionStatus) return;
+    this.extensionStatus = null;
+    this.sendToShell("extension:status", null);
+    this.relayout(true);
   }
 
   async runCommand(id: string, arg?: unknown): Promise<CommandResult> {
@@ -577,7 +639,7 @@ export class AppWindow {
   }
 
   private desiredShellMode(): ShellMode {
-    if (this.paletteOpen || this.showLoading || this.failed) return "full";
+    if (this.paletteOpen || this.showLoading || this.failed || this.extensionStatus) return "full";
     if (this.store.get().stripVisible) return "strip";
     return "hidden";
   }

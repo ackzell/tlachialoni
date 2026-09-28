@@ -16,6 +16,10 @@ export function createShellView(): WebContentsView {
       contextIsolation: true,
       nodeIntegration: false,
       preload: SHELL_PRELOAD,
+      // The shell runs in its own non-persistent session so extensions loaded
+      // into the guest page's session can never inject into the tool's UI
+      // (specs/007-extension-support/contracts/extension-session.md).
+      partition: "shell",
     },
   });
 

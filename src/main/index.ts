@@ -1,13 +1,17 @@
-import { app, Menu } from "electron";
+import { app, Menu, session } from "electron";
 import os from "node:os";
 import path from "node:path";
 import icon from "../../resources/icon.png?asset";
 import { COMMANDS, type Accelerator } from "@shared/commands";
 import { formatReleaseDate } from "@shared/release";
+import { StateStore } from "./state/store";
+import { ExtensionManager } from "./extensions/manager";
 import { AppWindow } from "./shell/window";
-import { runDockSelfTest, runUiSnapshot } from "./dock-test";
+import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-test";
 
 let mainWindow: AppWindow | null = null;
+let store: StateStore | null = null;
+let extensions: ExtensionManager | null = null;
 
 /**
  * App identity. The development Dock icon and the About panel use the same
@@ -30,7 +34,11 @@ function configureAppIdentity(): void {
 }
 
 // Keep automated checks away from the user's real state.
-if (process.env.TLACHIALONI_DOCK_TEST === "1" || process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
+if (
+  process.env.TLACHIALONI_DOCK_TEST === "1" ||
+  process.env.TLACHIALONI_UI_SNAPSHOT === "1" ||
+  process.env.TLACHIALONI_EXTENSION_TEST === "1"
+) {
   app.setPath("userData", path.join(os.tmpdir(), `tlachialoni-docktest-${process.pid}`));
 }
 
@@ -77,20 +85,44 @@ function installMenu(): void {
     },
   }));
 
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([
-      { role: "appMenu" },
-      { role: "editMenu" },
-      { label: "View", submenu: viewItems },
-    ]),
-  );
+  const template: Electron.MenuItemConstructorOptions[] = [
+    { role: "appMenu" },
+    { role: "editMenu" },
+    { label: "View", submenu: viewItems },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/**
+ * Builds the process-wide state store and extension manager and loads enabled
+ * extensions into the guest session. Extension loading must happen before the
+ * window's guest view starts loading, and the manager is process-wide so a
+ * re-activated window reuses the already-loaded extensions.
+ */
+async function createWindow(): Promise<AppWindow> {
+  let activeStore = store;
+  let manager = extensions;
+  if (!activeStore || !manager) {
+    activeStore = new StateStore(path.join(app.getPath("userData"), "state.json"));
+    manager = new ExtensionManager({
+      store: activeStore,
+      session: session.defaultSession,
+      root: path.join(app.getPath("userData"), "extensions"),
+    });
+    await manager.loadAll();
+    store = activeStore;
+    extensions = manager;
+  }
+  const window = new AppWindow({ store: activeStore, extensions: manager });
+  window.show();
+  return window;
 }
 
 app.whenReady().then(async () => {
   installMenu();
   configureAppIdentity();
-  mainWindow = new AppWindow();
-  mainWindow.show();
+  mainWindow = await createWindow();
 
   if (process.env.TLACHIALONI_DOCK_TEST === "1") {
     await runDockSelfTest(mainWindow);
@@ -99,6 +131,8 @@ app.whenReady().then(async () => {
   } else if (process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
     await runUiSnapshot(mainWindow);
     app.exit(0);
+  } else if (process.env.TLACHIALONI_EXTENSION_TEST === "1") {
+    await runExtensionSelfTest(mainWindow);
   }
 });
 
@@ -106,7 +140,8 @@ app.on("window-all-closed", () => app.quit());
 
 app.on("activate", () => {
   if (!mainWindow || mainWindow.win.isDestroyed()) {
-    mainWindow = new AppWindow();
-    mainWindow.show();
+    void createWindow().then((window) => {
+      mainWindow = window;
+    });
   }
 });
