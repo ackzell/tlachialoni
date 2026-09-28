@@ -112,7 +112,6 @@ function init(): void {
   api.on("palette:open", (payload) => {
     paletteInitial.value = (payload as { initial?: string }).initial ?? "";
     paletteOpen.value = true;
-    api.setPaletteVisible(true);
   });
   api.on("palette:close", () => {
     paletteOpen.value = false;

@@ -40,8 +40,8 @@ ranks smaller than the current one.
 | -------------------------------------- | ------ | ---------------------------------------------------------- |
 | `handleReady()` (veil leaving)         | yes    | Main-initiated; the veil needs its fade-out                |
 | `toggleStrip()` when hiding            | yes    | Main-initiated by the `⌘B` hotkey; the strip needs its leave |
+| `closePalette()`                       | yes    | The renderer owns the palette's leave; main keeps the shell full until it settles. When the close lands on the veil or failure view the desired mode is already `full`, so nothing defers |
 | `setPaletteVisible(false)`             | no     | Renderer-initiated; the renderer already finished its leave |
-| `closePalette()` from navigate/failure | no     | Those paths grow to the veil or failure view anyway        |
 | `loadTarget()`, `failure.retry`, `show()` | no  | Growing or first paint; nothing to cut                     |
 | Window resize                          | no     | The shell view stays visible; bounds only                   |
 
@@ -63,10 +63,11 @@ starts its leave), then call `relayout(true)`.
 - Under reduced motion the clamped tokens fire `after-leave` near-instantly; the
   protocol needs no special case.
 
-Renderer-initiated palette close: `Esc` / outside click / activation flips the
-local shown ref, lets `<Transition>` complete, and only then calls
-`setPaletteVisible(false)` + `settled()`. Main is still `paletteOpen` during the
-leave, so the shell view remains full-window for free.
+Main-initiated palette close (hotkey): the renderer owns the palette's leave, so
+main clears `paletteOpen`, sends `palette:close`, and calls `relayout(true)` — the
+shell view stays full-window until the renderer reports finished. The renderer flips
+its shown ref, lets the leave play, then `notifyPaletteClosed()` sends `settled()`
+and `setPaletteVisible(false)`, which applies the collapsed mode with no defer.
 
 ## Sequences
 
@@ -81,10 +82,12 @@ applies `strip` or `hidden`.
 surface) → `relayout(true)` marks `pendingSettle` (36 px stays applied) →
 after-leave: `settled()` → main applies `hidden`.
 
-**Palette close (immediate).**
-`Esc` → local shown ref flips → 100 ms leave → after-leave: `settled()` then
-`setPaletteVisible(false)` → main clears `paletteOpen`, refocuses the site view,
-applies the recalculated mode with no defer.
+**Palette close (deferred).**
+`⌘P` / `⌘J` in main → `paletteOpen = false`, `palette:close` → renderer starts the
+100 ms leave → `relayout(true)` marks `pendingSettle` (full-window stays applied) →
+after-leave: `setPaletteVisible(false)` + `settled()` → main applies the
+recalculated mode with no defer. `Esc` takes the same path from the renderer side,
+with main still `paletteOpen` until the leave reports.
 
 **Interrupted strip hide.**
 Hide marks `pendingSettle`; show arrives before the ack → `relayout(false)` with

@@ -17,7 +17,7 @@ There are two bridges: the **shell** preload (Vue surfaces) and the **site** pre
 | `theme:setColorMode` | invoke → | `{ mode: 'system' \| 'dark' \| 'light' }` | Persists and applies a mode |
 | `picker:arm` / `picker:disarm` | invoke → | — | Controls the picker session |
 | `window:close` | invoke → | — | Closes the current window (strip close button) |
-| `palette:visibility` | send → | `{ open: boolean }` | The renderer reports palette open/closed (keeps main's layout in sync) |
+| `palette:visibility` | send → | `{ open: boolean }` | The renderer reports the palette's leave finished (releases the shell view) |
 | `shell:ready` | send → | — | The renderer has mounted and subscribed; main flushes queued messages |
 | `state:changed` | ← on | `PersistedState` | Main pushes the full state (includes recents) |
 | `theme:apply` | ← on | `{ variant, colorMode, resolved }` | Main tells the shell which tokens to apply |

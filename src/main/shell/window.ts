@@ -447,8 +447,13 @@ export class AppWindow {
   private closePalette(): void {
     this.clearThemePreview();
     this.paletteOpen = false;
-    this.relayout();
+    // Defer the collapse: the renderer owns the palette's leave, and main must
+    // keep the shell full-window until it reports finished (settle protocol).
+    // Without this a main-initiated close (⌘P toggle, ⌘J) hides the shell view
+    // instantly and the exit animation never plays. When the close lands on the
+    // veil or failure view the desired mode is already `full`, so nothing defers.
     this.sendToShell("palette:close", {});
+    this.relayout(true);
   }
 
   /**
