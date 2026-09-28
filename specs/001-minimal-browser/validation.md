@@ -67,6 +67,13 @@ stays quiet.
   failure view on a target load
 - `src/renderer/src/utils/target.ts` — shared strip/veil URL formatter
 
+**Veil finding** (later): the veil is now a *site-switch* indicator, not a
+per-load one. A same-origin palette navigation (`:5173/a` → `:5173/b`) loads
+without covering the already-painted page; a cold start, a load from the failure
+view, and a switch to a different origin still veil. `window.ts` tracks the
+committed document (`shownUrl`, never seeded from persisted state) so the first
+launch — which has nothing painted — always veils.
+
 **S9 fix landed** (this change):
 - `src/main/shell/site-view.ts` — main-frame `will-redirect` to a non-local URL is
   prevented and opened in the system browser (closes a local-only bypass)

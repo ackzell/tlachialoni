@@ -217,7 +217,7 @@ renders.
 - **Window resize with the strip visible**: the strip spans the window width and does not alter the page's layout beyond the window resize itself.
 - **First-ever launch (no persisted state)**: target `http://localhost:3000`, obsidian variant, system mode, strip hidden, DevTools open docked bottom.
 - **Target changes port or dies mid-session**: the next load surfaces the failure view rather than a blank window.
-- **Slow or starting server**: while the target is loading, a themed loading indicator is shown over the themed background until first paint; it disappears immediately on paint and is never shown over an already-painted page.
+- **Slow or starting server**: while the target is loading, a themed loading indicator is shown over the themed background until first paint; it disappears immediately on paint and is never shown over an already-painted page. A same-origin target change (a different path on the same scheme+host+port) is treated as the site navigating itself and is therefore never covered; a switch to a different origin still is.
 - **Multiple instances**: launching the tool again opens an independent window; quitting or changing one instance does not affect the others, and targets opened in any instance remain in recents.
 
 ## Requirements _(mandatory)_
