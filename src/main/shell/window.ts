@@ -14,6 +14,7 @@ import {
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS } from "@shared/commands";
+import { isStripSurfaceVisible } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
@@ -61,6 +62,7 @@ export class AppWindow {
   private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
   private shellLoaded = false;
+  private buttonsVisible = false;
   private extensionStatus: ExtensionStatus | null = null;
   private statusDemoTimer: NodeJS.Timeout | null = null;
   /** Dev-only: a transient shell surface being previewed (see specs/008). */
@@ -804,11 +806,28 @@ export class AppWindow {
   }
 
   /**
+   * The macOS traffic lights are real AppKit controls that Electron hides on a
+   * frameless window. Showing them only while the drag strip is on screen keeps
+   * the chromeless default: the strip is the window's title bar, so the controls
+   * belong to it and come and go with `⌘B`. Mirrors the strip's render condition
+   * exactly (`stripVisible && !paletteOpen`); both sides read the shared
+   * predicate so they can never drift. A cached value keeps the frequent
+   * resize-driven relayouts from re-issuing the native call.
+   */
+  private syncWindowButtons(): void {
+    const visible = isStripSurfaceVisible(this.store.get(), this.paletteOpen);
+    if (visible === this.buttonsVisible) return;
+    this.buttonsVisible = visible;
+    if (!this.win.isDestroyed()) this.win.setWindowButtonVisibility(visible);
+  }
+
+  /**
    * Applies view bounds. A deferred, smaller mode keeps the current bounds
    * until the renderer's leave settles or the safety timeout fires, so exit
    * animations are never cut; motion is best-effort and never blocks state.
    */
   private relayout(defer = false): void {
+    this.syncWindowButtons();
     const { width, height } = this.win.getContentBounds();
     this.siteView.setBounds({ x: 0, y: 0, width, height });
 

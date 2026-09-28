@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { isStripSurfaceVisible } from "@shared/shell";
 import CommandPalette from "./components/CommandPalette.vue";
 import DragStrip from "./components/DragStrip.vue";
 import FailureView from "./components/FailureView.vue";
@@ -13,6 +15,12 @@ import {
 } from "./composables/useShell";
 
 const { state, loading, failed, paletteOpen, paletteInitial, extensionStatus } = useShell();
+
+// Main shows the native macOS traffic lights off the same predicate, so the
+// strip surface and its window controls stay in lockstep (specs/009).
+const stripVisible = computed(() =>
+  state.value ? isStripSurfaceVisible(state.value, paletteOpen.value) : false,
+);
 </script>
 
 <template>
@@ -46,7 +54,7 @@ const { state, loading, failed, paletteOpen, paletteInitial, extensionStatus } =
       @after-leave="markSurfaceLeft"
       @leave-cancelled="markSurfaceLeaveCancelled"
     >
-      <DragStrip v-if="state?.stripVisible && !paletteOpen" />
+      <DragStrip v-if="stripVisible" />
     </Transition>
 
     <Transition

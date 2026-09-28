@@ -141,7 +141,9 @@ function close(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  /* Left inset reserves room for the native macOS traffic lights, which main
+     shows whenever this strip is on screen (see AppWindow.syncWindowButtons). */
+  padding: 0 8px 0 68px;
   background: var(--tb-bg-elevated);
   border-bottom: 1px solid var(--tb-border);
   user-select: none;

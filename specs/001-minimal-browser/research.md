@@ -139,6 +139,11 @@ rejected. Items marked **(verify in M0)** are assumptions the spike must confirm
   (rejected: the tool wants no title bar at all). When the strip is hidden the
   window is only movable by invoking the strip (`⌘B`) — accepted as the cost of
   chromeless.
+- **Revised (specs/009-macos-traffic-lights)**: the native macOS traffic lights are
+  restored, but remain strip-bound. `frame: false` and the drag region are
+  unchanged; main only calls `win.setWindowButtonVisibility(true)` while the strip
+  surface is on screen, so the controls come and go with `⌘B` and the zero-chrome
+  default still holds.
 
 ## 9. Persisted state and multiple instances
 
