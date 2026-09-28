@@ -1,4 +1,4 @@
-import { app, BaseWindow, nativeTheme, type WebContentsView } from "electron";
+import { app, BaseWindow, nativeTheme, webContents, type WebContentsView } from "electron";
 import path from "node:path";
 import { StateStore } from "../state/store";
 import {
@@ -225,6 +225,7 @@ export class AppWindow {
     commands.register("devtools.dock.bottom", () => this.devtools.dock("bottom"));
     commands.register("devtools.dock.right", () => this.devtools.dock("right"));
     commands.register("devtools.dock.left", () => this.devtools.dock("left"));
+    commands.register("focus.toggle", () => this.toggleFocus());
     commands.register("picker.toggle", () => this.picker.toggle());
     for (const variant of THEME_VARIANTS) {
       commands.register(`theme.variant.${variant.slug}`, () => this.setVariant(variant.slug));
@@ -435,6 +436,33 @@ export class AppWindow {
     this.paletteOpen = false;
     this.relayout();
     this.sendToShell("palette:close", {});
+  }
+
+  /**
+   * Moves keyboard focus between the guest page and the docked DevTools panel.
+   * `⌘J` reaches this from both places: the page's `before-input-event` when the
+   * page (or shell) has focus, and the app-menu accelerator when DevTools does —
+   * DevTools does not bind plain `⌘J`, so the key equivalent falls through to the
+   * menu (unlike `⌘P`, which DevTools consumes).
+   */
+  private toggleFocus(): void {
+    // The palette owns input while open; hand focus back to the page first.
+    if (this.paletteOpen) {
+      this.closePalette();
+      this.siteView.webContents.focus();
+      return;
+    }
+
+    const devtools = this.siteView.webContents.devToolsWebContents;
+    const devtoolsAlive = devtools !== null && !devtools.isDestroyed();
+
+    if (devtoolsAlive && webContents.getFocusedWebContents() === devtools) {
+      this.siteView.webContents.focus();
+    } else if (devtoolsAlive) {
+      devtools.focus();
+    } else {
+      this.siteView.webContents.focus();
+    }
   }
 
   private toggleStrip(): void {

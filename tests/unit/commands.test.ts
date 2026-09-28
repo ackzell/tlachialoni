@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { COMMANDS, PALETTE_COMMANDS, commandForInput } from "@shared/commands";
 import { buildRows, fuzzyMatch, fuzzyScore } from "../../src/renderer/src/composables/useCommands";
+
+describe("command catalog", () => {
+  it("binds ⌘J to the focus toggle", () => {
+    const command = COMMANDS.find((entry) => entry.id === "focus.toggle");
+    expect(command).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘J",
+      accelerator: { meta: true, code: "KeyJ" },
+    });
+  });
+
+  it("matches the focus toggle from a raw key input", () => {
+    const input = {
+      type: "keyDown",
+      meta: true,
+      shift: false,
+      alt: false,
+      control: false,
+      code: "KeyJ",
+    };
+    expect(commandForInput(input)?.id).toBe("focus.toggle");
+  });
+
+  it("exposes the focus toggle in the palette", () => {
+    expect(PALETTE_COMMANDS.some((entry) => entry.id === "focus.toggle")).toBe(true);
+  });
+});
 
 describe("palette rows", () => {
   it("lists every theme variant command", () => {

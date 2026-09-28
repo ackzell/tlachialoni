@@ -21,6 +21,7 @@ focus, then dispatched through `command:run` semantics.
 | `devtools.dock.bottom` | Dock DevTools Bottom | `⌘1` | Plain Command+number; `⇧⌘3/4/5` are macOS screenshots |
 | `devtools.dock.right` | Dock DevTools Right | `⌘2` |  |
 | `devtools.dock.left` | Dock DevTools Left | `⌘3` |  |
+| `focus.toggle`        | Toggle Focus (Page / DevTools) | `⌘J` | Moves keyboard focus between the page and the docked DevTools |
 | `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | Hover highlight; click selects in DevTools            |
 | `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | Eight commands, one per mineral variant               |
 | `theme.cycleMode`      | Cycle Color Mode             | —                     | `system → dark → light`, persisted                    |
@@ -41,7 +42,7 @@ focus, then dispatched through `command:run` semantics.
 3. **Editable focus**: when `site:focus-editable` reports an editable element,
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
-5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators (the macOS **View** menu) and fire app-wide, wherever focus is.
+5. **While DevTools has focus**: the page's `before-input-event` never fires, so the same commands are also registered as application-menu accelerators (the macOS **View** menu) and fire app-wide, wherever focus is. This only helps for chords DevTools does not itself bind: `⌘P`, for example, is consumed by the DevTools front-end when it is focused, so `⌘J` (`focus.toggle`) exists to move keyboard focus back to the page without the mouse.
 6. **Mouse / swipe history**: the mouse's back/forward thumb buttons navigate history — on macOS mouse drivers deliver them as synthesized `swipe` events (`left` → back, `right` → forward); on Windows/Linux as `app-command` `browser-backward` / `browser-forward`.
 
 ## Guard rails

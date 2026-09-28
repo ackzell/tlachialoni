@@ -9,7 +9,8 @@ The only UI is transient and keyboard-first:
 
 - `⌘P` — command palette (type a target like `:5173`, or run a command)
 - `⌘B` — show/hide the draggable window strip
-- `⌘⇧J` — toggle DevTools; `⌘⇧1/2/3` dock it bottom/right/left
+- `⌘⌥J` — toggle DevTools; `⌘1/2/3` dock it bottom/right/left
+- `⌘J` — toggle keyboard focus between the page and DevTools
 - `⌘⇧C` — element picker with hover highlight
 - `⌘R` / `⇧⌘R` — reload / hard reload
 - `⌘←` / `⌘→` — back / forward (native text behavior inside inputs)

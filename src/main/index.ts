@@ -40,6 +40,7 @@ const MENU_COMMAND_IDS = [
   "devtools.dock.bottom",
   "devtools.dock.right",
   "devtools.dock.left",
+  "focus.toggle",
   "picker.toggle",
 ];
 

@@ -124,6 +124,13 @@ export const COMMANDS: CommandDef[] = [
     palette: true,
   },
   {
+    id: "focus.toggle",
+    label: "Toggle Focus (Page / DevTools)",
+    acceleratorLabel: "⌘J",
+    accelerator: { meta: true, code: "KeyJ" },
+    palette: true,
+  },
+  {
     id: "picker.toggle",
     label: "Inspect Element",
     acceleratorLabel: "⌘⇧C",
