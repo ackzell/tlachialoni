@@ -69,6 +69,7 @@ offered in recents.
 6. **Given** the tool is showing a target, **When** the developer presses `⌘L`, **Then** the palette opens prefilled with the current target.
 7. **Given** the palette is open, **When** the developer presses `Esc` or clicks outside it, **Then** the palette closes and keyboard focus returns to the page.
 8. **Given** the palette is open, **When** the developer types a query that fuzzy-matches a command, **Then** the matched characters in that row's label are emphasized (bolder, in the theme accent) without altering the label text.
+9. **Given** the palette is open with more matches than fit the visible list, **When** the developer moves the highlight with the arrow keys past the visible window, **Then** the list scrolls to keep the highlighted row in view.
 
 ---
 
@@ -248,6 +249,7 @@ renders.
 - **FR-022**: The system MUST dismiss the palette on `Esc` or a click outside it, return keyboard focus to the page afterwards, and keep the palette open with visible feedback when a submission is invalid.
 - **FR-023**: The system MUST allow more than one instance to run at once, each rendering its own target independently, so a developer can work on parallel related projects side by side.
 - **FR-026**: The system MUST emphasize, within each palette row's label, the characters the typed query matched, so the fuzzy match is visible at a glance without changing the label text.
+- **FR-027**: The system MUST keep the highlighted palette row within the visible list window as the developer moves the selection with the arrow keys, scrolling the list only when the row would otherwise leave it.
 
 ### Key Entities _(include if feature involves data)_
 

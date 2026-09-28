@@ -38,7 +38,8 @@ focus, then dispatched through `command:run` semantics.
 1. **Picker armed**: `Esc` and `⌘⇧C` disarm; all other picker input goes to the
    overlay (clicks select rather than reach the page).
 2. **Palette open**: the palette owns keyboard input; `Esc` closes it and returns
-   focus to the page; `Enter` runs the highlighted command or navigates.
+   focus to the page; `↑` / `↓` move the highlight, scrolling the list to keep it
+   in view; `Enter` runs the highlighted command or navigates.
 3. **Editable focus**: when `site:focus-editable` reports an editable element,
    `⌘←` / `⌘→` are not intercepted and perform native text navigation (FR-011).
 4. **Otherwise**: registered accelerators are captured before the page sees them.
