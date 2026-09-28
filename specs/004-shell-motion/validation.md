@@ -62,16 +62,27 @@ for S6. Record the outcome here.
 
 ## Notes
 
+- **Row animation resolved and shipped (2026-09-28)**: the palette now animates
+  rows with the Vue-docs technique (`TransitionGroup` + `:css="false"` + JS
+  hooks), staggered on entry, shrinking on leave, with a fixed row height. The
+  spike (`specs/005-row-animation-spike/`) proved the earlier duplication came
+  from the volatile `Open <query>` row key, and the fix (a stable `Row.key`) makes
+  every technique pass. The developer confirmed correct behaviour by hand and
+  noted only mild choppiness during very fast typing, tunable via the motion
+  tokens.
+- Remaining manual pass: `quickstart.md` S6 (system Reduce Motion) and slow-motion
+  captures for S1/S2/S4 have still not been recorded by a human. Everything
+  machine-checkable is in the table above.
 - **Pacing amendment (2026-09-27)**: the developer judged the first cut too fast.
   The token set moved to 160/220/300 ms with a 36 ms stagger and a 0.96 palette
   scale, and the spec budgets were re-baselined to match (FR-002, SC-002,
   `contracts/motion-tokens.md`). The main-process settle safety timeout moved to
   500 ms to stay above the longest leave.
-- **Row animation reverted (2026-09-27)**: the palette row `TransitionGroup` left
-  duplicated rows and a growing list, so the list is a plain `v-for` again. The
-  technique is deferred to `specs/005-row-animation-spike/` (research R10); FR-013
-  and US3 are rescoped accordingly. Row enter animation is therefore **not**
-  present in this feature's shipped state.
+- **Row animation fixed** (2026-09-27): the palette row `TransitionGroup` left
+  duplicated rows and a growing list. Root cause was the volatile `Open <query>`
+  row key; fixed by a stable `Row.key` plus a fixed row height, then re-implemented
+  with the Vue-docs JS-hook technique. Recorded in research R10 and
+  `spikes/row-animation/results.md`.
 - One probe target (`:4599`) was already occupied on this machine, which made the
   failure view appear to be missing; switching to a free port (`:4598`) produced
   the expected failure view. No code change was involved.

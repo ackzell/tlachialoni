@@ -194,33 +194,36 @@ typing responsiveness (SC-003).
 a "push" feel — explicitly not desired: the strip overlays and never reflows
 (spec Assumptions, 001 Clarifications). Rejected.
 
-## R10. Row animation reverted after a TransitionGroup failure; technique deferred
+## R10. Row animation: reverted, then solved via stable keys (see 005)
 
-**Decision**: Revert the palette row list to a plain `v-for` (no
-`TransitionGroup`, no row transition classes) and move the row-animation question
-to `specs/005-row-animation-spike/`, where candidate techniques are tested against
-the failure modes before one is adopted.
+**Decision**: Ship the Vue-docs technique — `TransitionGroup` with `:css="false"`
+and `onBeforeEnter` / `onEnter` / `onLeave` JS hooks driving the Web Animations
+API — now that the two prerequisites the spike identified are met: stable row
+keys and a fixed row height.
 
-**Rationale**: The first attempt wrapped rows in `<TransitionGroup
-name="palette-rows">` with enter-and-leave transitions and `position: absolute` on
-leaving rows. In real use this left **duplicated rows** that were fully opaque,
-stacked vertically, and grew the list on every matching keystroke. Two of the
-three artifacts were traceable to specific decisions — `position: absolute` on a
-leaving row inside a scrolling `overflow-y: auto` list overlaid the list and added
-scroll range; fading leave kept the row in flow while entering rows appeared. The
-duplication itself could not be reproduced from the build alone, and guessing
-twice made it worse, so the safe revert shipped and the technique was deferred
-rather than patched blind.
+**Rationale**: The first attempt left duplicated rows and a growing list. The
+spike (`specs/005-row-animation-spike/`, `spikes/row-animation/results.md`) found
+the cause: the typed-target row's key (`id + label`) changed on every keystroke,
+so `TransitionGroup` mounted a new element per character and held the previous one
+through its leave lifecycle. With a stable `Row.key` every candidate technique
+passes with zero duplicates — the engine was never the problem. Height animates
+between two constants (`0` and `--palette-row-height`) so the list unfolds without
+measuring the DOM while typing, and reduced motion collapses each animation to
+1 ms.
 
 **Alternatives considered**:
 
-- *Keep `TransitionGroup`, drop only the leave rules*: still left duplicates in
-  the reported behavior, because the leave lifecycle was still in play.
-- *Keep `TransitionGroup` and key rows by index*: masks accumulation rather than
-  preventing it; a duplicated node would still render.
-- *Patch repeatedly until the artifact disappears*: two attempts had already
-  regressed the UI; without a reproducer, further guessing was more likely to
-  break the palette than fix it.
+- *Keep `TransitionGroup`, drop only the leave rules*: still duplicated while the
+  key was volatile.
+- *Plain `v-for` + CSS `@keyframes` (candidate D, entry only)*: safe and passed the
+  spike, but offered no exit animation and no height unfold. Superseded once the
+  key fix made the lifecycle safe.
+- *GSAP as in the docs example*: unnecessary; the element API does the same job
+  and the docs' `:css="false"` pattern works with either. No new dependency.
+
+**Status**: shipped. FR-013 / US3 reinstated; FR-024 and FR-025 record the two
+prerequisites. Residual: enter/leave overlap during very fast typing reads as
+slight choppiness, tunable via the motion tokens.
 
 ## R11. Testing strategy
 

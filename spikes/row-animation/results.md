@@ -1,106 +1,68 @@
 # Results: Palette Row Animation Technique
 
-**Run**: 2026-09-27 · `node spikes/row-animation/probe.mjs`
+**Run**: 2026-09-27 (initial) · **Re-run**: 2026-09-28 (after the stable-key fix)
 **Environment**: Chromium headless shell (`chromium_headless_shell-1187`), harness
 served over localhost, real `buildRows` / `PALETTE_COMMANDS`, query sequence
 `devtools` typed one character at a time.
 
 ## Verdict table
 
-Probe run with the corrected sampling (see "Corrections during the run" below).
+| #   | Technique                                               | Initial run | After stable-key fix | maxNodes (model 15) | Duplicates | Ghosts |
+| --- | ------------------------------------------------------- | ----------- | -------------------- | ------------------- | ---------- | ------ |
+| A   | Plain `v-for`, no animation                             | PASS        | PASS                 | 15                  | —          | 0      |
+| B   | `TransitionGroup`, enter only                           | FAIL        | **PASS**             | 22                  | —          | 0      |
+| C   | `TransitionGroup`, enter + leave + `position: absolute` | FAIL        | **PASS**             | 22                  | —          | 0      |
+| D   | Plain `v-for` + CSS `@keyframes` entry                  | PASS        | PASS                 | 15                  | —          | 0      |
+| E   | `TransitionGroup` with `move`/FLIP, enter only          | FAIL        | **PASS**             | 22                  | —          | 0      |
 
-| #   | Technique                                               | Passed   | maxNodes | model rows | Duplicates        | Ghosts | Width stable | Warnings |
-| --- | ------------------------------------------------------- | -------- | -------- | ---------- | ----------------- | ------ | ------------ | -------- |
-| A   | Plain `v-for`, no animation                             | **PASS** | 15       | 15         | —                 | 0      | yes          | 0        |
-| B   | `TransitionGroup`, enter only                           | FAIL     | 22       | 15         | `target.navigate` | 0      | yes          | 0        |
-| C   | `TransitionGroup`, enter + leave + `position: absolute` | FAIL     | 22       | 15         | `target.navigate` | 0      | yes          | 0        |
-| D   | Plain `v-for` + CSS `@keyframes` entry                  | **PASS** | 15       | 15         | —                 | 0      | yes          | 0        |
-| E   | `TransitionGroup` with `move`/FLIP, enter only          | FAIL     | 22       | 15         | `target.navigate` | 0      | yes          | 0        |
+The re-run uses the harness's updated key function (`rowKey = row.key`), matching
+the app after the fix in `src/renderer/src/composables/useCommands.ts`.
 
 ## The finding
 
-**The duplication is not caused by leave rules, `position: absolute`, or FLIP. It
-is caused by `TransitionGroup` itself, and the row it duplicates is specifically
-`target.navigate`.**
+**Root cause: a key that changed while the row persisted.** `buildRows` emits a
+"type a target" row labelled `Open <query>`, so its key (`id + label`) changed on
+**every keystroke**. `TransitionGroup` identifies elements by key, so each
+keystroke mounted a new element and held the previous one through its leave
+lifecycle. The row was replaced before the previous node finished leaving, so
+fully opaque duplicates accumulated and the list grew. Candidate B had no leave
+rule at all and still duplicated, which ruled out leave rules, `position:
+absolute`, and FLIP as the cause.
 
-Every `TransitionGroup` variant — including B, which has _no leave rule at all_ —
-accumulates exactly one extra node, and the duplicate id is always
-`target.navigate`. The two non-`TransitionGroup` techniques neither accumulate nor
-duplicate.
+**Fix**: `Row.key` is now a stable identity — `target.typed`,
+`target.recent:<url>`, `command:<id>` — and the palette binds `:key="row.key"`.
+After the fix every technique passes with zero duplicates, which confirms the
+diagnosis: the engine was never the problem, the key was.
 
-### Root cause
+### Transient node count during a leave
 
-`buildRows` always emits a "type a target" row while a query is present
-(`src/renderer/src/composables/useCommands.ts:48-54`):
+B, C, and E peak at 22 nodes against 15 model rows in the _transient_ sample — a
+leaving row coexists with its successor before the leave completes. That is
+expected overlap, not accumulation: the settled count always returns to the model
+count, and no duplicate ids are ever observed. It is worth knowing that this
+overlap is what makes fast typing look "choppy": enter and leave animations run
+concurrently on adjacent rows.
 
-```ts
-rows.push({ kind: "target", id: "target.navigate", label: `Open ${trimmed}`, detail: "navigate" });
-```
+## What shipped
 
-The palette row key is `row.id + row.label` (`CommandPalette.vue`), so this row's
-key is `target.navigateOpen d`, `target.navigateOpen de`, `target.navigateOpen dev`
-— **it changes on every keystroke**. `TransitionGroup` identifies elements by key,
-so each keystroke:
+**The technique from the Vue docs** (`TransitionGroup` + `:css="false"` + JS
+hooks), implemented in `src/renderer/src/components/CommandPalette.vue`:
 
-1. mounts a new element for the new key, and
-2. moves the previous element into its leave lifecycle, holding it in the DOM.
+- `onBeforeEnter` / `onEnter` / `onLeave` drive the Web Animations API (no GSAP
+  dependency) using the existing motion tokens read at runtime.
+- Enter staggers by `data-index` with the same cap as the earlier CSS approach.
+- Height animates `0 ↔ var(--palette-row-height, 34px)`, so rows unfold; because
+  the height is a fixed token, nothing is measured while typing.
+- Reduced motion collapses each animation to 1 ms, so end states are identical.
+- Row height is fixed (`34px`) with `min-width: 0` + ellipsis on the label, so a
+  long target can never reflow the list.
 
-Because the row is replaced on _every_ keystroke, the previous node is still
-mid-leave when the next one arrives. The result is a fully opaque duplicate that
-stays in the DOM and grows the list — exactly the reported symptom. A plain
-`v-for` reuses the existing DOM node for the same position, so nothing accumulates.
+This combines the doc's JS-hook technique with the two things the spike proved
+are prerequisites: stable keys and a predictable row height.
 
-The `id` collision makes it worse: both the typed-target row and recent-target
-rows use `id: "target.navigate"`, so the duplicate is not distinguishable by id.
+## Corrections during the initial run
 
-### Why C looked worse in the app than in isolation
-
-Candidate C also sets `position: absolute` on leaving rows. Inside the scrolling
-`overflow-y: auto` list that additionally overlaid the list and added scroll
-range, which is why C showed the _ghost_ artifact on top of the duplication. The
-duplication itself, however, is reproduced here by B and E with no `position`
-rule at all — so the ghost was a second, separable bug in the same attempt.
-
-## Recommendation
-
-**Adopt technique D: plain `v-for` plus a CSS `@keyframes` entry animation.**
-
-- It passes all five checks, identical to the no-animation baseline A.
-- It animates entry (the visible half of the effect and what the developer asked
-  for) with no transition lifecycle, so there is no mechanism by which a node can
-  be retained.
-- No `TransitionGroup`, no `position: absolute`, no `move` class, and no Vue
-  transition deprecation warning (0 warnings observed).
-
-**Preconditions for the recommendation to hold**
-
-1. **The `target.navigate` key must be made stable across keystrokes** before any
-   `TransitionGroup`-based approach is reconsidered. As long as that row's key
-   changes on every keystroke, _any_ keyed transition technique will accumulate
-   it. This is the real prerequisite bug, independent of animation choice.
-2. Exit animation is not available with D. Rows disappear instantly. If exit
-   animation is later required, it must be reconsidered only after (1) is fixed
-   and re-tested in this harness.
-3. If F/LIP reorder animation is later wanted, technique E must first pass after
-   (1); today it fails.
-
-## Adoption cost (SC-003)
-
-| Aspect                  | Cost                                                                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Files touched           | `src/renderer/src/components/CommandPalette.vue` only (add class on new keys + one `@keyframes` + reuse the existing motion tokens) |
-| Row key                 | unchanged (`row.id + row.label`) — the key is not part of technique D                                                               |
-| Wrapper element         | none; rows stay a plain `<ul><li>` list                                                                                             |
-| New dependency          | none; reuses `--tb-motion-fast` / `--tb-motion-ease-out`                                                                            |
-| Vue lifecycle relied on | none (this is the point)                                                                                                            |
-
-Alternative if stable keys are fixed later: technique B (TransitionGroup, enter
-only) would give the same entry effect with a lifecycle, but it carries the
-dependency on stable keys and gains nothing over D for entry-only.
-
-## Corrections during the run
-
-Two probe false positives were fixed before this verdict:
+Two probe false positives were fixed before the first verdict:
 
 - `scrollHeight` (scroll range) was compared to the height ceiling; it must be
   `clientHeight`. Scrolling legitimately exceeds the collapsed box.
@@ -111,12 +73,10 @@ The ceiling check keeps a small slack for the list's border and padding.
 
 ## Caveats
 
-- The harness reproduces the artifact reliably for every `TransitionGroup`
-  variant, but it is a harness, not the app. Confirm the adopted technique against
-  the real palette in the 004 quickstart S3 before shipping.
+- The harness reproduces and clears the artifact reliably, but it is a harness,
+  not the app. The shipped behaviour was confirmed by hand in `npm run dev`.
 - The probe types one character at a time with ~40 ms/400 ms sampling. Real typing
-  can be faster; a faster cadence would only increase overlap, so it cannot
-  invalidate a passing technique, but it should be re-run for any candidate that
-  relies on timing.
-- `target.navigate` duplication was reproduced with the query sequence used here.
-  It is key-driven, so it reproduces for any non-empty query.
+  is faster, which increases enter/leave overlap — observed as a slight
+  choppiness during rapid re-population, and tunable via the motion tokens.
+- The transient-overlap peak (22 vs 15) is not asserted; only accumulation,
+  duplicates, ghosts, width stability, and typing responsiveness are.

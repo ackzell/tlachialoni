@@ -15,7 +15,9 @@ const tech = (params.get("tech") ?? "A").toUpperCase();
 const query = ref("");
 const rows = computed(() => buildRows(query.value, [], PALETTE_COMMANDS));
 
-const rowKey = (row) => row.id + row.label;
+// Mirrors the app's key choice. `row.key` is now the app's stable identity, so
+// the harness must use it too or it would test a key scheme the app no longer has.
+const rowKey = (row) => row.key;
 const label = (row) => row.label;
 const meta = (row) => row.accelerator ?? row.detail ?? "";
 

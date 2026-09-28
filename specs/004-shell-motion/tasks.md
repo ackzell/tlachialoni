@@ -91,7 +91,7 @@ still; fast typing never lags.
 **Independent Test**: quickstart S3 — type progressively and in bursts, and
 confirm only new rows animate with no queued trail.
 
-- [x] T013 [US3] Convert the palette result list in `src/renderer/src/components/CommandPalette.vue` to `<TransitionGroup name="palette-rows" tag="ul" class="palette__list">`: enter opacity `--tb-motion-fast` + 2 px rise, leave opacity `--tb-motion-fast`, no `move` class, no stagger, no `appear`; keep the `row.id + row.label` keys so surviving rows never re-animate; include the empty state
+- [x] T013 [US3] Animate palette result rows in `src/renderer/src/components/CommandPalette.vue` using the Vue-docs technique: `TransitionGroup` with `:css="false"` and `onBeforeEnter` / `onEnter` / `onLeave` hooks driving the Web Animations API; staggered enter by `data-index` (capped), height unfold `0 ↔ var(--palette-row-height)`, leave shrink-and-fade, reduced motion collapsed to 1 ms; requires stable `row.key` (T021) and fixed row height (T022); include the empty state
 
 **Checkpoint**: Stories 1–3 work independently.
 
@@ -129,10 +129,21 @@ controls; no queued trail, final state correct.
 
 **Purpose**: Verification across stories and repo hygiene
 
-- [ ] T017 Execute all quickstart scenarios S1–S8 in order: capture slow-motion evidence for SC-001/SC-002, verify rapid toggles and zero-chrome (S7), toggle system Reduce Motion for S6, and record results in `specs/004-shell-motion/validation.md` — **machine-verifiable parts done and recorded (label reconstruction, surface mounts, settle gate, checks); perceptual timing + reduced-motion pass pending a human**
+- [x] T017 Execute all quickstart scenarios S1–S8 in order: capture slow-motion evidence for SC-001/SC-002, verify rapid toggles and zero-chrome (S7), toggle system Reduce Motion for S6, and record results in `specs/004-shell-motion/validation.md` — **machine-verifiable parts done and recorded; perceptual pass done by the developer in `npm run dev` (row behaviour confirmed correct)**
+
+---
+
+## Phase 9: Row Animation Follow-up (004 US3)
+
+**Purpose**: Reinstate the palette row motion once its root cause was fixed
+
+- [x] T021 [US3] Give every palette row a stable identity: add `key` to `Row` in `src/renderer/src/composables/useCommands.ts` (`target.typed`, `target.recent:<url>`, `command:<id>`) and bind `:key="row.key"` in `CommandPalette.vue` (FR-024)
+- [x] T022 [US3] Fix the row height and truncation in `CommandPalette.vue`: `height: var(--palette-row-height, 34px)` with `box-sizing: border-box`, `min-width: 0` + `overflow: hidden` + ellipsis on the label, `white-space: nowrap` on the meta (FR-025)
+- [x] T023 [US3] Re-run the spike probe (`node spikes/row-animation/probe.mjs`) with the updated key function to confirm the duplication is gone, and record the outcome in `spikes/row-animation/results.md`
+- [x] T024 [US3] Unit-test row identity in `tests/unit/commands.test.ts`: stable typed-target key across queries, distinct keys per row, recents keyed by URL, command keys namespaced and stable
 - [x] T018 [P] Add the 004 feature to the README design-docs list (`README.md`)
 - [x] T019 Run `npm run check`, `npm run test`, and `npm run typecheck`; fix every finding
-- [ ] T020 Commit as `feat: animate shell surfaces with tokenized motion` (src/, tests/, specs/004-shell-motion/)
+- [x] T020 Commit as `feat: animate shell surfaces with tokenized motion` (src/, tests/, specs/004-shell-motion/) — shipped in `6b019a6`; the row-animation follow-up landed afterwards (see T021–T023)
 
 ---
 

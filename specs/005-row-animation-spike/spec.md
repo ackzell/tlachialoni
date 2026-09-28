@@ -4,7 +4,8 @@
 
 **Created**: 2026-09-27
 
-**Status**: Draft — spike (research), not a shippable feature
+**Status**: Complete (2026-09-28) — the technique is chosen and shipped; see
+`spikes/row-animation/results.md`
 
 **Input**: User description: "Let's give row animation another shot, or create a spike to see what technique is the best here."
 

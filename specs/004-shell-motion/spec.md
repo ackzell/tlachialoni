@@ -52,16 +52,9 @@ Pressing `⌘B` eases the strip surface in; the target location then reveals its
 
 ---
 
-### User Story 3 - Palette matches animate as the query changes (Priority: P2) — RESCOPED
+### User Story 3 - Palette matches animate as the query changes (Priority: P2)
 
-> **Rescoped 2026-09-27 (see `research.md` R10).** The first implementation drove
-> row enter/leave through Vue's `TransitionGroup`, which left duplicated rows and
-> grew the list on every keystroke. It was reverted. The row animation is deferred
-> to `specs/005-row-animation-spike/`, which compares candidate techniques against
-> the accumulate/ghost/lag failure modes before any of it is re-adopted. Until
-> then the palette list is a plain `v-for` with instant updates.
-
-When typing changes the fuzzy result set, newly matching rows enter with a subtle rise-and-fade instead of snapping into the list; rows that leave do so without drawing attention. Rows that remain in the result set stay still — they must not re-animate on every keystroke.
+When typing changes the fuzzy result set, newly matching rows unfold into place with a subtle staggered height-and-fade instead of snapping into the list; rows that leave shrink and fade out. Rows that remain in the result set stay still — they must not re-animate on every keystroke.
 
 **Why this priority**: Typing is continuous and this is the highest-risk animation for distraction, so it lands after the two discrete surfaces.
 
@@ -69,10 +62,12 @@ When typing changes the fuzzy result set, newly matching rows enter with a subtl
 
 **Acceptance Scenarios**:
 
-1. **Given** the palette is open, **When** the query changes so new rows match, **Then** the entering rows transition in subtly while surviving rows remain still.
-2. **Given** the developer types rapidly, **Then** animations never queue or stutter and each keystroke's results are visible immediately.
-3. **Given** the result set becomes empty, **Then** the empty state appears with the same treatment, and matches entering afterwards are treated the same way.
-4. **Given** the selection highlight moves between rows (keyboard or pointer), **Then** it moves without the list jumping or re-animating.
+1. **Given** the palette is open, **When** the query changes so new rows match, **Then** the entering rows unfold in with a staggered animation while surviving rows remain still.
+2. **Given** a row stops matching, **When** it leaves, **Then** it shrinks and fades out without the list growing, jumping, or pushing the row under the pointer.
+3. **Given** the developer types rapidly, **Then** animations never queue, leave duplicates, or retain departed rows, and each keystroke's results are visible immediately.
+4. **Given** the result set becomes empty, **Then** the empty state appears with the same treatment, and matches entering afterwards are treated the same way.
+5. **Given** the selection highlight moves between rows (keyboard or pointer), **Then** it moves without the list jumping or re-animating.
+6. **Given** a very long target label, **Then** the row truncates with an ellipsis and its height is unchanged, so the list height stays a function of the row count alone.
 
 ---
 
@@ -137,12 +132,14 @@ Pointer feedback eases rather than snaps: palette row fills and selection, strip
 - **FR-010**: The drag strip MUST ease its surface in, then reveal the location as segments split on `:` and `/` with staggered fades, then bring in its action controls sequentially, all within the shared budget.
 - **FR-011**: The location reveal MUST replay on every target change while the strip is visible, and whenever the strip is revealed.
 - **FR-012**: For targets with many segments, the stagger MUST compress so total reveal time stays within the shared budget regardless of target length.
-- **FR-013**: Palette result rows SHOULD animate subtly when they enter the result set due to a query change, while rows that remain must not re-animate — **rescoped 2026-09-27**: the technique is undecided and deferred to `specs/005-row-animation-spike/`; until it lands, rows update instantly and MUST NOT accumulate, duplicate, or resize the list.
+- **FR-013**: Palette result rows MUST animate subtly when they enter the result set due to a query change, while rows that remain MUST NOT re-animate. Rows MUST also animate on exit, and neither motion may accumulate, duplicate, or resize the list. Implemented with Vue's `TransitionGroup` + `:css="false"` JS hooks over the Web Animations API (`CommandPalette.vue`); requires stable row keys (FR-024) and a fixed row height (FR-025).
 - **FR-014**: Palette result animations MUST NOT interfere with typing responsiveness, keyboard navigation, or selection behavior; the list MUST keep pace with the fastest realistic typing.
 - **FR-015**: The loading veil MUST fade away when the target is ready and MUST be able to return promptly if a new load starts while it is leaving.
 - **FR-016**: The failure view MUST fade in when a target fails and fade out when Retry, Edit URL, or Go Back transitions to another state.
 - **FR-017**: Interactive micro-states (hover and selection fills on rows and buttons) MUST ease rather than cut, and MUST NOT queue when the pointer moves quickly.
 - **FR-018**: Motion MUST NOT gate or delay any keyboard affordance; everything reachable from the keyboard remains reachable at full speed.
+- **FR-024**: Every palette row MUST carry a stable DOM identity that does not change while the row persists, so a changing label (the `Open <query>` row) never registers as a new element.
+- **FR-025**: Palette rows MUST have a fixed height with label ellipsis rather than wrapping, so a long target can never reflow the list and the row animation animates between two known heights.
 
 ## Success Criteria _(mandatory)_
 
@@ -155,6 +152,7 @@ Pointer feedback eases rather than snaps: palette row fills and selection, strip
 - **SC-005**: Interrupting any transition (rapid toggle) ends in the state matching the last command 100% of the time, with zero residual chrome.
 - **SC-006**: The guest page's layout and viewport are unchanged by shell motion in all cases (strip overlays only; no reflow).
 - **SC-007**: During a normal work session the developer judges the motion subtle and non-distracting: no transition repeats on its own and none draws attention when unused.
+- **SC-008**: While typing a query of any length, the palette list never accumulates or duplicates rows: the settled row count always equals the number of matching rows, and the list height stays a function of that count.
 
 ## Assumptions
 

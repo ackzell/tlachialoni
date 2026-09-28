@@ -51,15 +51,21 @@ npm run typecheck  # explicit TS pass across node/preload/web
    pixels. Nothing cuts.
 5. Drag the window by the strip while it is still entering — dragging works.
 
-### S3 — Palette matches animate while typing (FR-013, FR-014, SC-003)
+### S3 — Palette matches animate while typing (FR-013, FR-014, FR-024, FR-025, SC-003, SC-008)
 
 1. Open the palette and type a query that changes the fuzzy result set. Newly
-   entering rows fade/rise subtly; rows that stay put do not re-animate.
-2. Type quickly (a burst of characters). No queued animation trail, no flicker,
-   results track each keystroke.
-3. Clear to a query with no matches. The empty state appears with the same
+   matching rows unfold in with a staggered height-and-fade; rows that stay put do
+   not re-animate.
+2. Delete characters so rows drop out. Departing rows shrink and fade where they
+   sit; the list does not grow, and the row under the pointer does not jump.
+3. Type quickly (a burst of characters). No queued animation trail, no duplicates,
+   and the settled row count always equals the number of matches.
+4. Type a long target (for example `localhost:5173/api/users?tab=1&sort=desc`).
+   The row truncates with an ellipsis and stays one row tall, so the list height
+   depends only on the row count.
+5. Clear to a query with no matches. The empty state appears with the same
    treatment, and matches entering afterwards are treated like any other entry.
-4. Arrow through rows while typing; the selection moves without the list jumping.
+6. Arrow through rows while typing; the selection moves without the list jumping.
 
 ### S4 — Loading veil fades out (FR-015, SC-001)
 
@@ -120,7 +126,7 @@ Findings that change behavior feed back into the spec or plan before commit.
 | -------- | ------------------------------------------------------ |
 | S1       | FR-003, FR-004, FR-009, SC-001–003                     |
 | S2       | FR-010, FR-011, FR-012, SC-002                         |
-| S3       | FR-013, FR-014, SC-003                                 |
+| S3       | FR-013, FR-014, FR-024, FR-025, SC-003, SC-008       |
 | S4       | FR-015, SC-001                                         |
 | S5       | FR-016, SC-001                                         |
 | S6       | FR-005, SC-004                                         |
