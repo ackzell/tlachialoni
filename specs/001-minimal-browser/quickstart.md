@@ -42,13 +42,14 @@ Relaunch: the same target loads. Resize: page and DevTools reflow together.
 Confirm the guest page exposes no Node/Electron globals (sandbox and context
 isolation active).
 
-### S2 — Palette (Story 2; FR-005–FR-007, FR-022)
+### S2 — Palette (Story 2; FR-005–FR-007, FR-022, FR-026)
 
 `⌘P` opens a centered palette listing commands and recents. Type `:5173` and
 submit → the view navigates to `http://localhost:5173`. Submit `file:///etc` → it is
-rejected with feedback and the target is unchanged. `Esc` and clicking outside both
-close the palette and return focus to the page. `⌘L` opens the palette prefilled
-with the current target.
+rejected with feedback and the target is unchanged. Type a command query such as
+`reload` → the matching characters are emphasized in each matched row's label.
+`Esc` and clicking outside both close the palette and return focus to the page.
+`⌘L` opens the palette prefilled with the current target.
 
 ### S3 — DevTools placement (Story 3; FR-008)
 
