@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import icon from "../../resources/icon.png?asset";
 import { COMMANDS, type Accelerator } from "@shared/commands";
+import { formatReleaseDate } from "@shared/release";
 import { AppWindow } from "./shell/window";
 import { runDockSelfTest, runUiSnapshot } from "./dock-test";
 
@@ -13,14 +14,18 @@ let mainWindow: AppWindow | null = null;
  * committed artwork as the packaged bundle (see
  * specs/003-standalone-packaging/contracts/app-identity.md). The product name is
  * declared once in package.json; `app.getName()` resolves `productName`.
+ *
+ * The release date is baked in at build time from the `v<version>` tag (see
+ * specs/006-release-versioning-about/contracts/release-identity.md) and shown in
+ * the panel's credits area, which macOS renders below the version line.
  */
 function configureAppIdentity(): void {
   if (process.platform === "darwin") app.dock?.setIcon(icon);
   app.setAboutPanelOptions({
     applicationName: app.getName(),
     applicationVersion: app.getVersion(),
-    version: app.getVersion(),
     iconPath: icon,
+    credits: `Released ${formatReleaseDate(__APP_RELEASE_DATE__)}`,
   });
 }
 

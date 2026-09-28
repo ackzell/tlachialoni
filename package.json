@@ -14,6 +14,10 @@
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --mac",
     "package:mac": "electron-builder --mac",
+    "tag:first": "commit-and-tag-version --first-release -- --no-verify",
+    "tag": "commit-and-tag-version -- --no-verify",
+    "tag:minor": "commit-and-tag-version --release-as minor -- --no-verify",
+    "tag:major": "commit-and-tag-version --release-as major -- --no-verify",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:preload": "tsc --noEmit -p tsconfig.preload.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
@@ -30,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^26.6.2",
     "@vitejs/plugin-vue": "^6.0.9",
+    "commit-and-tag-version": "^13.2.1",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",

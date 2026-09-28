@@ -60,6 +60,30 @@ The icon is generated from committed artwork by `scripts/build-icons.sh`
 signing and notarization are intentionally deferred; `electron-builder.yml` leaves
 room for them.
 
+## Releasing
+
+Releases are cut locally from Conventional Commit messages — no CI and no
+publishing involved. The version lives only in `package.json` and drives the app
+bundle, the artifact filenames, and the About panel.
+
+```sh
+npm run tag:first   # once: tag the current version as the baseline (e.g. v0.1.0)
+npm run tag         # bump by the commits since the last tag, update CHANGELOG.md, commit, tag vX.Y.Z
+npm run tag:minor   # force a minor bump
+npm run tag:major   # force a major bump
+```
+
+Tag first, then package, so the artifact carries the release's date:
+
+```sh
+npm run tag && npm run package
+```
+
+The About panel shows the logo, the version, and the release date taken from the
+`v<version>` tag's date (a build made before the tag is created falls back to the
+build date). Tags and artifacts are local; pushing tags is a deliberate manual
+step (`git push --follow-tags`) left for later.
+
 ## Design docs
 
 This project is built spec-first with [Spec Kit](https://github.com/github/spec-kit).
@@ -70,6 +94,7 @@ See:
 - `specs/001-minimal-browser/plan.md` and `tasks.md`
 - `specs/003-standalone-packaging/spec.md` — standalone app packaging
 - `specs/004-shell-motion/spec.md` — motion for the transient shell surfaces
+- `specs/006-release-versioning-about/spec.md` — release versioning and the About panel
 
 ## License
 
