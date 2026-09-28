@@ -17,10 +17,6 @@ function reload(): void {
 function toggleDevtools(): void {
   void api.runCommand("devtools.toggle");
 }
-
-function close(): void {
-  void api.closeWindow();
-}
 </script>
 
 <template>
@@ -117,35 +113,21 @@ function close(): void {
           />
         </svg>
       </button>
-      <button
-        class="strip__btn"
-        :style="{ '--i': segments.length + 2 }"
-        title="Close"
-        @click="close"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <!-- Icon from Material Symbols by Google - https://github.com/google/material-design-icons/blob/master/LICENSE -->
-          <path
-            fill="currentColor"
-            d="m12 13.4l-4.9 4.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l4.9-4.9l-4.9-4.9q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l4.9 4.9l4.9-4.9q.275-.275.7-.275t.7.275t.275.7t-.275.7L13.4 12l4.9 4.9q.275.275.275.7t-.275.7t-.7.275t-.7-.275z"
-          />
-        </svg>
-      </button>
     </div>
   </header>
 </template>
 
 <style scoped>
 .strip {
-  height: 36px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   /* Left inset reserves room for the native macOS traffic lights, which main
      shows whenever this strip is on screen (see AppWindow.syncWindowButtons). */
   padding: 0 8px 0 68px;
-  background: var(--tb-bg-elevated);
-  border-bottom: 1px solid var(--tb-border);
+  background: var(--tb-bg);
+  border-bottom: 1px solid var(--tb-fg-subtle);
   user-select: none;
   -webkit-app-region: drag;
   app-region: drag;
