@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.3](///compare/v0.1.2...v0.1.3) (2026-09-28)
+
+### Features
+
+* **dev:** preview transient shell surfaces be19377
+* **extensions:** install, unpack, and persist Chrome extensions 6205c46
+* **extensions:** load extensions into the guest session a278b38
+* **menu:** group the application menu into domain menus 97ce361
+* **palette:** group commands and scope the palette 5fa464e
+* **palette:** install and manage extensions from the palette c726033
+* **shell:** show native macOS traffic lights with the drag strip f2cd519
+
 ## [0.1.2](///compare/v0.1.1...v0.1.2) (2026-09-28)
 
 ### Bug Fixes
