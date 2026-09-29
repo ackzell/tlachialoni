@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.6](///compare/v0.1.5...v0.1.6) (2026-09-29)
+
+### Bug Fixes
+
+* **shell:** keep the drag band available over full-window surfaces (013) 7fd025e
+
 ## [0.1.5](///compare/v0.1.4...v0.1.5) (2026-09-29)
 
 ### Bug Fixes
