@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.8](///compare/v0.1.7...v0.1.8) (2026-09-29)
+
+### Bug Fixes
+
+* **shell:** thin the drag band so page content below it stays clickable (013) 976f443
+
 ## [0.1.7](///compare/v0.1.6...v0.1.7) (2026-09-29)
 
 ### Bug Fixes
