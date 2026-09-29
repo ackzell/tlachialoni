@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tlachialoni.local/contracts/state.schema.json",
+  "title": "tlachialoni persisted state (schema 3)",
+  "description": "Single JSON document stored in app.getPath('userData'), written atomically (temp file + fsync + rename). Several windows in one process share the document; separate processes may also read and write it. `windows` is merged by id, `recents` is read-merge-written, and shared scalars are last-writer-wins (see data-model.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 3,
+      "default": 3
+    },
+    "recents": {
+      "description": "Newest-first, deduplicated by url, bounded overall and per origin (010).",
+      "type": "array",
+      "maxItems": 30,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "lastOpenedAt"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^https?://[^\\s]+$"
+          },
+          "lastOpenedAt": {
+            "type": "integer",
+            "description": "Epoch milliseconds"
+          }
+        }
+      }
+    },
+    "extensions": {
+      "description": "Shared installed extensions (007).",
+      "type": "array",
+      "default": [],
+      "items": { "type": "object" }
+    },
+    "windows": {
+      "description": "Open windows in creation order; restored on launch. Bounded so a corrupt file cannot open unbounded windows.",
+      "type": "array",
+      "maxItems": 16,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable per-window identity and merge key."
+          },
+          "target": {
+            "description": "This window's page. Must satisfy the local-target policy; null means the window is blank and offers the location prompt.",
+            "type": ["string", "null"],
+            "pattern": "^https?://[^\\s]+$"
+          },
+          "bounds": {
+            "description": "This window's frame; validated against a connected display before use.",
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "width": { "type": "integer", "minimum": 480 },
+              "height": { "type": "integer", "minimum": 360 }
+            }
+          },
+          "dockMode": {
+            "description": "This window's DevTools dock side.",
+            "type": "string",
+            "enum": ["bottom", "right", "left"],
+            "default": "bottom"
+          },
+          "devtoolsOpen": {
+            "description": "This window's DevTools open state.",
+            "type": "boolean",
+            "default": false
+          },
+          "stripVisible": {
+            "description": "This window's drag strip visibility.",
+            "type": "boolean",
+            "default": false
+          },
+          "variant": {
+            "description": "This window's Tlapalli mineral variant.",
+            "type": "string",
+            "enum": [
+              "obsidian",
+              "gold",
+              "turquoise",
+              "quartz",
+              "lapis-lazuli",
+              "amethyst",
+              "jade",
+              "fire-opal"
+            ],
+            "default": "obsidian"
+          },
+          "colorMode": {
+            "description": "This window's color mode for the tool's own surfaces; the guest page and DevTools follow the OS.",
+            "type": "string",
+            "enum": ["system", "dark", "light"],
+            "default": "system"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,10 +1,20 @@
 import type { WebContentsView } from "electron";
-import type { StateStore } from "../state/store";
 import type { DockMode } from "../state/schema";
 
 export interface DevToolsStatus {
   open: boolean;
   mode: DockMode;
+}
+
+/**
+ * The window-local surface state DevTools writes to. Each window owns its own
+ * dock side and open state (specs/012-multi-window), so the controller no longer
+ * touches the shared store directly.
+ */
+export interface SurfaceState {
+  dockMode(): DockMode;
+  setDockMode(mode: DockMode): void;
+  setDevtoolsOpen(open: boolean): void;
 }
 
 /**
@@ -21,7 +31,7 @@ export class DevToolsController {
 
   constructor(
     private readonly getView: () => WebContentsView | null,
-    private readonly store: StateStore,
+    private readonly surface: SurfaceState,
     private readonly notify: (status: DevToolsStatus) => void,
   ) {}
 
@@ -41,8 +51,8 @@ export class DevToolsController {
     if (!wc.isDevToolsOpened()) {
       wc.openDevTools({ mode });
     }
-    this.store.setDockMode(mode);
-    this.store.setDevtoolsOpen(true);
+    this.surface.setDockMode(mode);
+    this.surface.setDevtoolsOpen(true);
     this.lastSyncedSide = mode;
     this.notify({ open: true, mode });
     this.startDockPolling();
@@ -54,13 +64,13 @@ export class DevToolsController {
     const wc = this.wc();
     if (!wc) return;
     if (wc.isDevToolsOpened()) wc.closeDevTools();
-    this.store.setDevtoolsOpen(false);
-    this.notify({ open: false, mode: this.store.get().dockMode });
+    this.surface.setDevtoolsOpen(false);
+    this.notify({ open: false, mode: this.surface.dockMode() });
   }
 
   toggle(): void {
     if (this.isOpen()) this.close();
-    else this.open(this.store.get().dockMode);
+    else this.open(this.surface.dockMode());
   }
 
   /** Opens if closed; moves the dock side if open. */
@@ -76,7 +86,7 @@ export class DevToolsController {
   }
 
   ensureOpen(): void {
-    if (!this.isOpen()) this.open(this.store.get().dockMode);
+    if (!this.isOpen()) this.open(this.surface.dockMode());
   }
 
   dispose(): void {
@@ -94,7 +104,7 @@ export class DevToolsController {
       if (side === "bottom" || side === "right" || side === "left") {
         if (side !== this.lastSyncedSide) {
           this.lastSyncedSide = side;
-          this.store.setDockMode(side);
+          this.surface.setDockMode(side);
           this.notify({ open: true, mode: side });
         }
         return side;

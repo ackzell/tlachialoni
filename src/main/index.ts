@@ -6,12 +6,10 @@ import { COMMANDS, THEME_VARIANTS, type Accelerator } from "@shared/commands";
 import { formatReleaseDate } from "@shared/release";
 import { StateStore } from "./state/store";
 import { ExtensionManager } from "./extensions/manager";
-import { AppWindow } from "./shell/window";
+import { WindowManager } from "./shell/window-manager";
+import { registerIpc } from "./ipc";
+import type { AppWindow } from "./shell/window";
 import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-test";
-
-let mainWindow: AppWindow | null = null;
-let store: StateStore | null = null;
-let extensions: ExtensionManager | null = null;
 
 /**
  * App identity. The development Dock icon and the About panel use the same
@@ -103,7 +101,10 @@ const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
  */
 const NO_OS_ACCELERATOR = new Set(["view.back", "view.forward"]);
 
-function menuItemFor(commandId: string): Electron.MenuItemConstructorOptions {
+function menuItemFor(
+  manager: WindowManager,
+  commandId: string,
+): Electron.MenuItemConstructorOptions {
   const command = COMMANDS.find((entry) => entry.id === commandId);
   if (!command) throw new Error(`Unknown menu command: ${commandId}`);
   // A "Theme: Jade" row reads fine in the palette; inside the Theme menu the
@@ -119,19 +120,19 @@ function menuItemFor(commandId: string): Electron.MenuItemConstructorOptions {
     label,
     accelerator,
     click: () => {
-      void mainWindow?.runCommand(command.id);
+      void manager.runOnFocused(command.id);
     },
   };
 }
 
-function buildSection(section: {
-  label: string;
-  items: Array<string | null>;
-}): Electron.MenuItemConstructorOptions {
+function buildSection(
+  manager: WindowManager,
+  section: { label: string; items: Array<string | null> },
+): Electron.MenuItemConstructorOptions {
   return {
     label: section.label,
     submenu: section.items.map((id): Electron.MenuItemConstructorOptions =>
-      id === null ? { type: "separator" } : menuItemFor(id),
+      id === null ? { type: "separator" } : menuItemFor(manager, id),
     ),
   };
 }
@@ -150,24 +151,22 @@ function toElectronAccelerator(accelerator: Accelerator): string {
   return parts.join("+");
 }
 
-function installMenu(): void {
+function installMenu(manager: WindowManager): void {
   // Menu accelerators are handled by the OS menu, so these shortcuts keep working
   // even while focus is inside the DevTools panel (where the page's
-  // before-input-event never fires). The window still shows no chrome.
+  // before-input-event never fires). Each item acts on the focused window. The
+  // window still shows no chrome.
   const template: Electron.MenuItemConstructorOptions[] = [
     { role: "appMenu" },
     { role: "editMenu" },
-    ...MENU_SECTIONS.map(buildSection),
+    {
+      label: "File",
+      submenu: [menuItemFor(manager, "window.new"), menuItemFor(manager, "window.close")],
+    },
+    ...MENU_SECTIONS.map((section) => buildSection(manager, section)),
     {
       label: "Window",
-      submenu: [
-        menuItemFor("window.close"),
-        { type: "separator" },
-        { role: "minimize" },
-        { role: "zoom" },
-        { type: "separator" },
-        { role: "front" },
-      ],
+      submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" }, { role: "front" }],
     },
   ];
 
@@ -179,20 +178,20 @@ function installMenu(): void {
       submenu: [
         {
           label: "Preview Loading Veil",
-          click: () => mainWindow?.previewLoadingVeil(),
+          click: () => manager.focused()?.previewLoadingVeil(),
         },
         {
           label: "Preview Failure View",
-          click: () => mainWindow?.previewFailureView(),
+          click: () => manager.focused()?.previewFailureView(),
         },
         {
           label: "Preview Extension Install",
-          click: () => mainWindow?.previewExtensionStatus(),
+          click: () => manager.focused()?.previewExtensionStatus(),
         },
         { type: "separator" },
         {
           label: "Stop Preview",
-          click: () => mainWindow?.stopSurfacePreview(),
+          click: () => manager.focused()?.stopSurfacePreview(),
         },
       ],
     });
@@ -202,58 +201,51 @@ function installMenu(): void {
 }
 
 /**
- * Builds the process-wide state store and extension manager and loads enabled
- * extensions into the guest session. Extension loading must happen before the
- * window's guest view starts loading, and the manager is process-wide so a
- * re-activated window reuses the already-loaded extensions.
+ * Builds the process-wide state store, extension manager, and window manager,
+ * loads the enabled extensions into the guest session, then restores the saved
+ * window set (or a single default window). Extension loading must happen before
+ * any guest view starts loading.
  */
-async function createWindow(): Promise<AppWindow> {
-  let activeStore = store;
-  let manager = extensions;
-  if (!activeStore || !manager) {
-    activeStore = new StateStore(path.join(app.getPath("userData"), "state.json"));
-    manager = new ExtensionManager({
-      store: activeStore,
-      session: session.defaultSession,
-      root: path.join(app.getPath("userData"), "extensions"),
-    });
-    await manager.loadAll();
-    store = activeStore;
-    extensions = manager;
-  }
-  const window = new AppWindow({ store: activeStore, extensions: manager });
-  window.show();
-  return window;
+async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }> {
+  const store = new StateStore(path.join(app.getPath("userData"), "state.json"));
+  const extensions = new ExtensionManager({
+    store,
+    session: session.defaultSession,
+    root: path.join(app.getPath("userData"), "extensions"),
+  });
+  await extensions.loadAll();
+
+  const manager = new WindowManager(store, extensions);
+  registerIpc(manager);
+  installMenu(manager);
+  const windows = manager.restoreAll();
+  return { manager, windows };
 }
 
 app.whenReady().then(async () => {
-  installMenu();
   configureAppIdentity();
-  mainWindow = await createWindow();
+  const { manager, windows } = await boot();
+  // Quitting closes every window; keep their records so the workspace restores.
+  // A window closed by the user (⌘W) still removes its record on its own.
+  app.on("before-quit", () => manager.beginQuit());
+  const primary = windows[0] ?? manager.focused();
 
   // Dev-only: start the looping install status so the surface can be styled.
   if (!app.isPackaged && process.env.TLACHIALONI_DEMO_STATUS === "1") {
-    mainWindow.previewExtensionStatus();
+    primary?.previewExtensionStatus();
   }
 
+  if (!primary) return;
   if (process.env.TLACHIALONI_DOCK_TEST === "1") {
-    await runDockSelfTest(mainWindow);
+    await runDockSelfTest(primary);
     if (process.env.TLACHIALONI_GRACEFUL === "1") app.quit();
     else app.exit(0);
   } else if (process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
-    await runUiSnapshot(mainWindow);
+    await runUiSnapshot(primary);
     app.exit(0);
   } else if (process.env.TLACHIALONI_EXTENSION_TEST === "1") {
-    await runExtensionSelfTest(mainWindow);
+    await runExtensionSelfTest(primary);
   }
 });
 
 app.on("window-all-closed", () => app.quit());
-
-app.on("activate", () => {
-  if (!mainWindow || mainWindow.win.isDestroyed()) {
-    void createWindow().then((window) => {
-      mainWindow = window;
-    });
-  }
-});

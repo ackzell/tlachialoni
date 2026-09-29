@@ -251,8 +251,18 @@ export const COMMANDS: CommandDef[] = [
     group: "other",
   },
   {
+    id: "window.new",
+    label: "New Window",
+    acceleratorLabel: "⌘N",
+    accelerator: { meta: true, code: "KeyN" },
+    palette: true,
+    group: "other",
+  },
+  {
     id: "window.close",
     label: "Close Window",
+    acceleratorLabel: "⌘W",
+    accelerator: { meta: true, code: "KeyW" },
     palette: true,
     group: "other",
   },

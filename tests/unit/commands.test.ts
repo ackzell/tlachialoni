@@ -65,6 +65,46 @@ describe("command catalog", () => {
     const ids = new Set(COMMAND_GROUPS.map((group) => group.id));
     for (const command of COMMANDS) expect(ids.has(command.group)).toBe(true);
   });
+
+  it("binds ⌘N to New Window and lists it in the palette", () => {
+    const command = COMMANDS.find((entry) => entry.id === "window.new");
+    expect(command).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘N",
+      accelerator: { meta: true, code: "KeyN" },
+    });
+    expect(PALETTE_COMMANDS.some((entry) => entry.id === "window.new")).toBe(true);
+  });
+
+  it("carries ⌘W on Close Window and matches it from raw input", () => {
+    const command = COMMANDS.find((entry) => entry.id === "window.close");
+    expect(command).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘W",
+      accelerator: { meta: true, code: "KeyW" },
+    });
+    const input = {
+      type: "keyDown",
+      meta: true,
+      shift: false,
+      alt: false,
+      control: false,
+      code: "KeyW",
+    };
+    expect(commandForInput(input)?.id).toBe("window.close");
+  });
+
+  it("matches New Window from raw input", () => {
+    const input = {
+      type: "keyDown",
+      meta: true,
+      shift: false,
+      alt: false,
+      control: false,
+      code: "KeyN",
+    };
+    expect(commandForInput(input)?.id).toBe("window.new");
+  });
 });
 
 describe("palette scopes", () => {

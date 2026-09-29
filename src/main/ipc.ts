@@ -1,64 +1,77 @@
-import { ipcMain } from "electron";
-import type { AppWindow } from "./shell/window";
+import { ipcMain, type WebContents } from "electron";
+import type { WindowManager } from "./shell/window-manager";
 import type { ColorMode, VariantSlug } from "./state/schema";
 
-/** Installs the typed IPC surface described in contracts/ipc.md. */
-export function registerIpc(appWindow: AppWindow): void {
-  ipcMain.handle("state:get", () => appWindow.getState());
+/**
+ * Installs the typed IPC surface described in
+ * `specs/012-multi-window/contracts/ipc-routing.md`.
+ *
+ * Handlers are registered once for the process; each message is routed to the
+ * window that sent it, so several windows can be served without re-registering
+ * (which would throw on the second window).
+ */
+export function registerIpc(manager: WindowManager): void {
+  const resolve = (sender: WebContents) => manager.resolveSender(sender);
 
-  ipcMain.handle("command:run", (_event, payload: { id: string; arg?: unknown }) =>
-    appWindow.runCommand(payload.id, payload.arg),
-  );
+  ipcMain.handle("state:get", (event) => resolve(event.sender)?.getState() ?? null);
 
-  ipcMain.handle("target:validate", (_event, payload: { input: string }) =>
-    appWindow.validateTarget(payload.input),
-  );
+  ipcMain.handle("command:run", (event, payload: { id: string; arg?: unknown }) => {
+    const appWindow = resolve(event.sender);
+    if (!appWindow) return { ok: false, reason: "Unknown window" };
+    return manager.dispatch(appWindow, payload.id, payload.arg);
+  });
 
-  ipcMain.handle("theme:setVariant", (_event, payload: { variant: VariantSlug }) => {
-    appWindow.setVariant(payload.variant);
+  ipcMain.handle("target:validate", (event, payload: { input: string }) => {
+    const appWindow = resolve(event.sender);
+    if (!appWindow) return { ok: false, reason: "Unknown window" };
+    return appWindow.validateTarget(payload.input);
+  });
+
+  ipcMain.handle("theme:setVariant", (event, payload: { variant: VariantSlug }) => {
+    resolve(event.sender)?.setVariant(payload.variant);
     return { ok: true };
   });
 
-  ipcMain.handle("theme:setColorMode", (_event, payload: { mode: ColorMode }) => {
-    appWindow.setColorMode(payload.mode);
+  ipcMain.handle("theme:setColorMode", (event, payload: { mode: ColorMode }) => {
+    resolve(event.sender)?.setColorMode(payload.mode);
     return { ok: true };
   });
 
-  ipcMain.handle("theme:previewVariant", (_event, payload: { variant: VariantSlug | null }) => {
-    appWindow.previewVariant(payload.variant);
+  ipcMain.handle("theme:previewVariant", (event, payload: { variant: VariantSlug | null }) => {
+    resolve(event.sender)?.previewVariant(payload.variant);
     return { ok: true };
   });
 
-  ipcMain.handle("picker:arm", () => {
-    appWindow.pickerArm();
+  ipcMain.handle("picker:arm", (event) => {
+    resolve(event.sender)?.pickerArm();
   });
 
-  ipcMain.handle("picker:disarm", () => {
-    appWindow.pickerDisarm();
+  ipcMain.handle("picker:disarm", (event) => {
+    resolve(event.sender)?.pickerDisarm();
   });
 
-  ipcMain.handle("window:close", () => {
-    appWindow.closeWindow();
+  ipcMain.handle("window:close", (event) => {
+    resolve(event.sender)?.closeWindow();
   });
 
-  ipcMain.on("palette:visibility", (_event, payload: { open: boolean }) => {
-    appWindow.setPaletteVisible(payload.open);
+  ipcMain.on("palette:visibility", (event, payload: { open: boolean }) => {
+    resolve(event.sender)?.setPaletteVisible(payload.open);
   });
 
-  ipcMain.on("shell:ready", () => {
-    appWindow.markShellReady();
+  ipcMain.on("shell:ready", (event) => {
+    resolve(event.sender)?.markShellReady();
   });
 
-  ipcMain.on("shell:settled", () => {
-    appWindow.notifyShellSettled();
+  ipcMain.on("shell:settled", (event) => {
+    resolve(event.sender)?.notifyShellSettled();
   });
 
-  ipcMain.on("site:focus-editable", (_event, payload: { editable: boolean }) => {
-    appWindow.setEditableFocused(payload.editable);
+  ipcMain.on("site:focus-editable", (event, payload: { editable: boolean }) => {
+    resolve(event.sender)?.setEditableFocused(payload.editable);
   });
 
-  ipcMain.on("picker:picked", (_event, payload: { x: number; y: number }) => {
-    appWindow.pickerPick(payload.x, payload.y);
+  ipcMain.on("picker:picked", (event, payload: { x: number; y: number }) => {
+    resolve(event.sender)?.pickerPick(payload.x, payload.y);
   });
 
   ipcMain.on("picker:hover", () => {

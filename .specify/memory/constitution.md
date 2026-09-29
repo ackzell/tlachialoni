@@ -56,11 +56,12 @@ why the runtime was chosen.
 ### V. One Target Per Window
 
 Each window renders exactly one http/https target at a time. Tabs and target
-multiplexing within a window are prohibited. Multiple independent instances MAY
-run concurrently so parallel related projects can be open side by side; instances
-do not control one another and each window is responsible only for its own
-target. The default target is `http://localhost:3000`; any other target is one
-palette edit away.
+multiplexing within a window are prohibited. Multiple independent windows MAY
+run concurrently — whether as separate application instances or as several
+windows opened from one instance — so parallel related projects can be open side
+by side. Windows do not control one another; each is responsible only for its own
+target, geometry, and DevTools and strip state. The default target is
+`http://localhost:3000`; any other target is one palette edit away.
 
 Rationale: one target per window keeps the window and its DevTools pairing
 simple to reason about. Parallel projects are a real need, but they belong in
@@ -92,8 +93,13 @@ source keeps the small UI coherent without a design system of its own.
 - **UI**: Vue 3 + VueUse + TypeScript. Node 24 already satisfies every
   toolchain requirement; no runtime pin is required.
 - **State**: a small JSON store under Electron's `userData` directory, safe for
-  concurrent instances (shared preferences and merged recents; per-window values
-  are last-writer-wins). No database, no config-file editing by the user.
+  concurrent instances and multiple windows within one instance. Per-window state
+  (the current target, window bounds, DevTools open state and dock side, strip
+  visibility, theme variant, and color mode) is independent per window; the
+  installed-extension list and recents are shared, with recents merged on write
+  and the shared list last-writer-wins. A window's color mode governs the tool's
+  own surfaces; the guest page's `prefers-color-scheme` and the docked DevTools
+  follow the OS. No database, no config-file editing by the user.
 
 ## Security & Isolation Requirements
 
@@ -163,4 +169,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.1 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-28
+**Version**: 2.2.3 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29

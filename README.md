@@ -1,12 +1,14 @@
 # Tlachialoni
 
 Tlachialoni — from Nahuatl, "a device for viewing, for seeing" — is a minimal
-local browser for frontend development: one frameless window that renders a local
+local browser for frontend development: a frameless window that renders a local
 dev server edge-to-edge with real Chromium DevTools docked inside the same window
-— and essentially no other browser chrome.
+— and essentially no other browser chrome. Each window is one target, and you can
+open as many windows as you have dev servers (`⌘N`), each fully independent.
 
 The only UI is transient and keyboard-first:
 
+- `⌘N` — open a new window (blank, with the location entry focused); `⌘W` closes it
 - `⌘P` — toggle the command palette (type a target like `:5173`, or run a command)
 - `⌘L` — edit the current target, with recent pages listed and grouped by origin
 - `⌘T` — jump to the theme picker
@@ -19,7 +21,9 @@ The only UI is transient and keyboard-first:
 - `⌘←` / `⌘→` — back / forward (native text behavior inside inputs)
 
 Everything is themed with [Tlapalli](https://tlapalli.ackzell.dev) (eight mineral
-variants, dark/light following the system) in Source Code Pro.
+variants, dark/light following the system) in Source Code Pro. Theme is
+per-window: each window can use its own variant and color mode (the guest page
+and DevTools still follow the OS).
 
 ## Extensions
 
@@ -138,6 +142,7 @@ See:
 - `specs/009-macos-traffic-lights/spec.md` — native window controls bound to the strip
 - `specs/010-palette-groups/spec.md` — grouped command palette and host-grouped recents
 - `specs/011-grouped-os-menu/spec.md` — domain-grouped application menu
+- `specs/012-multi-window/spec.md` — multiple independent windows
 
 ## License
 

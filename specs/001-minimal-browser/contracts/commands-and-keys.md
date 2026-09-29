@@ -35,7 +35,8 @@ are derived from `COMMAND_GROUPS` in `src/shared/commands.ts` (FR-020).
 | `extensions.revealFolder` | Reveal Extensions Folder  | —                     | extensions  |                                                       |
 | `failure.retry`        | Retry                        | (failure view button) | other       | Shown only while the target is unreachable            |
 | `failure.dismiss`      | Go Back to Last Target       | (failure view button) | other       | Returns to the last working target; hidden when none  |
-| `window.close`         | Close Window                 | —                     | other       | Strip close button; no accelerator to avoid accidents |
+| `window.new`           | New Window                   | `⌘N`                  | other       | Opens an additional independent window (012)          |
+| `window.close`         | Close Window                 | `⌘W`                  | other       | Closes the current window (accelerator added in 012)  |
 | `app.quit`             | Quit                         | `⌘Q`                  | —           | OS-standard (app menu), not in the palette catalog    |
 
 `VariantSlug` ∈ `obsidian`, `gold`, `turquoise`, `quartz`, `lapis-lazuli`,
@@ -84,12 +85,19 @@ menu on every change.
 
 | Menu | Items |
 | ---- | ----- |
+| File | New Window `⌘N` · Close Window `⌘W` |
 | View | Toggle Command Palette `⌘P`, Browse Themes `⌘T` · Reload `⌘R`, Hard Reload `⇧⌘R` · Toggle Window Strip `⌘B` |
 | History | Back, Forward · Edit Current Target `⌘L` |
 | DevTools | Toggle DevTools `⌘⌥J` · Dock Bottom/Right/Left `⌘1/2/3` · Toggle Focus `⌘J`, Inspect Element `⌘⇧C` |
 | Theme | the eight variants · Cycle Color Mode |
 | Extensions | Install from Folder, Reload Extensions, Reveal Extensions Folder |
-| Window | Close Window · Minimize, Zoom, Front (standard roles) |
+| Window | Minimize, Zoom, Front (standard roles) |
+
+Each menu item acts on the **focused window**. `specs/012-multi-window/` supersedes
+001 FR-004's "shared across instances" description of DevTools open state, dock
+side, strip visibility, theme variant, and color mode: those are now per-window,
+while the installed-extension list and recents remain shared. A window's color
+mode governs the tool's own surfaces; the guest page and DevTools follow the OS.
 
 `view.back` / `view.forward` are deliberately listed **without** OS accelerators:
 a menu key equivalent would be swallowed app-wide and break native `⌘←` / `⌘→`

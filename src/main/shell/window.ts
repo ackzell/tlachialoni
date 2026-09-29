@@ -1,16 +1,15 @@
-import { app, BaseWindow, nativeTheme, session, webContents, type WebContentsView } from "electron";
-import path from "node:path";
+import { BaseWindow, nativeTheme, webContents, type WebContentsView } from "electron";
 import { StateStore } from "../state/store";
 import { ExtensionManager } from "../extensions/manager";
 import { isActivePhase, type ExtensionStatus } from "@shared/extensions";
 import {
   DEFAULT_HEIGHT,
-  DEFAULT_TARGET,
   DEFAULT_WIDTH,
   MIN_HEIGHT,
   MIN_WIDTH,
   type ColorMode,
   type VariantSlug,
+  type WindowRecord,
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
@@ -18,10 +17,9 @@ import { isStripSurfaceVisible } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
-import { DevToolsController } from "./devtools";
+import { DevToolsController, type SurfaceState } from "./devtools";
 import { PickerController } from "./picker";
 import { CommandRegistry, type CommandResult } from "./commands";
-import { registerIpc } from "../ipc";
 
 export const STRIP_HEIGHT = 36;
 
@@ -36,10 +34,16 @@ const SHELL_MODE_RANK: Record<ShellMode, number> = { hidden: 0, strip: 1, full: 
 export type { CommandResult };
 
 export interface AppWindowOptions {
-  /** Shared state store; a window creates its own when omitted. */
-  store?: StateStore;
-  /** Extension manager; a window creates its own when omitted. */
-  extensions?: ExtensionManager;
+  /** The process-wide state store shared by every window. */
+  store: StateStore;
+  /** The process-wide extension manager shared by every window. */
+  extensions: ExtensionManager;
+  /** This window's stable record id. */
+  windowId: string;
+  /** Runs the `window.new` command; owned by the window manager. */
+  onNewWindow?: () => void;
+  /** Called once the window has fully closed, so the manager can clean up. */
+  onClosed?: () => void;
 }
 
 export class AppWindow {
@@ -51,6 +55,11 @@ export class AppWindow {
   readonly devtools: DevToolsController;
   readonly picker: PickerController;
   readonly commands = new CommandRegistry();
+  /** This window's stable identity, matching its persisted record. */
+  readonly windowId: string;
+
+  private readonly onNewWindow: () => void;
+  private readonly onClosed: () => void;
 
   private showLoading = false;
   private failed = false;
@@ -71,6 +80,8 @@ export class AppWindow {
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
   private currentUrl: string;
+  /** True once any target has been loaded, so the window stops reading as blank. */
+  private targetEverLoaded = false;
   /**
    * The URL of the document actually committed to the view, or null before the
    * first paint. Unlike `currentUrl` it is never seeded from persisted state, so
@@ -78,26 +89,21 @@ export class AppWindow {
    */
   private shownUrl: string | null = null;
 
-  constructor(options: AppWindowOptions = {}) {
-    this.store = options.store ?? new StateStore(path.join(app.getPath("userData"), "state.json"));
-    this.extensions =
-      options.extensions ??
-      new ExtensionManager({
-        store: this.store,
-        session: session.defaultSession,
-        root: path.join(app.getPath("userData"), "extensions"),
-      });
-    this.extensions.onChange = () => this.broadcastState();
-    this.extensions.onStatus = (status) => this.setExtensionStatus(status);
+  constructor(options: AppWindowOptions) {
+    this.store = options.store;
+    this.extensions = options.extensions;
+    this.windowId = options.windowId;
+    this.onNewWindow = options.onNewWindow ?? (() => {});
+    this.onClosed = options.onClosed ?? (() => {});
 
-    const state = this.store.get();
-    this.currentUrl = state.target ?? DEFAULT_TARGET;
+    const record = this.record();
+    this.currentUrl = record?.target ?? "";
 
     this.win = new BaseWindow({
-      width: state.bounds?.width ?? DEFAULT_WIDTH,
-      height: state.bounds?.height ?? DEFAULT_HEIGHT,
-      x: state.bounds?.x,
-      y: state.bounds?.y,
+      width: record?.bounds?.width ?? DEFAULT_WIDTH,
+      height: record?.bounds?.height ?? DEFAULT_HEIGHT,
+      x: record?.bounds?.x,
+      y: record?.bounds?.y,
       minWidth: MIN_WIDTH,
       minHeight: MIN_HEIGHT,
       frame: false,
@@ -112,7 +118,10 @@ export class AppWindow {
       onReady: (url) => this.handleReady(url),
       onNavigated: (url) => this.handleNavigated(url),
       onFailed: (url, reason) => this.handleFailed(url, reason),
-      onTitle: (title) => this.win.setTitle(title ? `${title} — Tlachialoni` : "Tlachialoni"),
+      onTitle: (title) => {
+        if (this.win.isDestroyed()) return;
+        this.win.setTitle(title ? `${title} — Tlachialoni` : "Tlachialoni");
+      },
     });
 
     this.shellView = createShellView();
@@ -122,17 +131,35 @@ export class AppWindow {
 
     this.devtools = new DevToolsController(
       () => this.siteView,
-      this.store,
+      this.surfaceState(),
       (status) => this.sendToShell("devtools:changed", status),
     );
     this.picker = new PickerController(() => this.siteView, this.devtools);
 
     this.registerCommands();
-    registerIpc(this);
 
     this.wireEvents();
     this.relayout();
-    this.loadTarget(state.target ?? DEFAULT_TARGET);
+    if (this.currentUrl) this.loadTarget(this.currentUrl);
+  }
+
+  // ---- per-window record -----------------------------------------------
+
+  private record(): WindowRecord | null {
+    return this.store.window(this.windowId);
+  }
+
+  /** This window's DevTools/strip state, backed by its persisted record. */
+  private surfaceState(): SurfaceState {
+    return {
+      dockMode: () => this.record()?.dockMode ?? "bottom",
+      setDockMode: (mode) => {
+        this.store.patchWindow(this.windowId, { dockMode: mode });
+      },
+      setDevtoolsOpen: (open) => {
+        this.store.patchWindow(this.windowId, { devtoolsOpen: open });
+      },
+    };
   }
 
   // ---- lifecycle -------------------------------------------------------
@@ -140,21 +167,29 @@ export class AppWindow {
   show(): void {
     this.win.show();
     this.win.focus();
-    this.siteView.webContents.focus();
+    if (this.targetEverLoaded || this.currentUrl) this.siteView.webContents.focus();
+    else this.shellView.webContents.focus();
     this.relayout();
-    if (this.store.get().devtoolsOpen) this.devtools.open(this.store.get().dockMode);
+    const record = this.record();
+    if (record?.devtoolsOpen && (this.targetEverLoaded || this.currentUrl)) {
+      this.devtools.open(record.dockMode);
+    }
     this.applyTheme();
   }
 
   private wireEvents(): void {
     this.win.on("resize", () => {
       this.relayout();
-      this.store.setBounds(this.win.getBounds());
+      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
     });
-    this.win.on("move", () => this.store.setBounds(this.win.getBounds()));
+    this.win.on("move", () =>
+      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() }),
+    );
     this.win.on("close", () => {
-      this.store.setBounds(this.win.getBounds());
-      this.store.setDevtoolsOpen(this.devtools.isOpen());
+      this.store.patchWindow(this.windowId, {
+        bounds: this.win.getBounds(),
+        devtoolsOpen: this.devtools.isOpen(),
+      });
     });
     this.win.on("closed", () => {
       this.clearPendingSettle();
@@ -166,6 +201,7 @@ export class AppWindow {
       for (const view of [this.siteView, this.shellView]) {
         if (!view.webContents.isDestroyed()) view.webContents.close();
       }
+      this.onClosed();
     });
 
     // While colorMode is "system", follow live OS dark/light switches so the
@@ -278,6 +314,7 @@ export class AppWindow {
       this.siteView.webContents.reload();
     });
     commands.register("failure.dismiss", () => this.dismissFailure());
+    commands.register("window.new", () => this.onNewWindow());
     commands.register("window.close", () => this.win.close());
 
     commands.register("extensions.install", (arg) =>
@@ -292,10 +329,10 @@ export class AppWindow {
     commands.register("extensions.dismissStatus", () => this.dismissExtensionStatus());
   }
 
-  // ---- public API used by IPC and the dock self-test -------------------
+  // ---- public API used by IPC and window manager -----------------------
 
   getState() {
-    return this.store.get();
+    return this.store.composeWindowView(this.windowId);
   }
 
   /**
@@ -303,7 +340,7 @@ export class AppWindow {
    * status is present so the surface is never clipped; the renderer dismisses a
    * finished one through `extensions.dismissStatus`.
    */
-  private setExtensionStatus(status: ExtensionStatus): void {
+  setExtensionStatus(status: ExtensionStatus): void {
     this.extensionStatus = status;
     this.sendToShell("extension:status", status);
     this.relayout();
@@ -315,6 +352,14 @@ export class AppWindow {
     this.extensionStatus = null;
     this.sendToShell("extension:status", null);
     this.relayout(true);
+  }
+
+  /**
+   * A shared preference (installed extensions) changed; push this window's
+   * composed state. Theme is per-window and is not touched here (FR-009).
+   */
+  refreshFromShared(): void {
+    this.broadcastState();
   }
 
   // ---- dev surface previews (specs/008-surface-preview) ----------------
@@ -479,9 +524,10 @@ export class AppWindow {
     return { ok: true };
   }
 
+  /** Sets this window's variant only; each window has its own theme (FR-009). */
   setVariant(variant: VariantSlug): void {
     this.previewVariantSlug = null;
-    this.store.setVariant(variant);
+    this.store.patchWindow(this.windowId, { variant });
     this.applyTheme();
     this.broadcastState();
   }
@@ -496,15 +542,16 @@ export class AppWindow {
     this.pushTheme();
   }
 
+  /** Sets this window's color mode only (FR-009). */
   setColorMode(mode: ColorMode): void {
-    this.store.setColorMode(mode);
+    this.store.patchWindow(this.windowId, { colorMode: mode });
     this.applyTheme();
     this.broadcastState();
   }
 
   cycleColorMode(): void {
     const order: ColorMode[] = ["system", "dark", "light"];
-    const current = this.store.get().colorMode;
+    const current = this.record()?.colorMode ?? "system";
     const next = order[(order.indexOf(current) + 1) % order.length];
     this.setColorMode(next);
   }
@@ -576,7 +623,8 @@ export class AppWindow {
     if (url) {
       this.currentUrl = url;
       this.shownUrl = url;
-      this.store.setTarget(url);
+      this.targetEverLoaded = true;
+      this.store.patchWindow(this.windowId, { target: url });
       this.store.recordRecent(url);
     }
     this.reportLoading(false);
@@ -596,7 +644,8 @@ export class AppWindow {
     if (!url || url === this.currentUrl) return;
     this.currentUrl = url;
     this.shownUrl = url;
-    this.store.setTarget(url);
+    this.targetEverLoaded = true;
+    this.store.patchWindow(this.windowId, { target: url });
     this.broadcastState();
   }
 
@@ -700,8 +749,8 @@ export class AppWindow {
   }
 
   private toggleStrip(): void {
-    const visible = !this.store.get().stripVisible;
-    this.store.setStripVisible(visible);
+    const visible = !(this.record()?.stripVisible ?? false);
+    this.store.patchWindow(this.windowId, { stripVisible: visible });
     // Broadcast first so the renderer can play its leave, then hold the
     // collapse for it when hiding (contracts/settle-protocol.md).
     this.broadcastState();
@@ -709,12 +758,18 @@ export class AppWindow {
   }
 
   private readonly handleNativeThemeUpdated = (): void => {
-    // Only the system mode is runtime-following; explicit overrides must stick.
-    if (this.store.get().colorMode === "system") this.pushTheme();
+    // Only this window's "system" mode follows live OS switches; explicit
+    // overrides stick. Theme is per-window (FR-009).
+    if ((this.record()?.colorMode ?? "system") === "system") this.pushTheme();
   };
 
+  /**
+   * Pushes this window's theme to its background and shell. `nativeTheme` is
+   * intentionally NOT set: it is process-wide and would make one window's color
+   * mode change every window (and the guest page / DevTools). Those follow the
+   * OS; only the tool's own surfaces are per-window.
+   */
   private applyTheme(): void {
-    nativeTheme.themeSource = this.store.get().colorMode;
     this.pushTheme();
   }
 
@@ -726,23 +781,22 @@ export class AppWindow {
   }
 
   private activeVariant(): VariantSlug {
-    return this.previewVariantSlug ?? this.store.get().variant;
+    return this.previewVariantSlug ?? this.record()?.variant ?? "obsidian";
   }
 
   /** Pushes the active variant + resolved mode to the window background and shell. */
   private pushTheme(): void {
     if (this.win.isDestroyed()) return;
-    const state = this.store.get();
     this.win.setBackgroundColor(this.backgroundColor());
     this.sendToShell("theme:apply", {
       variant: this.activeVariant(),
-      colorMode: state.colorMode,
+      colorMode: this.record()?.colorMode ?? "system",
       resolved: this.resolvedMode(),
     });
   }
 
   private resolvedMode(): "dark" | "light" {
-    const mode = this.store.get().colorMode;
+    const mode = this.record()?.colorMode ?? "system";
     if (mode === "dark" || mode === "light") return mode;
     return nativeTheme.shouldUseDarkColors ? "dark" : "light";
   }
@@ -753,7 +807,7 @@ export class AppWindow {
   }
 
   private broadcastState(): void {
-    this.sendToShell("state:changed", this.store.get());
+    this.sendToShell("state:changed", this.getState());
   }
 
   private sendToShell(channel: string, payload?: unknown): void {
@@ -780,6 +834,10 @@ export class AppWindow {
     this.broadcastState();
     this.applyTheme();
     this.pickerDisarm();
+    // A brand-new window starts blank and offers the location entry (FR-011).
+    if (!this.targetEverLoaded && !this.currentUrl && !this.paletteOpen) {
+      this.openPalette("", "location");
+    }
   }
 
   /**
@@ -802,7 +860,7 @@ export class AppWindow {
     ) {
       return "full";
     }
-    if (this.store.get().stripVisible) return "strip";
+    if (this.record()?.stripVisible) return "strip";
     return "hidden";
   }
 
@@ -816,7 +874,10 @@ export class AppWindow {
    * resize-driven relayouts from re-issuing the native call.
    */
   private syncWindowButtons(): void {
-    const visible = isStripSurfaceVisible(this.store.get(), this.paletteOpen);
+    const visible = isStripSurfaceVisible(
+      { stripVisible: this.record()?.stripVisible ?? false },
+      this.paletteOpen,
+    );
     if (visible === this.buttonsVisible) return;
     this.buttonsVisible = visible;
     if (!this.win.isDestroyed()) this.win.setWindowButtonVisibility(visible);
@@ -828,6 +889,9 @@ export class AppWindow {
    * animations are never cut; motion is best-effort and never blocks state.
    */
   private relayout(defer = false): void {
+    // A guest view can still emit load events while its window is tearing down;
+    // never touch a destroyed BaseWindow (specs/012-multi-window fix).
+    if (this.win.isDestroyed()) return;
     this.syncWindowButtons();
     const { width, height } = this.win.getContentBounds();
     this.siteView.setBounds({ x: 0, y: 0, width, height });
@@ -848,6 +912,7 @@ export class AppWindow {
   }
 
   private applyShellMode(mode: ShellMode): void {
+    if (this.win.isDestroyed()) return;
     const { width, height } = this.win.getContentBounds();
     if (mode === "full") {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
