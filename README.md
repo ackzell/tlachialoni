@@ -13,7 +13,9 @@ The only UI is transient and keyboard-first:
 - `⌘L` — edit the current target, with recent pages listed and grouped by origin
 - `⌘T` — jump to the theme picker
 - `Tab` / `Shift+Tab` — cycle the palette's groups (Location, DevTools, View, Theme, Extensions, Other)
-- `⌘B` — show/hide the draggable window strip (and, with it, the macOS window controls)
+- Drag from the top of the window at any time, pointer only; hovering the top
+  edge or resting there briefly reveals the strip
+- `⌘B` — pin the window strip on screen (and, with it, the macOS window controls)
 - `⌘⌥J` — toggle DevTools; `⌘1/2/3` dock it bottom/right/left
 - `⌘J` — toggle keyboard focus between the page and DevTools
 - `⌘⇧C` — element picker with hover highlight

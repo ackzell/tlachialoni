@@ -119,6 +119,8 @@ function toggleDevtools(): void {
 
 <style scoped>
 .strip {
+  /* Matches DRAG_BAND_HEIGHT (src/shared/shell.ts) so a visible strip fully
+     covers the always-on drag band beneath it (specs/013). */
   height: 30px;
   display: flex;
   align-items: center;
@@ -129,6 +131,10 @@ function toggleDevtools(): void {
   background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-fg-subtle);
   user-select: none;
+  /* Positioned so it paints after the absolutely positioned drag band beneath
+     it (same stacking context, tree order). No z-index: the palette and other
+     later surfaces must still paint above the strip. */
+  position: relative;
   -webkit-app-region: drag;
   app-region: drag;
 }

@@ -40,6 +40,8 @@ const paletteInitial = ref("");
 const paletteScope = ref<Scope>("all");
 const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bottom" });
 const extensionStatus = ref<ExtensionStatus | null>(null);
+/** Transient strip reveal driven by pointer proximity in main (specs/013). */
+const peeking = ref(false);
 
 let initialised = false;
 
@@ -117,6 +119,9 @@ function init(): void {
   api.on("extension:status", (payload) => {
     extensionStatus.value = (payload as ExtensionStatus | null) ?? null;
   });
+  api.on("strip:peek", (payload) => {
+    peeking.value = payload === true;
+  });
   api.on("palette:open", (payload) => {
     const { initial, scope } = payload as { initial?: string; scope?: Scope };
     paletteInitial.value = initial ?? "";
@@ -159,6 +164,7 @@ export function useShell() {
     paletteScope: readonly(paletteScope),
     devtools: readonly(devtools),
     extensionStatus: readonly(extensionStatus),
+    peeking: readonly(peeking),
     closePalette,
   };
 }

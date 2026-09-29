@@ -1,4 +1,4 @@
-import { BaseWindow, nativeTheme, webContents, type WebContentsView } from "electron";
+import { BaseWindow, nativeTheme, screen, webContents, type WebContentsView } from "electron";
 import { StateStore } from "../state/store";
 import { ExtensionManager } from "../extensions/manager";
 import { isActivePhase, type ExtensionStatus } from "@shared/extensions";
@@ -13,23 +13,28 @@ import {
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
-import { isStripSurfaceVisible } from "@shared/shell";
+import { DRAG_BAND_HEIGHT, isStripSurfaceVisible } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
 import { DevToolsController, type SurfaceState } from "./devtools";
 import { PickerController } from "./picker";
+import { ProximityTracker } from "./proximity";
 import { CommandRegistry, type CommandResult } from "./commands";
-
-export const STRIP_HEIGHT = 36;
 
 /** How long main waits for the renderer settle ack before collapsing anyway. */
 const SHELL_SETTLE_TIMEOUT_MS = 500;
 
-type ShellMode = "full" | "strip" | "hidden";
+/** How often the always-on drag band samples the pointer (specs/013). */
+const PROXIMITY_POLL_MS = 150;
+
+/** How long after the last move the window still counts as being dragged. */
+const DRAG_SETTLE_MS = 200;
+
+type ShellMode = "full" | "band";
 
 /** Bigger modes win when deciding whether a collapse needs the settle wait. */
-const SHELL_MODE_RANK: Record<ShellMode, number> = { hidden: 0, strip: 1, full: 2 };
+const SHELL_MODE_RANK: Record<ShellMode, number> = { band: 0, full: 1 };
 
 export type { CommandResult };
 
@@ -65,9 +70,16 @@ export class AppWindow {
   private failed = false;
   private failedUrl: string | null = null;
   private paletteOpen = false;
-  private shellMode: ShellMode = "hidden";
+  private shellMode: ShellMode = "band";
   private pendingSettle = false;
   private settleTimer: NodeJS.Timeout | null = null;
+  /** Whether the strip is currently revealed by pointer proximity (transient). */
+  private peek = false;
+  private readonly proximity = new ProximityTracker();
+  private proximityTimer: NodeJS.Timeout | null = null;
+  /** True briefly after a window move, so a drag does not trigger a peek. */
+  private dragging = false;
+  private dragSettleTimer: NodeJS.Timeout | null = null;
   private previewVariantSlug: VariantSlug | null = null;
   private editableFocused = false;
   private shellLoaded = false;
@@ -167,6 +179,7 @@ export class AppWindow {
   show(): void {
     this.win.show();
     this.win.focus();
+    this.startProximity();
     if (this.targetEverLoaded || this.currentUrl) this.siteView.webContents.focus();
     else this.shellView.webContents.focus();
     this.relayout();
@@ -182,9 +195,15 @@ export class AppWindow {
       this.relayout();
       this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
     });
-    this.win.on("move", () =>
-      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() }),
-    );
+    this.win.on("move", () => {
+      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
+      this.noteWindowMoved();
+    });
+    // Pointer proximity only matters for the focused, on-screen window
+    // (specs/013): start the sampler on focus, stop it when it can't matter.
+    this.win.on("focus", () => this.startProximity());
+    this.win.on("blur", () => this.stopProximity());
+    this.win.on("hide", () => this.stopProximity());
     this.win.on("close", () => {
       this.store.patchWindow(this.windowId, {
         bounds: this.win.getBounds(),
@@ -194,6 +213,8 @@ export class AppWindow {
     this.win.on("closed", () => {
       this.clearPendingSettle();
       this.clearStatusDemo();
+      this.stopProximity();
+      this.clearDragSuppress();
       this.devtools.dispose();
       this.detachDevToolsInput();
       nativeTheme.removeListener("updated", this.handleNativeThemeUpdated);
@@ -749,12 +770,13 @@ export class AppWindow {
   }
 
   private toggleStrip(): void {
-    const visible = !(this.record()?.stripVisible ?? false);
-    this.store.patchWindow(this.windowId, { stripVisible: visible });
-    // Broadcast first so the renderer can play its leave, then hold the
-    // collapse for it when hiding (contracts/settle-protocol.md).
+    const pinned = !(this.record()?.stripVisible ?? false);
+    this.store.patchWindow(this.windowId, { stripVisible: pinned });
+    // The band never changes bounds, so hiding the strip is a renderer-only
+    // transition: no relayout deferral is needed (specs/013). Broadcast so the
+    // renderer plays its leave, then refresh the traffic lights.
     this.broadcastState();
-    this.relayout(!visible);
+    this.syncWindowButtons();
   }
 
   private readonly handleNativeThemeUpdated = (): void => {
@@ -832,6 +854,8 @@ export class AppWindow {
     this.pendingShellMessages = [];
     for (const [channel, payload] of queued) this.sendToShell(channel, payload);
     this.broadcastState();
+    // Start the renderer in sync with the current transient reveal.
+    this.sendToShell("strip:peek", this.peek);
     this.applyTheme();
     this.pickerDisarm();
     // A brand-new window starts blank and offers the location entry (FR-011).
@@ -860,27 +884,105 @@ export class AppWindow {
     ) {
       return "full";
     }
-    if (this.record()?.stripVisible) return "strip";
-    return "hidden";
+    // The transparent drag band is always present so the window is always
+    // draggable; what the band paints (pinned strip or a transient peek) is a
+    // renderer concern (specs/013).
+    return "band";
   }
 
   /**
    * The macOS traffic lights are real AppKit controls that Electron hides on a
    * frameless window. Showing them only while the drag strip is on screen keeps
    * the chromeless default: the strip is the window's title bar, so the controls
-   * belong to it and come and go with `⌘B`. Mirrors the strip's render condition
-   * exactly (`stripVisible && !paletteOpen`); both sides read the shared
+   * belong to it — pinned with `⌘B` or transiently revealed by the pointer
+   * (specs/013). Mirrors the strip's render condition exactly
+   * (`(stripVisible || peeking) && !paletteOpen`); both sides read the shared
    * predicate so they can never drift. A cached value keeps the frequent
    * resize-driven relayouts from re-issuing the native call.
    */
   private syncWindowButtons(): void {
     const visible = isStripSurfaceVisible(
-      { stripVisible: this.record()?.stripVisible ?? false },
+      { stripVisible: this.record()?.stripVisible ?? false, peeking: this.peek },
       this.paletteOpen,
     );
     if (visible === this.buttonsVisible) return;
     this.buttonsVisible = visible;
     if (!this.win.isDestroyed()) this.win.setWindowButtonVisibility(visible);
+  }
+
+  // ---- always-on drag band (specs/013) --------------------------------
+
+  /** Starts sampling the pointer for the band; safe to call repeatedly. */
+  private startProximity(): void {
+    if (this.proximityTimer || this.win.isDestroyed() || !this.win.isVisible()) return;
+    this.proximityTimer = setInterval(() => this.sampleProximity(), PROXIMITY_POLL_MS);
+    this.sampleProximity();
+  }
+
+  private stopProximity(): void {
+    if (this.proximityTimer) {
+      clearInterval(this.proximityTimer);
+      this.proximityTimer = null;
+    }
+    this.proximity.reset();
+    this.setPeek(false);
+  }
+
+  private sampleProximity(): void {
+    if (this.win.isDestroyed()) {
+      this.stopProximity();
+      return;
+    }
+    this.setPeek(
+      this.proximity.update({
+        cursor: screen.getCursorScreenPoint(),
+        bounds: this.win.getContentBounds(),
+        now: Date.now(),
+        paused: this.proximityPaused(),
+        dragging: this.dragging,
+      }),
+    );
+  }
+
+  private proximityPaused(): boolean {
+    return (
+      !this.win.isFocused() ||
+      this.paletteOpen ||
+      this.showLoading ||
+      this.failed ||
+      this.extensionStatus !== null ||
+      this.devPreview !== null
+    );
+  }
+
+  /** Applies a peek change to this window's strip and traffic lights. */
+  private setPeek(peeking: boolean): void {
+    if (peeking === this.peek) return;
+    this.peek = peeking;
+    this.sendToShell("strip:peek", peeking);
+    this.syncWindowButtons();
+  }
+
+  /**
+   * Marks the window as being dragged: the tracker holds the strip's current
+   * state for the drag, then normal pointer rules resume after the last move.
+   */
+  private noteWindowMoved(): void {
+    if (!this.win.isFocused()) return;
+    this.dragging = true;
+    if (this.dragSettleTimer) clearTimeout(this.dragSettleTimer);
+    this.dragSettleTimer = setTimeout(() => {
+      this.dragSettleTimer = null;
+      this.dragging = false;
+    }, DRAG_SETTLE_MS);
+  }
+
+  private clearDragSuppress(): void {
+    if (this.dragSettleTimer) {
+      clearTimeout(this.dragSettleTimer);
+      this.dragSettleTimer = null;
+    }
+    this.dragging = false;
   }
 
   /**
@@ -917,11 +1019,9 @@ export class AppWindow {
     if (mode === "full") {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
       this.shellView.setVisible(true);
-    } else if (mode === "strip") {
-      this.shellView.setBounds({ x: 0, y: 0, width, height: STRIP_HEIGHT });
-      this.shellView.setVisible(true);
     } else {
-      this.shellView.setVisible(false);
+      this.shellView.setBounds({ x: 0, y: 0, width, height: DRAG_BAND_HEIGHT });
+      this.shellView.setVisible(true);
     }
     this.shellMode = mode;
   }

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { isStripSurfaceVisible } from "@shared/shell";
 import CommandPalette from "./components/CommandPalette.vue";
+import DragBand from "./components/DragBand.vue";
 import DragStrip from "./components/DragStrip.vue";
 import FailureView from "./components/FailureView.vue";
 import InstallStatus from "./components/InstallStatus.vue";
@@ -14,13 +15,33 @@ import {
   useShell,
 } from "./composables/useShell";
 
-const { state, loading, failed, paletteOpen, paletteInitial, paletteScope, extensionStatus } =
-  useShell();
+const {
+  state,
+  loading,
+  failed,
+  paletteOpen,
+  paletteInitial,
+  paletteScope,
+  peeking,
+  extensionStatus,
+} = useShell();
+
+// The transparent drag band is present whenever no full-window surface owns the
+// window, so the frameless window is always draggable with the pointer alone
+// (specs/013). Full surfaces (palette, veil, failure, status) suppress it.
+const bandEnabled = computed(
+  () => !paletteOpen.value && !loading.value && !failed.value && !extensionStatus.value,
+);
 
 // Main shows the native macOS traffic lights off the same predicate, so the
-// strip surface and its window controls stay in lockstep (specs/009).
+// strip surface and its window controls stay in lockstep (specs/009, specs/013).
 const stripVisible = computed(() =>
-  state.value ? isStripSurfaceVisible(state.value, paletteOpen.value) : false,
+  state.value
+    ? isStripSurfaceVisible(
+        { stripVisible: state.value.stripVisible, peeking: peeking.value },
+        paletteOpen.value,
+      )
+    : false,
 );
 </script>
 
@@ -48,6 +69,8 @@ const stripVisible = computed(() =>
         :previous-url="failed.previousUrl"
       />
     </Transition>
+
+    <DragBand v-if="bandEnabled" />
 
     <Transition
       name="strip"

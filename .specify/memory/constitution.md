@@ -9,7 +9,10 @@ transient: the drag strip is hidden until explicitly toggled, the command palett
 exists only while invoked, and the failure view appears only when the target is
 unreachable. The tool MUST NOT ship a URL bar, tab strip, menu bar, status bar,
 or any always-visible browser chrome. When all shell surfaces are dismissed, the
-visible tool chrome is zero pixels.
+visible tool chrome is zero pixels. Chrome is counted by painted pixels: an
+invisible, pointer-only drag region across the top of the window is permitted and
+is not the strip — the strip itself remains hidden until toggled, or transiently
+revealed by the pointer.
 
 Rationale: the entire value of this tool is a distraction-free viewport for a
 running app. Any permanent chrome erodes that value and duplicates the browser
@@ -169,4 +172,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.3 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29
+**Version**: 2.2.4 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29
