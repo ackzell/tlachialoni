@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.5](///compare/v0.1.4...v0.1.5) (2026-09-29)
+
+### Bug Fixes
+
+* **window:** keep the hover reveal alive across macOS Spaces (013) bb8c493
+
 ## [0.1.4](///compare/v0.1.3...v0.1.4) (2026-09-29)
 
 ### Features
