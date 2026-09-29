@@ -29,7 +29,7 @@ The permanent, transparent top region of the shell overlay.
 | Width | window content width | Full width, including above docked DevTools |
 | Painted | none | Satisfies FR-003 / SC-004 |
 | Draggable | yes (`app-region: drag`) | The whole band; controls are `no-drag` |
-| Mounted when | no full-window surface is up | FR-011; not rendered behind palette/veil/failure/status |
+| Mounted when | always | FR-011; layered above palette/veil/failure/status, below the strip |
 
 ### Strip surface
 

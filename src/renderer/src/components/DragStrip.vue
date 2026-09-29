@@ -131,10 +131,10 @@ function toggleDevtools(): void {
   background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-fg-subtle);
   user-select: none;
-  /* Positioned so it paints after the absolutely positioned drag band beneath
-     it (same stacking context, tree order). No z-index: the palette and other
-     later surfaces must still paint above the strip. */
+  /* Paints above the drag band (z-index 1) so its controls stay clickable; the
+     band is always mounted now, including under full-window surfaces. */
   position: relative;
+  z-index: 2;
   -webkit-app-region: drag;
   app-region: drag;
 }

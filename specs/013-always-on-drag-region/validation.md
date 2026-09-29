@@ -32,7 +32,7 @@ this environment. Scenarios are defined in `quickstart.md`.
 | S5 — Traffic lights track the strip | FR-008 | PENDING manual |
 | S6 — Reduced motion | FR-014 | PENDING manual |
 | S7 — Multi-window independence | FR-012, FR-009 | PENDING manual |
-| S8 — Full surfaces suppress the band | FR-011 | PENDING manual |
+| S8 — The band stays available over full surfaces | FR-011 | PENDING manual |
 | S9 — Drag holds the current titlebar state | FR-016 | PENDING manual |
 | S10 — Resource baseline | FR-010, SC-007 | PENDING manual |
 | S11 — Spike outcomes | FR-013, SC-002 | PENDING manual (T001) |

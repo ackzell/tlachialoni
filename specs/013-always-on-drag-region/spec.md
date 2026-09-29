@@ -142,9 +142,10 @@ window zooms; double-click again and confirm it restores.
 
 ### Edge Cases
 
-- **Full-window surfaces**: while the command palette, loading veil, failure view,
-  or extension status is on screen, that surface covers the window and owns input;
-  the band does not apply behind it. Closing the surface restores the band.
+- **Full-window surfaces**: the command palette, loading veil, failure view, and
+  extension status cover the window and keep their input, but the band stays on top
+  of them across the top band, so the window remains draggable. Only that strip of
+  the surface is displaced.
 - **Docked DevTools**: the band spans the full window width above the docked
   DevTools; dragging from above the DevTools area still moves the window.
 - **Active drag**: a drag holds the strip's current visibility — it never creates a
@@ -195,9 +196,9 @@ window zooms; double-click again and confirm it restores.
 - **FR-010**: Detection MUST be scoped to focused, visible windows and stopped on
   blur/close, and MUST NOT perform per-frame work; idle resource use attributable
   to the feature MUST be negligible.
-- **FR-011**: While a full-window shell surface (command palette, loading veil,
-  failure view, extension status) is on screen, the band MUST NOT intercept input;
-  that surface owns the window.
+- **FR-011**: The band MUST remain available (draggable) while a full-window shell
+  surface (command palette, loading veil, failure view, extension status) is on
+  screen. The band owns only the top band; the surface keeps the rest of the window.
 - **FR-012**: Each window MUST manage its own band, reveal, and pin state
   independently (constitution V).
 - **FR-013**: Double-clicking the top band SHOULD zoom/maximize the window using

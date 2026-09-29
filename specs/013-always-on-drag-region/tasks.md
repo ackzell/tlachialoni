@@ -59,7 +59,7 @@ description: "Task list for the Always-On Drag Region feature"
 **Independent Test**: Cold-launch, leave the strip hidden, press inside the top band and drag — the window moves with no keyboard step. Repeat with the strip pinned (`⌘B`).
 
 - [X] T007 [US1] Create `src/renderer/src/components/DragBand.vue`: a transparent, absolutely positioned, full-width, `DRAG_BAND_HEIGHT`-tall (`36px`) element with `user-select: none`, `-webkit-app-region: drag` and `app-region: drag`, and no background or color (zero painted pixels).
-- [X] T008 [US1] Mount the band in `src/renderer/src/App.vue`: compute `bandEnabled = !paletteOpen && !loading && !failed && !extensionStatus` and render `<DragBand v-if="bandEnabled" />` before the strip so the strip paints over it; the band is absent while a full-window surface owns the window (FR-011).
+- [X] T008 [US1] Mount the band in `src/renderer/src/App.vue` unconditionally so it is always available, layering it below the strip: the band is `z-index: 1` (above full-window surfaces, all `z-index: auto`) and the strip is `z-index: 2`, so the window stays draggable even while the palette, veil, failure view, or status is up (FR-011).
 - [X] T009 [US1] Adjust `src/renderer/src/components/DragStrip.vue` so the strip covers the band's top edge and its whole surface stays draggable (fill the 36px band height; keep the left traffic-light inset and every control `app-region: no-drag`).
 - [ ] T010 [US1] Validate User Story 1 against `specs/013-always-on-drag-region/quickstart.md` S1 (and S5 zero-chrome, S8 full surfaces), recording results for `validation.md`.
 

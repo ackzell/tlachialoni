@@ -85,13 +85,13 @@ npm run typecheck  # explicit TS pass across node/preload/web
 3. Pin A's strip; window B stays hidden until its own pointer enters.
 4. Blur window A (click B): A's peek clears and A's sensor stops.
 
-### S8 — Full surfaces suppress the band (FR-011)
+### S8 — The band stays available over full surfaces (FR-011)
 
-1. Open the palette (`⌘P`); press in the top band and drag. The window does not move
-   behind the palette and the palette keeps its input.
-2. Dismiss the palette; dragging from the band works again.
-3. Trigger the loading veil and the failure view; the band does not intercept input
-   while either is up.
+1. Open the palette (`⌘P`); press in the top band and drag. The window moves, and
+   the palette keeps its input below the top band.
+2. Repeat with the loading veil and the failure view on screen: dragging from the
+   top band still moves the window.
+3. Close each surface; dragging from the band continues to work.
 
 ### S9 — A drag holds the current titlebar state (FR-016)
 

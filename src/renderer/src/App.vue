@@ -27,13 +27,6 @@ const {
   extensionStatus,
 } = useShell();
 
-// The transparent drag band is present whenever no full-window surface owns the
-// window, so the frameless window is always draggable with the pointer alone
-// (specs/013). Full surfaces (palette, veil, failure, status) suppress it.
-const bandEnabled = computed(
-  () => !paletteOpen.value && !loading.value && !failed.value && !extensionStatus.value,
-);
-
 // Main shows the native macOS traffic lights off the same predicate, so the
 // strip surface and its window controls stay in lockstep (specs/009, specs/013).
 const stripVisible = computed(() =>
@@ -81,7 +74,7 @@ const blankVisible = computed(() =>
       />
     </Transition>
 
-    <DragBand v-if="bandEnabled" />
+    <DragBand />
 
     <Transition
       name="strip"
