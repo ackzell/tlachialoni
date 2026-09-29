@@ -7,6 +7,7 @@ import {
   DEFAULT_WIDTH,
   MIN_HEIGHT,
   MIN_WIDTH,
+  type Bounds,
   type ColorMode,
   type VariantSlug,
   type WindowRecord,
@@ -17,6 +18,7 @@ import { DRAG_BAND_HEIGHT, isBlankSurfaceVisible, isStripSurfaceVisible } from "
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
+import { framesEqual } from "./geometry";
 import { DevToolsController, type SurfaceState } from "./devtools";
 import { PickerController } from "./picker";
 import { ProximityTracker } from "./proximity";
@@ -177,7 +179,19 @@ export class AppWindow {
   // ---- lifecycle -------------------------------------------------------
 
   show(): void {
+    // Capture the frame to restore before `show()`: macOS repositions the
+    // window when it is first ordered on screen, and the move/resize handlers
+    // then persist that repositioned frame over the saved one.
+    const saved = this.record()?.bounds ?? null;
     this.win.show();
+    // macOS constrains a window to the display's work area when it is first
+    // ordered on screen, so a restored frame that extended past the work area —
+    // or was saved on another display — is silently clamped or relocated at
+    // launch. Re-applying the saved frame after `show()` bypasses that
+    // constraint, restoring the exact position and monitor the user left it on
+    // (specs/013 restore fix). Deferred a tick so it lands after macOS has
+    // finished ordering the window.
+    if (saved) setImmediate(() => this.restoreBounds(saved));
     this.win.focus();
     this.startProximity();
     if (this.targetEverLoaded || this.currentUrl) this.siteView.webContents.focus();
@@ -188,6 +202,16 @@ export class AppWindow {
       this.devtools.open(record.dockMode);
     }
     this.applyTheme();
+  }
+
+  /**
+   * Re-applies the captured saved frame, overriding any clamp or relocation
+   * macOS applied while ordering the window on screen.
+   */
+  private restoreBounds(saved: Bounds): void {
+    if (this.win.isDestroyed()) return;
+    if (framesEqual(this.win.getBounds(), saved)) return;
+    this.win.setBounds(saved);
   }
 
   private wireEvents(): void {

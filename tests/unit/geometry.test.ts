@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cascadeBounds, ensureVisibleBounds, type WorkArea } from "../../src/main/shell/geometry";
+import {
+  cascadeBounds,
+  ensureVisibleBounds,
+  framesEqual,
+  type WorkArea,
+} from "../../src/main/shell/geometry";
 
 const area: WorkArea = { x: 0, y: 0, width: 2000, height: 1200 };
 
@@ -53,5 +58,22 @@ describe("ensureVisibleBounds", () => {
       width: 480,
       height: 360,
     });
+  });
+});
+
+describe("framesEqual", () => {
+  it("is true for identical position and size", () => {
+    expect(
+      framesEqual({ x: 1, y: 2, width: 3, height: 4 }, { x: 1, y: 2, width: 3, height: 4 }),
+    ).toBe(true);
+  });
+
+  it("is false when macOS repositioned the frame", () => {
+    expect(
+      framesEqual(
+        { x: 2208, y: 217, width: 1440, height: 900 },
+        { x: 2411, y: 320, width: 1440, height: 900 },
+      ),
+    ).toBe(false);
   });
 });

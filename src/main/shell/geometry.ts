@@ -63,6 +63,11 @@ export function cascadeBounds(from: Bounds | null, area: WorkArea, offset = 32):
   );
 }
 
+/** Whether two frames are identical in both position and size. */
+export function framesEqual(a: Bounds, b: Bounds): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 /**
  * Whether a saved frame is still usable: it must intersect a connected display's
  * work area. Missing or off-screen frames fall back to a visible default
