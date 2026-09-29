@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRAG_BAND_HEIGHT, isStripSurfaceVisible } from "@shared/shell";
+import { DRAG_BAND_HEIGHT, isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
 
 describe("isStripSurfaceVisible", () => {
   it("shows the strip when it is pinned and no palette is open", () => {
@@ -43,5 +43,19 @@ describe("isStripSurfaceVisible", () => {
 describe("DRAG_BAND_HEIGHT", () => {
   it("matches the strip height the shell renders", () => {
     expect(DRAG_BAND_HEIGHT).toBe(36);
+  });
+});
+
+describe("isBlankSurfaceVisible", () => {
+  it("shows the blank surface when the window has no target", () => {
+    expect(isBlankSurfaceVisible({ target: null })).toBe(true);
+  });
+
+  it("hides the blank surface once a target is set", () => {
+    expect(isBlankSurfaceVisible({ target: "http://localhost:3000/" })).toBe(false);
+  });
+
+  it("treats a missing target as blank", () => {
+    expect(isBlankSurfaceVisible({} as { target: string | null })).toBe(true);
   });
 });

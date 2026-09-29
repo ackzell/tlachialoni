@@ -13,7 +13,7 @@ import {
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
-import { DRAG_BAND_HEIGHT, isStripSurfaceVisible } from "@shared/shell";
+import { DRAG_BAND_HEIGHT, isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
@@ -880,7 +880,11 @@ export class AppWindow {
       this.showLoading ||
       this.failed ||
       this.extensionStatus ||
-      this.devPreview
+      this.devPreview ||
+      // A blank window (no target yet) keeps the shell full-window so its
+      // watermark backdrop stays painted even after the location palette is
+      // dismissed; the band would clip it to the top strip.
+      isBlankSurfaceVisible({ target: this.record()?.target ?? null })
     ) {
       return "full";
     }

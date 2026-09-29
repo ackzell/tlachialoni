@@ -22,3 +22,14 @@ export function isStripSurfaceVisible(
 ): boolean {
   return (state.stripVisible || state.peeking === true) && !paletteOpen;
 }
+
+/**
+ * Whether a window is the blank "new page": one that has never loaded a target
+ * (a fresh New Window or a restored window that never had one). Main keeps the
+ * shell full-window in this state so the blank surface stays painted after the
+ * location palette is dismissed, and the renderer mounts that surface from this
+ * same predicate, so the two can never drift.
+ */
+export function isBlankSurfaceVisible(state: { target: string | null }): boolean {
+  return state.target == null;
+}

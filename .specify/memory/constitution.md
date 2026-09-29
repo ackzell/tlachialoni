@@ -12,7 +12,10 @@ or any always-visible browser chrome. When all shell surfaces are dismissed, the
 visible tool chrome is zero pixels. Chrome is counted by painted pixels: an
 invisible, pointer-only drag region across the top of the window is permitted and
 is not the strip — the strip itself remains hidden until toggled, or transiently
-revealed by the pointer.
+revealed by the pointer. The zero-pixel rule constrains chrome over the guest
+page; a window that has never loaded a target has no page to obscure, so a
+decorative identity watermark on that empty page is permitted, provided it is
+removed as soon as a target commits and never intercepts input.
 
 Rationale: the entire value of this tool is a distraction-free viewport for a
 running app. Any permanent chrome erodes that value and duplicates the browser
@@ -172,4 +175,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.4 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29
+**Version**: 2.2.5 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29

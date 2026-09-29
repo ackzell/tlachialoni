@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { isStripSurfaceVisible } from "@shared/shell";
+import { isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
+import BlankView from "./components/BlankView.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import DragBand from "./components/DragBand.vue";
 import DragStrip from "./components/DragStrip.vue";
@@ -43,10 +44,20 @@ const stripVisible = computed(() =>
       )
     : false,
 );
+
+// A window that has never loaded a target shows the blank "new page" watermark.
+// Main keeps the shell full-window in this state, so it stays painted whether or
+// not the location palette is open. The veil and failure view own the window
+// during a load or a failure, so the watermark yields to them.
+const blankVisible = computed(() =>
+  state.value ? isBlankSurfaceVisible(state.value) && !loading.value && !failed.value : false,
+);
 </script>
 
 <template>
   <div class="shell-root">
+    <BlankView v-if="blankVisible" />
+
     <Transition
       name="veil"
       @leave="markSurfaceLeaving"

@@ -8,7 +8,8 @@ open as many windows as you have dev servers (`⌘N`), each fully independent.
 
 The only UI is transient and keyboard-first:
 
-- `⌘N` — open a new window (blank, with the location entry focused); `⌘W` closes it
+- `⌘N` — open a new window (blank, with the location entry focused and the logo
+  watermark on the empty page); `⌘W` closes it
 - `⌘P` — toggle the command palette (type a target like `:5173`, or run a command)
 - `⌘L` — edit the current target, with recent pages listed and grouped by origin
 - `⌘T` — jump to the theme picker
@@ -145,6 +146,8 @@ See:
 - `specs/010-palette-groups/spec.md` — grouped command palette and host-grouped recents
 - `specs/011-grouped-os-menu/spec.md` — domain-grouped application menu
 - `specs/012-multi-window/spec.md` — multiple independent windows
+- `specs/013-always-on-drag-region/spec.md` — always-draggable window with a hover-revealed strip
+- `specs/014-blank-watermark/spec.md` — the logo watermark on a blank, never-loaded window
 
 ## License
 
