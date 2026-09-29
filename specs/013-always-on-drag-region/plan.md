@@ -8,11 +8,13 @@
 
 Make the window draggable at all times without touching the keyboard. The shell
 overlay stops collapsing to nothing: whenever no full-window surface is up, it
-stays visible as a 36px, fully transparent **drag band** with `app-region: drag`.
-The visible strip (target + controls) becomes a renderer surface that is either
-**pinned** (`⌘B`, persisted `stripVisible`) or **peeking** (transient, driven by
-pointer proximity to the top edge or a short dwell in the band). Peek never
-persists.
+stays visible as a thin (10px), fully transparent **drag band** with `app-region:
+drag`, keeping the guest page clickable just below the top edge. The visible strip
+(target + controls) becomes a renderer surface that is either **pinned** (`⌘B`,
+persisted `stripVisible`) or **peeking** (transient, driven by pointer proximity to
+the top edge or a short dwell in the band). While the strip is shown the overlay
+grows to its height (~30px) so it is not clipped, then shrinks back on dismiss.
+Peek never persists.
 
 Because a draggable region ignores all pointer events (Electron's documented
 behavior), the band cannot sense the pointer itself. A small main-process
@@ -51,8 +53,9 @@ cheap native coordinate read and four integer comparisons while focused — no
 per-frame work, no busy loop (FR-010, SC-007).
 
 **Constraints**: the band paints zero pixels and the guest page is never touched;
-the band swallows clicks in the top 36px of the page (accepted, title-bar-like); the
-shell view can no longer be hidden in normal use, so its renderer stays warm.
+the thin (10px) band swallows clicks only in the top 10px of the page (accepted,
+title-bar-like) while the strip expands the overlay only transiently; the shell view
+can no longer be hidden in normal use, so its renderer stays warm.
 
 **Scale/Scope**: one new renderer surface and one new main module; roughly eight
 files touched across main, shared, renderer, and tests. Multi-window safe: each
@@ -149,40 +152,45 @@ the persisted renderer shape stays exactly as 012 defined it.
 
 ### Shell modes
 
-`ShellMode` becomes `full | band`. `desiredShellMode()` returns `full` when the
-palette, loading veil, failure view, extension status, or a dev preview is up, else
-`band`. `band` sets the shell view to `{0, 0, width, DRAG_BAND_HEIGHT}` and keeps it
-visible — the view is never hidden in normal use. `stripVisible` no longer selects a
-mode; it selects what the renderer paints inside the band. The settle protocol is
-retained for `full → band` collapses (palette/veil/failure leaves) and no longer
-applies to hiding the strip (no bounds change).
+`ShellMode` becomes `full | strip | band`. `desiredShellMode()` returns `full` when
+the palette, loading veil, failure view, extension status, or a dev preview is up;
+otherwise it returns `strip` while the strip surface is visible (`pinned || peeking`,
+not suppressed by the palette) and `band` when it is not. `strip` sets the shell view
+to `{0, 0, width, STRIP_HEIGHT}` so the painted strip renders in full; `band` sets it
+to `{0, 0, width, DRAG_BAND_HEIGHT}` and keeps it visible — the view is never hidden
+in normal use. The settle protocol defers `full → strip/band` and `strip → band`
+collapses (palette/veil/failure leaves and a dismissed/unpinned strip) so leave
+animations are never cut.
 
 ### Proximity sensor (`src/main/shell/proximity.ts`)
 
 A `ProximityTracker` with `update({ cursor, bounds, now, paused })` returning the new
-peek boolean. Constants: `bandHeight = 36`, `proximity = 4`, `dwellMs = 400`,
-`graceMs = 600`. Rules: `atEdge` reveals immediately; `inBand` reveals after dwell;
-leaving the band keeps the strip for `graceMs`; `paused` (unfocused, full surface,
-active drag) clears peek and resets timers. The tracker holds no timers of its own —
-main calls it on an interval, so time is injected and the logic is pure.
+peek boolean. Constants: `bandHeight = 10`, `stripHeight = 30`, `proximity = 4`,
+`dwellMs = 400`, `graceMs = 600`. Rules: `atEdge` reveals immediately; `inBand`
+reveals after dwell; once peeking, the taller strip region holds the reveal so its
+controls stay usable; leaving the held region keeps the strip for `graceMs`; `paused`
+(unfocused, full surface, active drag) clears peek and resets timers. The tracker holds
+no timers of its own — main calls it on an interval, so time is injected and the logic
+is pure.
 
 ### Main integration (`src/main/shell/window.ts`)
 
 - Start a ~150ms interval on `show`/`focus`; stop on `blur`/`hide`/`closed`.
 - Each tick: `screen.getCursorScreenPoint()` + `win.getContentBounds()` →
-  `tracker.update`; on a change, set `peek`, send `strip:peek`, and refresh the
-  traffic lights.
+  `tracker.update`; on a change, set `peek`, send `strip:peek`, and relayout (grow at
+  once on reveal, defer the shrink through the settle protocol on dismiss).
 - Pause when palette/loading/failure/extension-status/dev-preview is active, or for
   ~200ms after a `move` event (an in-progress drag).
 - `syncWindowButtons` reads the extended predicate so the lights appear with a peek
   and hide when it ends (FR-008).
-- `toggleStrip` patches state, broadcasts, and refreshes the lights; it no longer
-  defers a bounds collapse (the band never moves).
+- `toggleStrip` patches state, broadcasts, and relayouts so pinning grows the overlay
+  and unpinning defers the shrink.
 
 ### Renderer
 
-- `DragBand.vue`: a transparent, full-width, 36px element with `app-region: drag`,
+- `DragBand.vue`: a transparent, full-width, 10px element with `app-region: drag`,
   mounted whenever no full-window surface is up.
+- `DragStrip.vue`: the 30px painted strip that fills the grown overlay while shown.
 - `App.vue`: render the band, then the strip (`pinned || peeking`, and not while the
   palette is open) above it. The band is not rendered while a full-window surface
   owns the window (FR-011).
@@ -209,13 +217,13 @@ main calls it on an interval, so time is injected and the logic is pure.
 | Risk | Mitigation |
 | ---- | ---------- |
 | Cursor polling is unreliable at the screen's top edge or with multiple displays | M0 spike measures it; fall back to a `no-drag` sensor strip if needed |
-| The always-visible shell view costs more than expected | The band is 36px and static; the sensor is a 150ms interval scoped to focus. Measure idle CPU against baseline in validation (SC-007) |
+| The always-visible shell view costs more than expected | The band is 10px and static; the sensor is a 150ms interval scoped to focus; the overlay only grows while the strip is shown. Measure idle CPU against baseline in validation (SC-007) |
 | Peek/dismiss flaps when the pointer hovers the boundary | Dwell before reveal and a 600ms grace before dismiss give hysteresis; a drag suppresses reveal for 200ms after the last `move` |
 | Strip hides while a control is used | The whole band is tracked (not a 4px sensor), so the strip stays until the pointer truly leaves |
 | Lights flash on every accidental peek | Expected per the Q2 decision; the grace period keeps it from strobing during normal movement |
 | Double-click-to-zoom is impossible inside a drag region | M0 spike decides; FR-013 is a SHOULD and is dropped rather than shipped as a fake |
 | A second window's sensor lights up a background window | Sensors stop on blur and are per-window; validated in the quickstart |
-| The band blocks clicks in a page's top strip | Accepted trade-off (spec Assumptions); the band is the same 36px the pinned strip already covered |
+| The band blocks clicks in a page's top strip | Accepted but minimized: the band is thin (10px), so only the top 10px is non-clickable; the overlay grows only while the strip is shown |
 
 ## Complexity Tracking
 

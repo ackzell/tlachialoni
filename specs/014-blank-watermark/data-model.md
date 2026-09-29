@@ -54,9 +54,11 @@ isBlankSurfaceVisible(state) = state.target == null
 | Mode | When | Shell bounds |
 | --- | --- | --- |
 | `full` | palette, loading veil, failure view, extension status, dev preview, **or a blank window** | full window |
-| `band` | otherwise | full width × `DRAG_BAND_HEIGHT` (36px) |
+| `strip` | otherwise, when the strip surface is pinned or peeking | full width × `STRIP_HEIGHT` (30px) |
+| `band` | otherwise | full width × `DRAG_BAND_HEIGHT` (10px) |
 
-The blank case is added to the existing `full` set; no new mode is introduced.
+The blank case is added to the existing `full` set; the blank surface never renders in
+the smaller `strip`/`band` modes.
 
 ### Derived mark
 

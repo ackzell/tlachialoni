@@ -14,7 +14,12 @@ import {
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
 import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
-import { DRAG_BAND_HEIGHT, isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
+import {
+  DRAG_BAND_HEIGHT,
+  STRIP_HEIGHT,
+  isBlankSurfaceVisible,
+  isStripSurfaceVisible,
+} from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
@@ -33,10 +38,15 @@ const PROXIMITY_POLL_MS = 150;
 /** How long after the last move the window still counts as being dragged. */
 const DRAG_SETTLE_MS = 200;
 
-type ShellMode = "full" | "band";
+/**
+ * Shell overlay heights. `band` is the thin always-on drag/reveal region that keeps
+ * the page below the top edge clickable; `strip` grows the overlay just enough for
+ * the painted strip (target + controls) whenever it is pinned or peeking.
+ */
+type ShellMode = "full" | "strip" | "band";
 
 /** Bigger modes win when deciding whether a collapse needs the settle wait. */
-const SHELL_MODE_RANK: Record<ShellMode, number> = { band: 0, full: 1 };
+const SHELL_MODE_RANK: Record<ShellMode, number> = { band: 0, strip: 1, full: 2 };
 
 export type { CommandResult };
 
@@ -799,11 +809,11 @@ export class AppWindow {
   private toggleStrip(): void {
     const pinned = !(this.record()?.stripVisible ?? false);
     this.store.patchWindow(this.windowId, { stripVisible: pinned });
-    // The band never changes bounds, so hiding the strip is a renderer-only
-    // transition: no relayout deferral is needed (specs/013). Broadcast so the
-    // renderer plays its leave, then refresh the traffic lights.
+    // Pinning grows the overlay to the strip height; unpinning defers the shrink so
+    // the renderer's leave animation is not cut (specs/013, settle protocol).
+    // `relayout` refreshes the traffic lights off the shared predicate.
     this.broadcastState();
-    this.syncWindowButtons();
+    this.relayout(true);
   }
 
   private readonly handleNativeThemeUpdated = (): void => {
@@ -915,10 +925,15 @@ export class AppWindow {
     ) {
       return "full";
     }
-    // The transparent drag band is always present so the window is always
-    // draggable; what the band paints (pinned strip or a transient peek) is a
-    // renderer concern (specs/013).
-    return "band";
+    // The thin transparent band is always present so the window is always
+    // draggable and can sense a reveal; when the strip is pinned or peeking the
+    // overlay grows just enough to paint it (specs/013).
+    return isStripSurfaceVisible(
+      { stripVisible: this.record()?.stripVisible ?? false, peeking: this.peek },
+      this.paletteOpen,
+    )
+      ? "strip"
+      : "band";
   }
 
   /**
@@ -997,7 +1012,10 @@ export class AppWindow {
     if (peeking === this.peek) return;
     this.peek = peeking;
     this.sendToShell("strip:peek", peeking);
-    this.syncWindowButtons();
+    // A reveal grows the overlay so the strip is not clipped (applied at once); a
+    // dismiss defers the shrink so the strip's leave animation is not cut and runs
+    // through the settle protocol (specs/013, contracts/settle-protocol.md).
+    this.relayout(!peeking);
   }
 
   /**
@@ -1055,11 +1073,11 @@ export class AppWindow {
     const { width, height } = this.win.getContentBounds();
     if (mode === "full") {
       this.shellView.setBounds({ x: 0, y: 0, width, height });
-      this.shellView.setVisible(true);
     } else {
-      this.shellView.setBounds({ x: 0, y: 0, width, height: DRAG_BAND_HEIGHT });
-      this.shellView.setVisible(true);
+      const bandHeight = mode === "strip" ? STRIP_HEIGHT : DRAG_BAND_HEIGHT;
+      this.shellView.setBounds({ x: 0, y: 0, width, height: bandHeight });
     }
+    this.shellView.setVisible(true);
     this.shellMode = mode;
   }
 

@@ -11,9 +11,19 @@
 
 /**
  * Height of the always-available transparent drag band at the top of the window.
- * It matches the strip height; the CSS in `DragBand.vue` must stay in step.
+ * It is intentionally thin: it is both the draggable region and the pointer-proximity
+ * trigger, so keeping it short leaves the guest page clickable just below the top
+ * edge. The CSS in `DragBand.vue` must stay in step.
  */
-export const DRAG_BAND_HEIGHT = 36;
+export const DRAG_BAND_HEIGHT = 10;
+
+/**
+ * Height of the painted strip surface (target + controls) when it is shown. The
+ * shell overlay grows from `DRAG_BAND_HEIGHT` to this while the strip is pinned or
+ * peeking, so the strip renders in full instead of being clipped, then shrinks back
+ * when it is dismissed. The CSS in `DragStrip.vue` must stay in step.
+ */
+export const STRIP_HEIGHT = 30;
 
 /** Whether the target `state` should have the strip surface on screen. */
 export function isStripSurfaceVisible(

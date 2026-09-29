@@ -11,7 +11,7 @@ shell renderer paints a centered, faded watermark of the tool's logo mark. The m
 is inlined as raw SVG rather than a background image so two of its inner chevrons can
 take the window's theme accent color; the rest of the art is untouched. The main
 process keeps the shell in its `full` mode for a blank window (the 013 band would clip
-the surface to 36px and hide it), so the watermark survives the location palette
+the surface to a thin strip and hide it), so the watermark survives the location palette
 being dismissed. The surface yields to the loading veil and failure view, paints
 beneath the palette, and disappears the moment a target commits.
 
@@ -144,8 +144,8 @@ export function isBlankSurfaceVisible(state: { target: string | null }): boolean
 - Renderer: `App.vue` mounts `BlankView` when the predicate holds **and** no loading
   veil or failure view is up.
 - Main: `desiredShellMode()` returns `full` when the predicate holds on the window's
-  record, so the shell is not collapsed to the 36px band (which would clip and hide
-  the surface).
+  record, so the shell is not collapsed to the thin `strip`/`band` (which would clip
+  and hide the surface).
 
 ### Main integration (`src/main/shell/window.ts`)
 
@@ -189,7 +189,7 @@ export function isBlankSurfaceVisible(state: { target: string | null }): boolean
 | Risk | Mitigation |
 | --- | --- |
 | The watermark shows through over a loading page or a failure | `App.vue` gates on `!loading && !failed`, and the veil/failure view paint above it; the predicate only holds while the record target is `null` |
-| The shell stays full-window on a blank window and swallows clicks | The surface is `pointer-events: none`; the drag band still owns the top 36px; a blank window has no page to click anyway |
+| The shell stays full-window on a blank window and swallows clicks | The surface is `pointer-events: none`; the drag band still owns the top 10px; a blank window has no page to click anyway |
 | Light mode makes the white mark invisible or hue-shifts the accent | A dedicated light-mode rule inverts the mark while preserving the accent hue (`invert(1) hue-rotate(180deg)`) |
 | The derived asset drifts from the source art | The copy differs from `resources/logo.svg` only in the two `currentColor` fills; keep that invariant when re-deriving |
 | Inlining the SVG weakens CSP or adds risk | The string is a first-party build-time asset, not runtime input; it carries no script |

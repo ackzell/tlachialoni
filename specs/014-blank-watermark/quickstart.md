@@ -32,7 +32,7 @@ npm run build      # confirms the mark is bundled into the renderer
    the watermark is centered and visible.
 3. Confirm the watermark is faint, centered, and does not move or react to the
    pointer.
-4. Press inside the top ~36px and drag; the window moves (the drag band still works
+4. Press inside the top ~10px and drag; the window moves (the drag band still works
    beneath the watermark).
 
 ### S2 — The watermark is blank-only (FR-005, SC-002)

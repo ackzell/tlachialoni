@@ -30,13 +30,14 @@ export function isBlankSurfaceVisible(state: { target: string | null }): boolean
 ```text
 full  when paletteOpen || showLoading || failed || extensionStatus || devPreview
       || isBlankSurfaceVisible({ target: record?.target ?? null })
+strip when isStripSurfaceVisible({ stripVisible, peeking })
 band  otherwise
 ```
 
-- A blank window MUST be `full`; `band` sizes the shell view to 36px and would clip
-  and hide the watermark (FR-004).
-- This adds a case to the existing `full` set; no new `ShellMode` value, no bounds
-  logic, and no settle-protocol change.
+- A blank window MUST be `full`; the smaller `band` (10px) or `strip` (30px) modes
+  size the shell view to a top band and would clip and hide the watermark (FR-004).
+- This adds a case to the existing `full` set; no bounds logic and no
+  settle-protocol change.
 - The record's `target` flips from `null` on the first committed load
   (`handleReady` / `handleNavigated`), which is exactly when the watermark must go.
 

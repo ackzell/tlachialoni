@@ -176,8 +176,8 @@ the mark remains visible, without a reload.
 - The blank-window model from `specs/012-multi-window/` (FR-011: a new window starts
   with no target and an armed location prompt).
 - The shell-mode state machine from `specs/013-always-on-drag-region/` (`full` /
-  `band`), whose `full` mode the blank page now depends on so the watermark is not
-  clipped to the 36px band, and whose drag band must keep working beneath the
+  `strip` / `band`), whose `full` mode the blank page now depends on so the watermark
+  is not clipped to the thin band, and whose drag band must keep working beneath the
   watermark.
 - The Tlapalli token system (`--tb-*`) and per-window variant/mode resolution from
   `specs/001-minimal-browser/` and `specs/012-multi-window/`, which supply the accent

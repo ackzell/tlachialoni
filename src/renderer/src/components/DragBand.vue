@@ -14,7 +14,7 @@
   left: 0;
   right: 0;
   /* Must match DRAG_BAND_HEIGHT in src/shared/shell.ts. */
-  height: 36px;
+  height: 10px;
   /* Above every full-window surface (palette/veil/failure/status, all z-index
      auto) so the window is draggable even while one is showing; below the strip
      (z-index 2) so its controls stay clickable. */

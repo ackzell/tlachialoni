@@ -27,8 +27,9 @@ npm run typecheck  # explicit TS pass across node/preload/web
 
 1. Cold-launch and do not press `⌘B`. The chrome is invisible; the page reaches the
    top edge.
-2. Press inside the top 36px anywhere across the width (including above the docked
-   DevTools area) and drag. The window moves with the pointer.
+2. Press inside the top 10px anywhere across the width (including above the docked
+   DevTools area) and drag. The window moves with the pointer, and the page just below
+   the band stays clickable.
 3. Press `⌘B` to pin the strip; drag from the strip's background between the controls.
    The window moves.
 4. Press `⌘B` to unpin; drag again from the transparent band. The window moves with

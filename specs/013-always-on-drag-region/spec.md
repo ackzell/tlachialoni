@@ -249,8 +249,9 @@ window zooms; double-click again and confirm it restores.
 - macOS is the only shipping target; other platforms' draggable regions still work
   via the same standard mechanism, but the controls and conventions are macOS
   specific.
-- The drag band is the same height as the strip (36px) and spans the full window
-  width; a "generous" top band means this full-height region, not a larger one.
+- The drag band is intentionally thin (~10px) and spans the full window width; the
+  painted strip is taller (~30px), so the shell overlay grows to the strip height
+  while the strip is shown and shrinks back to the band when it is dismissed.
 - Proximity is defined as the pointer within ~4px of the window's top edge; dwell
   is ~400ms inside the band; dismissal grace is ~600ms after leaving. These are
   tuning constants, expected to be adjusted during implementation.
@@ -258,9 +259,8 @@ window zooms; double-click again and confirm it restores.
   pointer itself; the reveal/dismiss signals come from a small main-process
   cursor-proximity check (chosen over a thin `no-drag` sensor, which would create a
   drag dead zone and dismiss the strip while its controls are used).
-- The band makes the top 36px of the guest page non-clickable; this is the
-  accepted cost of a title-bar-like drag surface and matches the current pinned
-  strip behavior.
+- The thin band makes only the top ~10px of the guest page non-clickable; the page
+  below it stays usable, which is the point of keeping the band short.
 - The hover reveal is an accelerator, not the only path: `⌘B` and the command
   palette remain the keyboard-complete routes (constitution III).
 - Constitution I's "hidden until explicitly toggled" is preserved in spirit: the

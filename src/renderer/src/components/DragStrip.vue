@@ -119,8 +119,9 @@ function toggleDevtools(): void {
 
 <style scoped>
 .strip {
-  /* Matches DRAG_BAND_HEIGHT (src/shared/shell.ts) so a visible strip fully
-     covers the always-on drag band beneath it (specs/013). */
+  /* Matches STRIP_HEIGHT (src/shared/shell.ts); the shell overlay grows to this
+     while the strip is shown so it is not clipped, then shrinks to the thin
+     DRAG_BAND_HEIGHT band when it is dismissed (specs/013). */
   height: 30px;
   display: flex;
   align-items: center;

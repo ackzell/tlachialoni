@@ -9,7 +9,8 @@ is persisted.
 `src/shared/shell.ts`:
 
 ```ts
-export const DRAG_BAND_HEIGHT = 36;
+export const DRAG_BAND_HEIGHT = 10;
+export const STRIP_HEIGHT = 30;
 
 export function isStripSurfaceVisible(
   state: { stripVisible: boolean; peeking?: boolean },
@@ -19,6 +20,12 @@ export function isStripSurfaceVisible(
 }
 ```
 
+- `DRAG_BAND_HEIGHT` is the thin always-on drag/reveal region. Keeping it short
+  leaves the guest page clickable just below the top edge; it also bounds the
+  pointer-proximity reveal trigger.
+- `STRIP_HEIGHT` is the painted strip. Main sizes the shell overlay to
+  `STRIP_HEIGHT` while the strip is pinned or peeking (so it is not clipped) and
+  back to `DRAG_BAND_HEIGHT` when it is dismissed.
 - **Consumers**: the shell renderer (whether `DragStrip` mounts) and main
   (`syncWindowButtons`, whether the traffic lights show). Both MUST use this function
   so the two cannot disagree (spec FR-008, 009 FR-004).
@@ -62,7 +69,7 @@ export class ProximityTracker {
 }
 ```
 
-Behavior (constants: `proximity` 4, `dwellMs` 400, `graceMs` 600):
+Behavior (constants: `bandHeight` 10, `stripHeight` 30, `proximity` 4, `dwellMs` 400, `graceMs` 600):
 
 | Condition | Result |
 | --- | --- |
@@ -70,13 +77,16 @@ Behavior (constants: `proximity` 4, `dwellMs` 400, `graceMs` 600):
 | `dragging` | current `peeking` held; no reveal, no dismissal |
 | Cursor within band and `relY <= proximity` | `peeking = true` immediately |
 | Cursor within band, below proximity, for `>= dwellMs` | `peeking = true` |
-| Cursor within band while peeking | `peeking` stays `true`; dismissal cancelled |
-| Cursor outside band while peeking | starts/continues the grace timer |
+| Cursor within the held region while peeking | `peeking` stays `true`; dismissal cancelled |
+| Cursor outside the held region while peeking | starts/continues the grace timer |
 | Grace elapsed `>= graceMs` while outside | `peeking = false` |
-| Cursor outside band while hidden | `peeking` stays `false` |
+| Cursor outside the held region while hidden | `peeking` stays `false` |
 
 "Within band" means `0 <= relX < width` and `0 <= relY < bandHeight`, where
-`relX = cursor.x - bounds.x` and `relY = cursor.y - bounds.y`.
+`relX = cursor.x - bounds.x` and `relY = cursor.y - bounds.y`. The **held region** is
+`bandHeight` tall while hidden and `stripHeight` tall while peeking, so once the strip
+is revealed the pointer may travel down onto its controls without dismissing it
+(FR-006).
 
 ## Main lifecycle contract
 
@@ -92,9 +102,12 @@ Behavior (constants: `proximity` 4, `dwellMs` 400, `graceMs` 600):
   pointer-in-band rule resumes, so a visible strip stays if the pointer is still on
   the titlebar and a hidden one can reveal by the normal hover rules.
 - On a peek change, main sends `strip:peek` and re-evaluates the traffic lights via
-  the shared predicate.
+  the shared predicate. A reveal grows the shell overlay to `STRIP_HEIGHT` at once; a
+  dismissal defers the shrink back to `DRAG_BAND_HEIGHT` through the settle protocol
+  so the strip's leave animation is not cut.
 - `⌘B` (`strip.toggle`) patches `stripVisible`, broadcasts state, and re-evaluates
-  the lights; it performs no bounds change and therefore no settle deferral.
+  the lights; pinning grows the overlay to `STRIP_HEIGHT`, unpinning defers the
+  shrink through the settle protocol (same height change as a dismiss).
 
 ## Failure / edge behavior
 

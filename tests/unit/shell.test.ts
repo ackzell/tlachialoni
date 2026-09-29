@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DRAG_BAND_HEIGHT, isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
+import {
+  DRAG_BAND_HEIGHT,
+  STRIP_HEIGHT,
+  isBlankSurfaceVisible,
+  isStripSurfaceVisible,
+} from "@shared/shell";
 
 describe("isStripSurfaceVisible", () => {
   it("shows the strip when it is pinned and no palette is open", () => {
@@ -41,8 +46,15 @@ describe("isStripSurfaceVisible", () => {
 });
 
 describe("DRAG_BAND_HEIGHT", () => {
-  it("matches the strip height the shell renders", () => {
-    expect(DRAG_BAND_HEIGHT).toBe(36);
+  it("stays thin so the page below the top edge stays clickable", () => {
+    expect(DRAG_BAND_HEIGHT).toBe(10);
+  });
+});
+
+describe("STRIP_HEIGHT", () => {
+  it("is tall enough for the painted strip and taller than the band", () => {
+    expect(STRIP_HEIGHT).toBe(30);
+    expect(STRIP_HEIGHT).toBeGreaterThan(DRAG_BAND_HEIGHT);
   });
 });
 

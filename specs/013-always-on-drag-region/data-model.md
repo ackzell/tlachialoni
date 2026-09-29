@@ -25,7 +25,7 @@ The permanent, transparent top region of the shell overlay.
 
 | Attribute | Value | Notes |
 | --- | --- | --- |
-| Height | `DRAG_BAND_HEIGHT` = 36px | Equals the strip height; a CSS value and a main constant that must agree |
+| Height | `DRAG_BAND_HEIGHT` = 10px | Thin, so the guest page stays clickable just below the top edge; also the pointer-proximity trigger |
 | Width | window content width | Full width, including above docked DevTools |
 | Painted | none | Satisfies FR-003 / SC-004 |
 | Draggable | yes (`app-region: drag`) | The whole band; controls are `no-drag` |
@@ -33,7 +33,9 @@ The permanent, transparent top region of the shell overlay.
 
 ### Strip surface
 
-The visible strip (target + controls) inside the band. Derived, not stored:
+The visible strip (target + controls). It is taller than the always-on band, so while
+it is shown the shell overlay is resized to `STRIP_HEIGHT` (30px) and falls back to
+`DRAG_BAND_HEIGHT` when it is dismissed. Visibility is derived, not stored:
 
 ```text
 stripSurfaceVisible = (stripVisible || peeking) && !paletteOpen
@@ -68,7 +70,8 @@ The pure tracker receives one sample per tick and returns the new `peeking` valu
 
 | Constant | Value | Requirement |
 | --- | --- | --- |
-| `bandHeight` | 36 | FR-001 |
+| `bandHeight` | 10 | FR-001 |
+| `stripHeight` | 30 | FR-004 (the overlay grows to this while the strip is shown) |
 | `proximity` | 4px | FR-004 (spec Q1 A) |
 | `dwellMs` | 400 | FR-004 (spec Q1 A) |
 | `graceMs` | 600 | FR-005 (spec Q1 A) |
@@ -89,7 +92,7 @@ The pure tracker receives one sample per tick and returns the new `peeking` valu
                      (paused clears peek and resets timers)
 
   hidden  : strip not shown unless pinned
-  peeking : strip shown; stays while inBand/atEdge, dismisses graceMs after leaving
+  peeking : strip shown; stays while in the band or on the strip, dismisses graceMs after leaving
   dragging: a window move holds the current strip state (no reveal, no dismissal)
 ```
 
@@ -115,4 +118,6 @@ Transitions and effects:
 - `peeking` never changes any persisted field.
 - The renderer's `DragStrip` presence and the native traffic lights derive from the
   same predicate, so they cannot disagree.
-- The guest page is never read or modified by any of the above.
+- The shell overlay is sized to `STRIP_HEIGHT` while the strip surface is visible (and
+  no full-window surface is up) and to `DRAG_BAND_HEIGHT` otherwise; the guest page is
+  never read or modified by any of the above.
