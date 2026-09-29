@@ -199,11 +199,14 @@ export class AppWindow {
       this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
       this.noteWindowMoved();
     });
-    // Pointer proximity only matters for the focused, on-screen window
-    // (specs/013): start the sampler on focus, stop it when it can't matter.
+    // Keep the proximity sampler alive for the window's lifetime. macOS moves a
+    // window to another Space without reliably re-emitting focus/show, so an
+    // earlier revision that stopped on blur/hide left the strip unrevealed after
+    // a Space change until the window was refocused. Each tick pauses itself when
+    // the window is hidden or unfocused, so a live timer costs nothing.
     this.win.on("focus", () => this.startProximity());
-    this.win.on("blur", () => this.stopProximity());
-    this.win.on("hide", () => this.stopProximity());
+    this.win.on("show", () => this.startProximity());
+    this.win.on("restore", () => this.startProximity());
     this.win.on("close", () => {
       this.store.patchWindow(this.windowId, {
         bounds: this.win.getBounds(),
@@ -918,7 +921,7 @@ export class AppWindow {
 
   /** Starts sampling the pointer for the band; safe to call repeatedly. */
   private startProximity(): void {
-    if (this.proximityTimer || this.win.isDestroyed() || !this.win.isVisible()) return;
+    if (this.proximityTimer || this.win.isDestroyed()) return;
     this.proximityTimer = setInterval(() => this.sampleProximity(), PROXIMITY_POLL_MS);
     this.sampleProximity();
   }
@@ -935,6 +938,12 @@ export class AppWindow {
   private sampleProximity(): void {
     if (this.win.isDestroyed()) {
       this.stopProximity();
+      return;
+    }
+    // A hidden or minimized window has nothing to sense; clear and wait.
+    if (!this.win.isVisible()) {
+      this.proximity.reset();
+      this.setPeek(false);
       return;
     }
     this.setPeek(

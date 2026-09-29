@@ -118,17 +118,19 @@ items that must be retired before UI work.
 
 ## 8. Lifecycle, pause, and multi-window safety
 
-- **Decision**: the sensor interval runs only while the window is focused and
-  visible; it is stopped on blur/hide and on close. Each tick computes a `paused`
-  flag (palette, loading, failure, extension status, or dev preview) and a separate
-  `dragging` flag (true for ≤200ms after a `move`). When paused, peek clears and the
-  tracker resets; when dragging, the tracker holds the current peek state (it neither
-  reveals a hidden strip nor dismisses a visible one), then normal pointer rules
-  resume once the drag settles. Every window owns its own tracker and peek flag.
-- **Rationale**: FR-009/FR-010 require the sensing to be confined to the window and
-  to stop doing work when it cannot matter. Holding the state during a drag (FR-016)
-  keeps a visible titlebar from flashing closed while the window is moved, without
-  making a drag spawn a titlebar that was hidden.
+- **Decision**: the sensor interval runs for the window's lifetime and is cleared
+  only on close. Each tick pauses itself when the window is hidden or unfocused, and
+  also while a full surface (palette, loading, failure, extension status, dev
+  preview) is up; a separate `dragging` flag is true for ≤200ms after a `move`. When
+  paused, peek clears and the tracker resets; when dragging, the tracker holds the
+  current peek state (it neither reveals a hidden strip nor dismisses a visible one),
+  then normal pointer rules resume once the drag settles. Every window owns its own
+  tracker and peek flag.
+- **Rationale**: macOS moves a window to another Space without reliably re-emitting
+  `focus`/`show`, so tearing the sampler down on `blur`/`hide` left the strip
+  permanently unrevealed after a Space change until the window was refocused. Keeping
+  one cheap timer alive and pausing inside the tick is self-healing and still costs
+  nothing while the window is hidden or unfocused.
 - **Alternatives considered**: keep the interval always running and let the tracker
   ignore inputs (rejected: pointless wakeups for a background window); force the
   strip revealed during a drag (rejected by the user: a drag must not create a

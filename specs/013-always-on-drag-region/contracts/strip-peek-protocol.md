@@ -80,9 +80,11 @@ Behavior (constants: `proximity` 4, `dwellMs` 400, `graceMs` 600):
 
 ## Main lifecycle contract
 
-- The polling interval (`pollMs` = 150) runs only while the window is focused and
-  visible; it is cleared on blur, hide, and close, and never runs for a destroyed
-  window.
+- The polling interval (`pollMs` = 150) runs for the window's lifetime and is
+  cleared only on close; each tick pauses itself when the window is hidden or
+  unfocused, and it never runs for a destroyed window. It is deliberately not
+  stopped on blur/hide, so moving the window to another macOS Space cannot leave the
+  strip permanently unrevealed.
 - `paused` is true when any of: the window is not focused; or the palette, loading
   veil, failure view, extension status, or a dev preview is active.
 - `dragging` is true for 200ms after a window `move`; while true the tracker holds

@@ -108,8 +108,8 @@ npm run typecheck  # explicit TS pass across node/preload/web
 1. With the window focused and the strip hidden, leave it idle and sample CPU for a
    minute; the app's idle CPU must be indistinguishable from the pre-feature
    baseline (no per-frame work).
-2. Blur the window and confirm the sensor's interval stops (no further wakeups from
-   this feature).
+2. Blur the window and confirm the feature stops sensing (peek clears and no reveal
+   happens) without needing the timer torn down.
 
 ### S11 — Spike outcomes (M0)
 
@@ -123,6 +123,14 @@ npm run typecheck  # explicit TS pass across node/preload/web
 1. `npm run test` — `ProximityTracker` cases and the updated predicate cases pass.
 2. `npm run check` — format, lint, and type checks green.
 3. `npm run typecheck` — node, preload, and web configurations clean.
+
+### S13 — Space change keeps the reveal (FR-009 edge)
+
+1. With the strip hidden, move the window to another macOS Space (drag it to the
+   screen edge, or use Mission Control).
+2. On the new Space, hover the top band; the strip peeks. It no longer requires
+   leaving and returning to the old Space first.
+3. Move the window back and re-check both Spaces.
 
 ## Results recording
 
@@ -147,3 +155,4 @@ before commit.
 | S10 | FR-010, SC-007 |
 | S11 | FR-013 (spike), SC-002 |
 | S12 | Development Workflow gate (`vp check` / `vp test`) |
+| S13 | FR-009 (Spaces edge case) |

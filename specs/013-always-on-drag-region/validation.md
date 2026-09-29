@@ -10,7 +10,7 @@
 | Types (main) | `npm run typecheck:node` | PASS |
 | Types (preload) | `npm run typecheck:preload` | PASS |
 | Types (renderer) | `npm run typecheck:web` | PASS |
-| Unit tests | `npm run test` | PASS — 136 tests / 10 files, including `tests/unit/proximity.test.ts` (10) and `tests/unit/shell.test.ts` (10) |
+| Unit tests | `npm run test` | PASS — 141 tests / 10 files, including `tests/unit/proximity.test.ts` (15) and `tests/unit/shell.test.ts` (10) |
 | Format + lint | `npm run check` | PASS (70 files formatted, 0 warnings/errors) |
 | Build | `npm run build` | PASS — main, preload, and renderer bundles produced |
 
@@ -36,6 +36,22 @@ this environment. Scenarios are defined in `quickstart.md`.
 | S9 — Drag holds the current titlebar state | FR-016 | PENDING manual |
 | S10 — Resource baseline | FR-010, SC-007 | PENDING manual |
 | S11 — Spike outcomes | FR-013, SC-002 | PENDING manual (T001) |
+| S13 — Space change keeps the reveal | FR-009 Spaces edge | PENDING manual |
+
+## Fix log
+
+- **Space change stopped the reveal (found in use, fixed).** Moving the window to
+  another macOS Space fired `blur` (and sometimes `hide`) on the window, which
+  stopped the proximity sampler; it only recovered when the window was refocused.
+  The sampler is now kept alive for the window's lifetime and pauses itself per
+  tick, so a Space change can no longer leave the strip unrevealed (`window.ts`).
+
+## Known platform behavior
+
+- macOS does not restore a window to the Space it was on before quitting; restored
+  windows open on the currently active Space. There is no public API to assign a
+  window to a specific existing Space (`setVisibleOnAllWorkspaces` only makes it
+  appear everywhere), so this is a platform limitation unrelated to this feature.
 
 ## Spike notes (T001)
 

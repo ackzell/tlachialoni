@@ -159,6 +159,8 @@ window zooms; double-click again and confirm it restores.
   under `prefers-reduced-motion`, and interaction is never blocked by motion.
 - **Fullscreen**: macOS manages window controls in fullscreen; the band and its
   sensing re-apply when leaving fullscreen.
+- **Spaces**: moving the window to another macOS Space does not stop the hover
+  reveal; the strip still peeks when the pointer reaches the top band.
 - **Pointer leaves via another display edge or a fast flick**: dismissal uses a
   grace period so an accidental exit does not flash the strip; a fast exit still
   hides it.
