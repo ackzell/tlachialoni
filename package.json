@@ -12,6 +12,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "screenshots": "electron-vite build && TLACHIALONI_SCREENSHOTS=1 TLACHIALONI_SCREENSHOTS_DEBUG=1 electron .",
     "package": "electron-vite build && electron-builder --mac",
     "package:mac": "electron-builder --mac",
     "tag:first": "commit-and-tag-version --first-release -- --no-verify",

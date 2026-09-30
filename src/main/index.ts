@@ -10,6 +10,7 @@ import { WindowManager } from "./shell/window-manager";
 import { registerIpc } from "./ipc";
 import type { AppWindow } from "./shell/window";
 import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-test";
+import { runScreenshots, seedScreenshotState } from "./screenshots";
 
 /**
  * App identity. The development Dock icon and the About panel use the same
@@ -35,7 +36,8 @@ function configureAppIdentity(): void {
 if (
   process.env.TLACHIALONI_DOCK_TEST === "1" ||
   process.env.TLACHIALONI_UI_SNAPSHOT === "1" ||
-  process.env.TLACHIALONI_EXTENSION_TEST === "1"
+  process.env.TLACHIALONI_EXTENSION_TEST === "1" ||
+  process.env.TLACHIALONI_SCREENSHOTS === "1"
 ) {
   app.setPath("userData", path.join(os.tmpdir(), `tlachialoni-docktest-${process.pid}`));
 }
@@ -224,6 +226,11 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
 
 app.whenReady().then(async () => {
   configureAppIdentity();
+  // Dev-only: seed a deterministic frame and sample history before the store is
+  // built, so the capture run never depends on (or touches) real state.
+  if (process.env.TLACHIALONI_SCREENSHOTS === "1") {
+    seedScreenshotState(app.getPath("userData"));
+  }
   const { manager, windows } = await boot();
   // Quitting closes every window; keep their records so the workspace restores.
   // A window closed by the user (⌘W) still removes its record on its own.
@@ -242,6 +249,9 @@ app.whenReady().then(async () => {
     else app.exit(0);
   } else if (process.env.TLACHIALONI_UI_SNAPSHOT === "1") {
     await runUiSnapshot(primary);
+    app.exit(0);
+  } else if (process.env.TLACHIALONI_SCREENSHOTS === "1") {
+    await runScreenshots(primary);
     app.exit(0);
   } else if (process.env.TLACHIALONI_EXTENSION_TEST === "1") {
     await runExtensionSelfTest(primary);
