@@ -1,4 +1,5 @@
 import { ipcRenderer } from "electron";
+import { observePageScrollEdge } from "./scroll-edge";
 
 /**
  * Site bridge. Runs in the guest's isolated world; it never exposes anything to
@@ -70,6 +71,14 @@ function disarm(): void {
 ipcRenderer.on("picker:armed", (_event, payload: { armed?: boolean }) => {
   if (payload?.armed) arm();
   else disarm();
+});
+
+// Trackpad history swipe (specs/015, native path). The native addon reads the
+// scroll stream directly; what it cannot know is whether the page under the
+// pointer has anywhere left to scroll, because a swipe is answered while its
+// scroll event waits to be delivered. This keeps main told of that state.
+observePageScrollEdge((pageScrollEdge) => {
+  ipcRenderer.send("page:scroll-edge", pageScrollEdge);
 });
 
 // Editable-focus tracking for the ⌘← / ⌘→ guard.

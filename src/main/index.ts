@@ -7,6 +7,7 @@ import { formatReleaseDate } from "@shared/release";
 import { StateStore } from "./state/store";
 import { ExtensionManager } from "./extensions/manager";
 import { WindowManager } from "./shell/window-manager";
+import { swipeNavigation } from "./shell/swipe/navigation";
 import { registerIpc } from "./ipc";
 import type { AppWindow } from "./shell/window";
 import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-test";
@@ -190,6 +191,10 @@ function installMenu(manager: WindowManager): void {
           label: "Preview Extension Install",
           click: () => manager.focused()?.previewExtensionStatus(),
         },
+        {
+          label: "Preview History Navigation",
+          click: () => manager.focused()?.previewHistoryArm(),
+        },
         { type: "separator" },
         {
           label: "Stop Preview",
@@ -226,6 +231,9 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
 
 app.whenReady().then(async () => {
   configureAppIdentity();
+  // Start the process-wide trackpad swipe monitor (macOS only; a missing addon
+  // leaves swiping off and everything else working).
+  swipeNavigation.start();
   // Dev-only: seed a deterministic frame and sample history before the store is
   // built, so the capture run never depends on (or touches) real state.
   if (process.env.TLACHIALONI_SCREENSHOTS === "1") {

@@ -1,7 +1,7 @@
 import { ipcMain, type WebContents } from "electron";
 import type { WindowManager } from "./shell/window-manager";
 import type { ColorMode, VariantSlug } from "./state/schema";
-
+import type { PageScrollEdge } from "@shared/scroll-edge";
 /**
  * Installs the typed IPC surface described in
  * `specs/012-multi-window/contracts/ipc-routing.md`.
@@ -68,6 +68,10 @@ export function registerIpc(manager: WindowManager): void {
 
   ipcMain.on("site:focus-editable", (event, payload: { editable: boolean }) => {
     resolve(event.sender)?.setEditableFocused(payload.editable);
+  });
+
+  ipcMain.on("page:scroll-edge", (event, payload: PageScrollEdge) => {
+    resolve(event.sender)?.setPageScrollEdge(payload);
   });
 
   ipcMain.on("picker:picked", (event, payload: { x: number; y: number }) => {

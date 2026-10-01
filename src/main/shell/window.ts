@@ -21,13 +21,17 @@ import {
   isStripSurfaceVisible,
 } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
+import { isHistoryArmedVisible, type HistoryArmed } from "@shared/history";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
 import { framesEqual } from "./geometry";
 import { DevToolsController, type SurfaceState } from "./devtools";
 import { PickerController } from "./picker";
+import { installGestureProbe, type GestureProbeHandle } from "./gesture-probe";
 import { ProximityTracker } from "./proximity";
 import { CommandRegistry, type CommandResult } from "./commands";
+import { swipeNavigation, type SwipeWindow } from "./swipe/navigation";
+import { PAGE_AT_BOTH_EDGES, type PageScrollEdge } from "@shared/scroll-edge";
 
 /** How long main waits for the renderer settle ack before collapsing anyway. */
 const SHELL_SETTLE_TIMEOUT_MS = 500;
@@ -63,7 +67,7 @@ export interface AppWindowOptions {
   onClosed?: () => void;
 }
 
-export class AppWindow {
+export class AppWindow implements SwipeWindow {
   readonly win: BaseWindow;
   readonly store: StateStore;
   readonly extensions: ExtensionManager;
@@ -99,7 +103,15 @@ export class AppWindow {
   private extensionStatus: ExtensionStatus | null = null;
   private statusDemoTimer: NodeJS.Timeout | null = null;
   /** Dev-only: a transient shell surface being previewed (see specs/008). */
-  private devPreview: "loading" | "failure" | null = null;
+  private devPreview: "loading" | "failure" | "history" | null = null;
+  /** TEMPORARY: the specs/015 M0 spike probe; absent unless debugging is on. */
+  private gestureProbe: GestureProbeHandle | null = null;
+  /** The live armed signal driving the edge overlay (specs/015). */
+  private historyArmed: HistoryArmed | null = null;
+  /** Dev-only: keeps the armed overlay cycling for styling. */
+  private historyPreviewTimer: NodeJS.Timeout | null = null;
+  /** Latest report of what the page under the pointer can still scroll. */
+  private scrollEdge: PageScrollEdge = PAGE_AT_BOTH_EDGES;
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
@@ -160,7 +172,17 @@ export class AppWindow {
     );
     this.picker = new PickerController(() => this.siteView, this.devtools);
 
+    // Register with the process-wide swipe controller; a scroll event is matched
+    // to this window by its native handle (specs/015, native path).
+    swipeNavigation.register(this);
+
     this.registerCommands();
+
+    // TEMPORARY: the specs/015 M0 spike probe. Observes only; see
+    // src/main/shell/gesture-probe.ts. Deleted once research.md §10 records it.
+    if (process.env["TLACHIALONI_GESTURE_DEBUG"] === "1") {
+      this.gestureProbe = installGestureProbe(this.win, this.siteView, "site");
+    }
 
     this.wireEvents();
     this.relayout();
@@ -250,6 +272,10 @@ export class AppWindow {
     this.win.on("closed", () => {
       this.clearPendingSettle();
       this.clearStatusDemo();
+      this.clearHistoryPreview();
+      this.gestureProbe?.dispose();
+      this.gestureProbe = null;
+      swipeNavigation.unregister(this);
       this.stopProximity();
       this.clearDragSuppress();
       this.devtools.dispose();
@@ -269,18 +295,21 @@ export class AppWindow {
     this.siteView.webContents.on("before-input-event", this.handleInput);
     this.shellView.webContents.on("before-input-event", this.handleInput);
 
-    // Mouse back/forward buttons. On Windows/Linux the OS surfaces them as app
-    // commands; on macOS mouse drivers (Logitech Options+ and friends) deliver
-    // the thumb buttons as synthesized swipe events, the same way Safari and
-    // Chrome receive them, so a swipe navigates history.
+    // Two-finger history gesture (specs/015). Driven entirely by wheel events
+    // from the preload: the machine manages its own lifecycle via idle timing,
+    // so there is no dependency on input-event gesture phases (which are
+    // unreliable on some MacBooks — missing, late, or out-of-order).
+    // Mouse back/forward thumb buttons. The trackpad swipe is handled entirely
+    // by the native addon (see swipe/navigation.ts); the OS `swipe` event is
+    // intentionally not used, so one physical swipe can never navigate twice.
     this.win.on("app-command", (_event, command) => {
       if (command === "browser-backward") void this.commands.run("view.back");
       else if (command === "browser-forward") void this.commands.run("view.forward");
     });
-    this.win.on("swipe", (_event, direction) => {
-      if (direction === "left") void this.commands.run("view.back");
-      else if (direction === "right") void this.commands.run("view.forward");
-    });
+
+    // A gesture is meaningless once the window is gone or unfocused.
+    this.win.on("blur", () => this.clearHistoryArm());
+    this.win.on("hide", () => this.clearHistoryArm());
 
     // While focus is inside DevTools, key events go there — attach the same
     // dispatcher so shortcuts keep working from the DevTools panel too.
@@ -453,11 +482,24 @@ export class AppWindow {
     this.startExtensionStatusDemo();
   }
 
+  /**
+   * Dev-only: holds the armed history overlay on screen, alternating Back and
+   * Forward, so its look and motion can be iterated with live HMR (specs/008).
+   * The swipe detector itself is not wired up yet; this previews the surface.
+   */
+  previewHistoryArm(): void {
+    this.enterDevPreview();
+    this.devPreview = "history";
+    this.startHistoryPreview();
+    this.relayout();
+  }
+
   /** Dev-only: clears whichever surface is being previewed. */
   stopSurfacePreview(): void {
     this.exitDevPreview();
     this.clearStatusDemo();
     this.dismissExtensionStatus();
+    this.clearHistoryPreview();
     this.relayout(true);
   }
 
@@ -466,6 +508,7 @@ export class AppWindow {
     this.exitDevPreview();
     this.clearStatusDemo();
     this.dismissExtensionStatus();
+    this.clearHistoryPreview();
   }
 
   /** Restores the renderer signals a loading/failure preview overrode. */
@@ -478,9 +521,138 @@ export class AppWindow {
         loading: false,
         url: this.requestedTarget ?? this.currentUrl,
       });
-    } else {
+    } else if (preview === "failure") {
       this.sendToShell("viewport:ready", { url: this.currentUrl });
+    } else {
+      // The history preview never overrode a viewport signal; just drop the arm.
+      this.clearHistoryPreview();
     }
+  }
+
+  // ---- two-finger history swipe (specs/015, native path) ----------------
+
+  /** Latest report of what the page under the pointer can still scroll. */
+  setPageScrollEdge(edge: PageScrollEdge): void {
+    this.scrollEdge = edge;
+  }
+
+  /**
+   * The window-side half of the swipe integration (see swipe/navigation.ts). The
+   * native addon owns the gesture; these answer its questions and apply its
+   * outcome.
+   */
+  nativeHandle(): Buffer {
+    return this.win.getNativeWindowHandle();
+  }
+
+  pageScrollEdge(): PageScrollEdge {
+    return this.scrollEdge;
+  }
+
+  isDevToolsFocused(): boolean {
+    const devtools = this.siteView.webContents.devToolsWebContents;
+    return (
+      this.devtools.isOpen() &&
+      devtools !== null &&
+      !devtools.isDestroyed() &&
+      webContents.getFocusedWebContents() === devtools
+    );
+  }
+
+  /** The DevTools panel's bounds, when docked beside or below the page. */
+  isPointerOverDevTools(x: number, y: number): boolean {
+    if (!this.devtools.isOpen()) return false;
+    const { width, height } = this.win.getContentBounds();
+    // DevTools always takes a band along one edge; the page keeps the rest.
+    // Without a public API for the panel's exact frame, use the dock side to
+    // decide the band that cannot be the page. Conservative: a pointer in that
+    // band is treated as over DevTools.
+    const dock = this.record()?.dockMode ?? "bottom";
+    if (dock === "bottom") return y >= height * 0.5;
+    if (dock === "right") return x >= width * 0.5;
+    return x < width * 0.5;
+  }
+
+  canGoBack(): boolean {
+    return this.siteView.webContents.navigationHistory.canGoBack();
+  }
+
+  canGoForward(): boolean {
+    return this.siteView.webContents.navigationHistory.canGoForward();
+  }
+
+  siteWebContentsId(): number {
+    return this.siteView.webContents.id;
+  }
+
+  /** A gesture advanced: show/refresh the armed edge overlay. */
+  onSwipeProgress(action: "back" | "forward", progress: number): void {
+    if (this.gesturePaused()) {
+      this.clearHistoryArm();
+      return;
+    }
+    this.setHistoryArmed({ direction: action, progress });
+  }
+
+  /** A gesture ended: clear the overlay and, when committed, move history. */
+  onSwipeEnd(action: "back" | "forward", committed: boolean): void {
+    this.setHistoryArmed(null);
+    if (!committed) return;
+    void this.commands.run(action === "back" ? "view.back" : "view.forward");
+  }
+
+  /** True while a surface that owns input is up; the overlay stays out of the way. */
+  private gesturePaused(): boolean {
+    return (
+      this.paletteOpen ||
+      this.showLoading ||
+      this.failed ||
+      this.extensionStatus !== null ||
+      this.devPreview !== null ||
+      this.picker.isArmed()
+    );
+  }
+
+  /** Drops the armed overlay (focus loss, a surface opening, teardown). */
+  private clearHistoryArm(): void {
+    if (this.historyArmed === null) return;
+    this.setHistoryArmed(null);
+  }
+
+  /**
+   * Records the armed signal and mirrors it to the shell. Growing to `full` so
+   * the edge overlay can paint is immediate; clearing defers the shrink so the
+   * overlay's leave is not cut (the settle protocol, like the strip and palette).
+   */
+  private setHistoryArmed(next: HistoryArmed | null): void {
+    const visibilityChanged =
+      (next === null) !== (this.historyArmed === null) ||
+      (next?.direction ?? null) !== (this.historyArmed?.direction ?? null);
+    this.historyArmed = next;
+    this.sendToShell("history:armed", next);
+    if (visibilityChanged) this.relayout(next === null);
+  }
+
+  /** Dev-only: alternates the armed direction so both edges can be styled. */
+  private startHistoryPreview(): void {
+    this.clearHistoryPreview();
+    const directions: Array<"back" | "forward"> = ["back", "forward"];
+    let index = 0;
+    const tick = (): void => {
+      const direction = directions[index % directions.length];
+      index += 1;
+      this.setHistoryArmed({ direction, progress: 0.6 });
+    };
+    tick();
+    this.historyPreviewTimer = setInterval(tick, 1600);
+  }
+
+  private clearHistoryPreview(): void {
+    if (this.historyPreviewTimer) {
+      clearInterval(this.historyPreviewTimer);
+      this.historyPreviewTimer = null;
+    }
+    this.setHistoryArmed(null);
   }
 
   /**
@@ -688,6 +860,7 @@ export class AppWindow {
     this.reportLoading(false);
     this.sendToShell("viewport:ready", { url });
     this.broadcastState();
+    this.reportHistoryAvailability();
     // The veil's fade-out happens in the renderer; hold the collapse for it.
     this.relayout(veilWasUp);
   }
@@ -699,6 +872,12 @@ export class AppWindow {
    */
   private handleNavigated(url: string): void {
     this.picker.invalidate();
+    // Any navigation — including the one a committed swipe just triggered, or one
+    // from a link or the palette — drops the armed overlay (specs/015).
+    this.clearHistoryArm();
+    // History moved (or a fresh load replaced the stack): refresh the strip's
+    // back/forward availability before the early return below.
+    this.reportHistoryAvailability();
     if (!url || url === this.currentUrl) return;
     this.currentUrl = url;
     this.shownUrl = url;
@@ -869,6 +1048,19 @@ export class AppWindow {
     this.sendToShell("state:changed", this.getState());
   }
 
+  /**
+   * Pushes whether history can move in each direction, so the strip's back and
+   * forward buttons can disable themselves. Transient (never persisted): it
+   * tracks the live guest navigation stack.
+   */
+  private reportHistoryAvailability(): void {
+    const history = this.siteView.webContents.navigationHistory;
+    this.sendToShell("history:availability", {
+      canGoBack: history.canGoBack(),
+      canGoForward: history.canGoForward(),
+    });
+  }
+
   private sendToShell(channel: string, payload?: unknown): void {
     if (!this.shellLoaded) {
       this.pendingShellMessages.push([channel, payload]);
@@ -893,6 +1085,8 @@ export class AppWindow {
     this.broadcastState();
     // Start the renderer in sync with the current transient reveal.
     this.sendToShell("strip:peek", this.peek);
+    this.sendToShell("history:armed", this.historyArmed);
+    this.reportHistoryAvailability();
     this.applyTheme();
     this.pickerDisarm();
     // A brand-new window starts blank and offers the location entry (FR-011).
@@ -918,6 +1112,9 @@ export class AppWindow {
       this.failed ||
       this.extensionStatus ||
       this.devPreview ||
+      // An armed history signal paints a full-height edge overlay, so the shell
+      // must span the window to host it (specs/015).
+      isHistoryArmedVisible(this.historyArmed, this.paletteOpen) ||
       // A blank window (no target yet) keeps the shell full-window so its
       // watermark backdrop stays painted even after the location palette is
       // dismissed; the band would clip it to the top strip.
