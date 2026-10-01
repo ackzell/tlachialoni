@@ -156,6 +156,8 @@ See:
 - `specs/013-always-on-drag-region/spec.md` — always-draggable window with a hover-revealed strip
 - `specs/014-blank-watermark/spec.md` — the logo watermark on a blank, never-loaded window
 - `specs/015-trackpad-swipe-navigation/spec.md` — two-finger swipe history navigation
+- `specs/017-macos-dock-menu/spec.md` — the macOS Dock window menu and Dock-icon behavior
+  (macOS now stays open when the last window closes, so the Dock stays available)
 
 ## License
 

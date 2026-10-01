@@ -244,6 +244,9 @@ app.whenReady().then(async () => {
   // Quitting closes every window; keep their records so the workspace restores.
   // A window closed by the user (⌘W) still removes its record on its own.
   app.on("before-quit", () => manager.beginQuit());
+  // A Dock-icon click (or a re-launch) raises an existing window, or opens one
+  // when the app is running with none (specs/017-macos-dock-menu, FR-007/FR-008).
+  app.on("activate", () => manager.activate());
   const primary = windows[0] ?? manager.focused();
 
   // Dev-only: start the looping install status so the surface can be styled.
@@ -267,4 +270,9 @@ app.whenReady().then(async () => {
   }
 });
 
-app.on("window-all-closed", () => app.quit());
+// macOS keeps the app resident after the last window closes so the Dock icon
+// and its menu stay available; a later Dock click reopens a window
+// (specs/017-macos-dock-menu, FR-009). Every other platform keeps quitting.
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
