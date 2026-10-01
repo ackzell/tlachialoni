@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
 import vue from "@vitejs/plugin-vue";
+import { buildSwipeNavigationAddon } from "./scripts/build-native.mjs";
 
 /**
  * Resolves the release date baked into the main bundle for the About panel
@@ -31,39 +32,45 @@ function resolveReleaseDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default defineConfig({
-  main: {
-    define: {
-      __APP_RELEASE_DATE__: JSON.stringify(resolveReleaseDate()),
-    },
-    resolve: {
-      alias: {
-        "@shared": resolve(__dirname, "src/shared"),
+export default defineConfig(async () => {
+  // Compile the swipe addon before the main bundle. macOS-only; a dev run
+  // without it starts without swipe navigation, a packaged build fails loudly.
+  await buildSwipeNavigationAddon({ dev: Boolean(process.env.ELECTRON_RENDERER_URL) });
+
+  return {
+    main: {
+      define: {
+        __APP_RELEASE_DATE__: JSON.stringify(resolveReleaseDate()),
       },
-    },
-  },
-  preload: {
-    resolve: {
-      alias: {
-        "@shared": resolve(__dirname, "src/shared"),
-      },
-    },
-    build: {
-      rollupOptions: {
-        input: {
-          shell: resolve(__dirname, "src/preload/shell.ts"),
-          site: resolve(__dirname, "src/preload/site.ts"),
+      resolve: {
+        alias: {
+          "@shared": resolve(__dirname, "src/shared"),
         },
       },
     },
-  },
-  renderer: {
-    resolve: {
-      alias: {
-        "@renderer": resolve(__dirname, "src/renderer/src"),
-        "@shared": resolve(__dirname, "src/shared"),
+    preload: {
+      resolve: {
+        alias: {
+          "@shared": resolve(__dirname, "src/shared"),
+        },
+      },
+      build: {
+        rollupOptions: {
+          input: {
+            shell: resolve(__dirname, "src/preload/shell.ts"),
+            site: resolve(__dirname, "src/preload/site.ts"),
+          },
+        },
       },
     },
-    plugins: [vue()],
-  },
+    renderer: {
+      resolve: {
+        alias: {
+          "@renderer": resolve(__dirname, "src/renderer/src"),
+          "@shared": resolve(__dirname, "src/shared"),
+        },
+      },
+      plugins: [vue()],
+    },
+  };
 });

@@ -23,6 +23,11 @@ files:
 
 asar: true
 
+# The swipe-navigation addon is compiled to out/native; electron-builder must
+# ship it unpacked so Electron's asar layer can dlopen it.
+asarUnpack:
+  - out/native/**
+
 mac:
   category: public.app-category.developer-tools
   icon: resources/icon.icns

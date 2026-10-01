@@ -24,6 +24,7 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:preload && npm run typecheck:web",
     "test": "vp test",
+    "probe:gesture": "TLACHIALONI_GESTURE_DEBUG=1 electron-vite dev",
     "check": "vp check",
     "check:fix": "vp check --fix"
   },
