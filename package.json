@@ -1,6 +1,6 @@
 {
   "name": "tlachialoni",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "A chromeless localhost browser with docked Chromium DevTools",
   "author": {

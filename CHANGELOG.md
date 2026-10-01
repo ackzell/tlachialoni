@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.10](///compare/v0.1.9...v0.1.10) (2026-10-01)
+
+### Features
+
+* **dock:** native macOS Dock menu with origin-grouped recents (017) 23e3421
+* **extensions:** warn once on an MV3 service worker, then badge it (018) a1848d6
+* **shell:** titlebar mode docks the strip and pushes the page below (016) 59c5a6b
+
 ## [0.1.9](///compare/v0.1.8...v0.1.9) (2026-10-01)
 
 ### Features
