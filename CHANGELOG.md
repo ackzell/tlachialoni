@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.9](///compare/v0.1.8...v0.1.9) (2026-10-01)
+
+### Features
+
+* **screenshots:** capture the shell's states as shareable images 06e9292
+* **shell:** armed swipe overlay and history buttons in the strip 9213555
+* **swipe:** drive history from the native gesture, not the wheel relay 7afffcd
+* **swipe:** native macOS gesture addon and its build step 626d1bb
+
 ## [0.1.8](///compare/v0.1.7...v0.1.8) (2026-09-29)
 
 ### Bug Fixes
