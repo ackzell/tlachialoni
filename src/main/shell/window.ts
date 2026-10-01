@@ -19,6 +19,7 @@ import {
   STRIP_HEIGHT,
   isBlankSurfaceVisible,
   isStripSurfaceVisible,
+  titlebarInset,
 } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { isHistoryArmedVisible, type HistoryArmed } from "@shared/history";
@@ -193,6 +194,11 @@ export class AppWindow implements SwipeWindow {
 
   private record(): WindowRecord | null {
     return this.store.window(this.windowId);
+  }
+
+  /** Whether this window docks the strip permanently (specs/016). */
+  private titlebarActive(): boolean {
+    return this.record()?.titlebarMode ?? false;
   }
 
   /** This window's DevTools/strip state, backed by its persisted record. */
@@ -371,6 +377,7 @@ export class AppWindow implements SwipeWindow {
     commands.register("palette.openTheme", () => this.openPalette("", "theme"));
     commands.register("target.navigate", (arg) => this.navigate(String(arg ?? "")));
     commands.register("strip.toggle", () => this.toggleStrip());
+    commands.register("titlebar.toggle", () => this.toggleTitlebar());
     commands.register("view.reload", () => this.siteView.webContents.reload());
     commands.register("view.hardReload", () => this.siteView.webContents.reloadIgnoringCache());
     commands.register("view.back", () => {
@@ -986,11 +993,30 @@ export class AppWindow implements SwipeWindow {
   }
 
   private toggleStrip(): void {
+    // In titlebar mode the strip is already permanent (specs/016). Leave the
+    // persisted pin untouched so the overlay layout the developer had is exactly
+    // the one they get back when the mode ends.
+    if (this.titlebarActive()) return;
     const pinned = !(this.record()?.stripVisible ?? false);
     this.store.patchWindow(this.windowId, { stripVisible: pinned });
     // Pinning grows the overlay to the strip height; unpinning defers the shrink so
     // the renderer's leave animation is not cut (specs/013, settle protocol).
     // `relayout` refreshes the traffic lights off the shared predicate.
+    this.broadcastState();
+    this.relayout(true);
+  }
+
+  /**
+   * Toggles titlebar mode (specs/016): the strip docks permanently and the guest
+   * content is pushed below it. Enabling applies at once; disabling restores the
+   * page to full immediately while the shell's `strip -> band` shrink defers
+   * through the settle protocol so the strip's leave animation is not cut (the
+   * same path unpinning uses).
+   */
+  private toggleTitlebar(): void {
+    const next = !this.titlebarActive();
+    this.store.patchWindow(this.windowId, { titlebarMode: next });
+    if (next) this.setPeek(false);
     this.broadcastState();
     this.relayout(true);
   }
@@ -1126,7 +1152,11 @@ export class AppWindow implements SwipeWindow {
     // draggable and can sense a reveal; when the strip is pinned or peeking the
     // overlay grows just enough to paint it (specs/013).
     return isStripSurfaceVisible(
-      { stripVisible: this.record()?.stripVisible ?? false, peeking: this.peek },
+      {
+        stripVisible: this.record()?.stripVisible ?? false,
+        peeking: this.peek,
+        titlebarMode: this.titlebarActive(),
+      },
       this.paletteOpen,
     )
       ? "strip"
@@ -1145,7 +1175,11 @@ export class AppWindow implements SwipeWindow {
    */
   private syncWindowButtons(): void {
     const visible = isStripSurfaceVisible(
-      { stripVisible: this.record()?.stripVisible ?? false, peeking: this.peek },
+      {
+        stripVisible: this.record()?.stripVisible ?? false,
+        peeking: this.peek,
+        titlebarMode: this.titlebarActive(),
+      },
       this.paletteOpen,
     );
     if (visible === this.buttonsVisible) return;
@@ -1196,6 +1230,7 @@ export class AppWindow implements SwipeWindow {
   private proximityPaused(): boolean {
     return (
       !this.win.isFocused() ||
+      this.titlebarActive() ||
       this.paletteOpen ||
       this.showLoading ||
       this.failed ||
@@ -1248,7 +1283,11 @@ export class AppWindow implements SwipeWindow {
     if (this.win.isDestroyed()) return;
     this.syncWindowButtons();
     const { width, height } = this.win.getContentBounds();
-    this.siteView.setBounds({ x: 0, y: 0, width, height });
+    // Titlebar mode docks the strip and pushes the guest content (and any docked
+    // DevTools) below it, so the page viewport reflects the reduced height; the
+    // default overlay keeps the page full-bleed (specs/016).
+    const inset = titlebarInset(this.titlebarActive());
+    this.siteView.setBounds({ x: 0, y: inset, width, height: Math.max(0, height - inset) });
 
     const desired = this.desiredShellMode();
     const collapsing =

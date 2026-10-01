@@ -4,6 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { WebContentsView } from "electron";
+import { STRIP_HEIGHT } from "@shared/shell";
 import type { AppWindow } from "./shell/window";
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,12 +125,65 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
     const overlayDisarmed = await count();
     log.picker = { overlayArmed, overlayDisarmed };
 
+    // Titlebar mode (specs/016): the strip docks and pushes the guest content
+    // below it. The page must reflow (innerHeight drops by the inset), must not
+    // reload, and the strip must mount; toggling back restores the overlay.
+    wc.closeDevTools();
+    await wait(600);
+    const heightBeforeTitlebar = await measure();
+    await wc.executeJavaScript("window.__tlachialoniTitlebarSentinel = 42");
+    let titlebarReloaded = false;
+    const onTitlebarLoad = (): void => {
+      titlebarReloaded = true;
+    };
+    wc.on("did-start-loading", onTitlebarLoad);
+
+    await appWindow.runCommand("titlebar.toggle");
+    await wait(700);
+    const heightInTitlebar = await measure();
+    const siteBounds = appWindow.siteView.getBounds();
+    const sentinel = await wc.executeJavaScript("window.__tlachialoniTitlebarSentinel");
+    const titlebarStripMounted = (await appWindow.shellView.webContents.executeJavaScript(
+      "Boolean(document.querySelector('.strip'))",
+    )) as boolean;
+    wc.off("did-start-loading", onTitlebarLoad);
+
+    log.titlebar = {
+      siteTop: siteBounds.y,
+      siteHeight: siteBounds.height,
+      innerHeight: heightInTitlebar.innerHeight,
+      heightDrop: heightBeforeTitlebar.innerHeight - heightInTitlebar.innerHeight,
+      sentinel,
+      reloaded: titlebarReloaded,
+      stripMounted: titlebarStripMounted,
+    };
+
+    await appWindow.runCommand("titlebar.toggle");
+    await wait(700);
+    const restoredBounds = appWindow.siteView.getBounds();
+    log.titlebarRestored = { siteTop: restoredBounds.y, siteHeight: restoredBounds.height };
+
+    const titlebar = log.titlebar as {
+      siteTop: number;
+      heightDrop: number;
+      sentinel: unknown;
+      reloaded: boolean;
+      stripMounted: boolean;
+    };
+    const restored = log.titlebarRestored as { siteTop: number };
+
     log.pass =
       bottom.innerHeight < baseline.innerHeight &&
       right.innerWidth < baseline.innerWidth &&
       overlayArmed === 1 &&
       overlayDisarmed === 0 &&
-      Boolean((log.shortcutSite as { toggled: boolean }).toggled);
+      Boolean((log.shortcutSite as { toggled: boolean }).toggled) &&
+      titlebar.siteTop === STRIP_HEIGHT &&
+      titlebar.heightDrop === STRIP_HEIGHT &&
+      titlebar.sentinel === 42 &&
+      titlebar.reloaded === false &&
+      titlebar.stripMounted === true &&
+      restored.siteTop === 0;
   } catch (error) {
     log.error = String(error);
     log.pass = false;

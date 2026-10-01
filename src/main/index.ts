@@ -63,6 +63,7 @@ const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
       "view.hardReload",
       null,
       "strip.toggle",
+      "titlebar.toggle",
     ],
   },
   {

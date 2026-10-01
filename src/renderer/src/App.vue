@@ -31,11 +31,18 @@ const {
 } = useShell();
 
 // Main shows the native macOS traffic lights off the same predicate, so the
-// strip surface and its window controls stay in lockstep (specs/009, specs/013).
+// strip surface and its window controls stay in lockstep (specs/009, specs/013,
+// specs/016).
+const titlebar = computed(() => state.value?.titlebarMode ?? false);
+
 const stripVisible = computed(() =>
   state.value
     ? isStripSurfaceVisible(
-        { stripVisible: state.value.stripVisible, peeking: peeking.value },
+        {
+          stripVisible: state.value.stripVisible,
+          peeking: peeking.value,
+          titlebarMode: state.value.titlebarMode,
+        },
         paletteOpen.value,
       )
     : false,
@@ -59,7 +66,7 @@ const historyProgress = computed(() => historyArmed.value?.progress ?? 0);
 </script>
 
 <template>
-  <div class="shell-root">
+  <div class="shell-root" :class="{ 'is-titlebar': titlebar }">
     <BlankView v-if="blankVisible" />
 
     <Transition

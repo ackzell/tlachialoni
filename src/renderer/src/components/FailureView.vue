@@ -38,7 +38,10 @@ function goBack(): void {
 <style scoped>
 .failure {
   position: fixed;
-  inset: 0;
+  top: var(--shell-inset, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
   /* The shell root is pointer-transparent; an opaque full-window surface takes
      input back so it keeps swallowing the page behind it. */
   pointer-events: auto;

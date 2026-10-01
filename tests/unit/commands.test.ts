@@ -105,6 +105,28 @@ describe("command catalog", () => {
     };
     expect(commandForInput(input)?.id).toBe("window.new");
   });
+
+  it("binds ⇧⌘F to titlebar mode and lists it in the palette", () => {
+    const command = COMMANDS.find((entry) => entry.id === "titlebar.toggle");
+    expect(command).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⇧⌘F",
+      accelerator: { meta: true, shift: true, code: "KeyF" },
+    });
+    expect(PALETTE_COMMANDS.some((entry) => entry.id === "titlebar.toggle")).toBe(true);
+  });
+
+  it("matches titlebar mode from raw input", () => {
+    const input = {
+      type: "keyDown",
+      meta: true,
+      shift: true,
+      alt: false,
+      control: false,
+      code: "KeyF",
+    };
+    expect(commandForInput(input)?.id).toBe("titlebar.toggle");
+  });
 });
 
 describe("palette scopes", () => {

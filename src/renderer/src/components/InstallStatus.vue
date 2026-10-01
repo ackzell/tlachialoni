@@ -99,7 +99,10 @@ onBeforeUnmount(clearTimer);
 <style scoped>
 .status {
   position: fixed;
-  inset: 0;
+  top: var(--shell-inset, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;

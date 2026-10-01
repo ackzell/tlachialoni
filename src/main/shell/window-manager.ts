@@ -59,6 +59,7 @@ export class WindowManager {
       dockMode: "bottom",
       devtoolsOpen: false,
       stripVisible: false,
+      titlebarMode: false,
       variant: "obsidian",
       colorMode: "system",
     });
@@ -80,6 +81,9 @@ export class WindowManager {
       dockMode: parentRecord?.dockMode ?? "bottom",
       devtoolsOpen: false,
       stripVisible: false,
+      // A new window starts in the default overlay layout, regardless of the
+      // window it was opened from (specs/016, FR-008).
+      titlebarMode: false,
       // A new window inherits the focused window's theme.
       variant: parentRecord?.variant ?? "obsidian",
       colorMode: parentRecord?.colorMode ?? "system",

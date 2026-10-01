@@ -33,6 +33,7 @@ function record(id: string, overrides: Partial<WindowRecord> = {}): WindowRecord
     dockMode: "bottom",
     devtoolsOpen: false,
     stripVisible: false,
+    titlebarMode: false,
     variant: "obsidian",
     colorMode: "system",
     ...overrides,
@@ -122,6 +123,15 @@ describe("sanitizeWindows", () => {
     expect(sanitizeWindows([{ id: "a" }, { id: "a" }])).toHaveLength(1);
     const many = Array.from({ length: MAX_WINDOWS + 4 }, (_, i) => ({ id: `w${i}` }));
     expect(sanitizeWindows(many)).toHaveLength(MAX_WINDOWS);
+  });
+
+  it("defaults titlebarMode to false and preserves an explicit value", () => {
+    const windows = sanitizeWindows([
+      { id: "overlay" },
+      { id: "docked", titlebarMode: true },
+      { id: "garbage", titlebarMode: "yes" },
+    ]);
+    expect(windows.map((w) => w.titlebarMode)).toEqual([false, true, false]);
   });
 });
 
@@ -343,5 +353,27 @@ describe("StateStore window records", () => {
     // Theme is per-window: b keeps the default while a is jade.
     expect(b).toMatchObject({ target: null, devtoolsOpen: false, variant: "obsidian" });
     expect(a.recents).toEqual(b.recents);
+  });
+
+  it("keeps two windows' titlebar modes independent", () => {
+    const file = tmpFile();
+    const store = new StateStore(file);
+    store.upsertWindow(record("a", { titlebarMode: true }));
+    store.upsertWindow(record("b"));
+    store.patchWindow("b", { titlebarMode: false });
+
+    const windows = new StateStore(file).get().windows;
+    expect(windows.find((w) => w.id === "a")?.titlebarMode).toBe(true);
+    expect(windows.find((w) => w.id === "b")?.titlebarMode).toBe(false);
+  });
+
+  it("composes titlebarMode into the renderer view per window", () => {
+    const file = tmpFile();
+    const store = new StateStore(file);
+    store.upsertWindow(record("a", { titlebarMode: true }));
+    store.upsertWindow(record("b"));
+
+    expect(store.composeWindowView("a").titlebarMode).toBe(true);
+    expect(store.composeWindowView("b").titlebarMode).toBe(false);
   });
 });

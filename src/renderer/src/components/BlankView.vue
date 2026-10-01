@@ -20,7 +20,10 @@ import logoSvg from "../assets/logo.svg?raw";
 <style scoped>
 .blank {
   position: fixed;
-  inset: 0;
+  top: var(--shell-inset, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: center;

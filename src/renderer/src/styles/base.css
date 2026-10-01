@@ -31,4 +31,15 @@ button {
      not swallow input meant for the guest page beneath it; each interactive
      surface opts back in with `pointer-events: auto` (constitution I, FR-010). */
   pointer-events: none;
+  /* Inset of the full-window surfaces from the top of the window. Zero in the
+     default overlay, so surfaces cover the window; STRIP_HEIGHT while the strip
+     is docked as a title bar, so surface content sits below it (specs/016). */
+  --shell-inset: 0px;
+}
+
+/* Titlebar mode: the strip is a permanent docked title bar; the guest content
+   (a separate view) is inset in main by the same height, and full-window
+   surfaces here start below it. Keep in step with STRIP_HEIGHT. */
+.shell-root.is-titlebar {
+  --shell-inset: 30px;
 }

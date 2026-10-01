@@ -33,6 +33,7 @@ export interface WindowViewState {
   dockMode: WindowRecord["dockMode"];
   devtoolsOpen: boolean;
   stripVisible: boolean;
+  titlebarMode: boolean;
   variant: VariantSlug;
   colorMode: ColorMode;
   extensions: InstalledExtension[];
@@ -145,6 +146,7 @@ export class StateStore {
       dockMode: record?.dockMode ?? "bottom",
       devtoolsOpen: record?.devtoolsOpen ?? false,
       stripVisible: record?.stripVisible ?? false,
+      titlebarMode: record?.titlebarMode ?? false,
       variant: record?.variant ?? "obsidian",
       colorMode: record?.colorMode ?? "system",
       extensions: structuredClone(this.state.extensions),

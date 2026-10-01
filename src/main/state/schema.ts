@@ -50,6 +50,12 @@ export interface WindowRecord {
   dockMode: DockMode;
   devtoolsOpen: boolean;
   stripVisible: boolean;
+  /**
+   * Whether this window docks the strip as a permanent title bar and pushes the
+   * guest content below it (specs/016). Additive and defaulted to `false`, so an
+   * older document without the field reads as the default overlay layout.
+   */
+  titlebarMode: boolean;
   /** This window's Tlapalli mineral variant. */
   variant: VariantSlug;
   /**
@@ -101,6 +107,7 @@ export function defaultWindowRecord(): WindowRecord {
     dockMode: "bottom",
     devtoolsOpen: false,
     stripVisible: false,
+    titlebarMode: false,
     variant: "obsidian",
     colorMode: "system",
   };
@@ -173,6 +180,7 @@ export function sanitizeWindowRecord(raw: unknown): WindowRecord | null {
       : "bottom",
     devtoolsOpen: typeof record.devtoolsOpen === "boolean" ? record.devtoolsOpen : false,
     stripVisible: typeof record.stripVisible === "boolean" ? record.stripVisible : false,
+    titlebarMode: typeof record.titlebarMode === "boolean" ? record.titlebarMode : false,
     variant: sanitizeVariant(record.variant),
     colorMode: sanitizeColorMode(record.colorMode),
   };
@@ -217,6 +225,7 @@ function migrateLegacyWindow(input: Record<string, unknown>): WindowRecord {
       : "bottom",
     devtoolsOpen: typeof input.devtoolsOpen === "boolean" ? input.devtoolsOpen : true,
     stripVisible: typeof input.stripVisible === "boolean" ? input.stripVisible : false,
+    titlebarMode: false,
     // The old document's theme was app-wide; it becomes the migrated window's.
     variant: sanitizeVariant(input.variant),
     colorMode: sanitizeColorMode(input.colorMode),

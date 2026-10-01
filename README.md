@@ -17,6 +17,9 @@ The only UI is transient and keyboard-first:
 - Drag from the top of the window at any time, pointer only; hovering the top
   edge or resting there briefly reveals the strip
 - `⌘B` — pin the window strip on screen (and, with it, the macOS window controls)
+- `⇧⌘F` — toggle titlebar mode: the strip docks permanently as a title bar and the
+  page moves below it, so the target and controls are always visible without covering
+  the page
 - `⌘⌥J` — toggle DevTools; `⌘1/2/3` dock it bottom/right/left
 - `⌘J` — toggle keyboard focus between the page and DevTools
 - `⌘⇧C` — element picker with hover highlight

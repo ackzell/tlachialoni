@@ -27,10 +27,24 @@ export const STRIP_HEIGHT = 30;
 
 /** Whether the target `state` should have the strip surface on screen. */
 export function isStripSurfaceVisible(
-  state: { stripVisible: boolean; peeking?: boolean },
+  state: { stripVisible: boolean; peeking?: boolean; titlebarMode?: boolean },
   paletteOpen: boolean,
 ): boolean {
+  // Titlebar mode docks the strip permanently (specs/016): it is always on screen,
+  // including over full-window surfaces, so the pin/peek and palette-suppression
+  // rules do not apply.
+  if (state.titlebarMode === true) return true;
   return (state.stripVisible || state.peeking === true) && !paletteOpen;
+}
+
+/**
+ * Vertical inset of the guest content when the strip is docked (titlebar mode);
+ * zero in the default overlay. Main insets the site view by this and the renderer
+ * offsets its full-window surfaces by the same value, so the page always begins
+ * below the strip and nothing is covered.
+ */
+export function titlebarInset(titlebarMode: boolean): number {
+  return titlebarMode ? STRIP_HEIGHT : 0;
 }
 
 /**

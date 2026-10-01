@@ -4,6 +4,7 @@ import {
   STRIP_HEIGHT,
   isBlankSurfaceVisible,
   isStripSurfaceVisible,
+  titlebarInset,
 } from "@shared/shell";
 
 describe("isStripSurfaceVisible", () => {
@@ -45,6 +46,30 @@ describe("isStripSurfaceVisible", () => {
   });
 });
 
+describe("isStripSurfaceVisible with titlebar mode", () => {
+  it("shows the strip whenever titlebar mode is on", () => {
+    expect(isStripSurfaceVisible({ stripVisible: false, titlebarMode: true }, false)).toBe(true);
+  });
+
+  it("keeps the strip while the command palette is open in titlebar mode", () => {
+    expect(isStripSurfaceVisible({ stripVisible: false, titlebarMode: true }, true)).toBe(true);
+  });
+
+  it("does not require a pin or a peek in titlebar mode", () => {
+    expect(
+      isStripSurfaceVisible({ stripVisible: false, peeking: false, titlebarMode: true }, false),
+    ).toBe(true);
+  });
+
+  it("falls back to the overlay rule when titlebar mode is off", () => {
+    expect(isStripSurfaceVisible({ stripVisible: false, titlebarMode: false }, false)).toBe(false);
+    expect(isStripSurfaceVisible({ stripVisible: true, titlebarMode: false }, true)).toBe(false);
+    expect(
+      isStripSurfaceVisible({ stripVisible: false, peeking: true, titlebarMode: false }, true),
+    ).toBe(false);
+  });
+});
+
 describe("DRAG_BAND_HEIGHT", () => {
   it("stays thin so the page below the top edge stays clickable", () => {
     expect(DRAG_BAND_HEIGHT).toBe(10);
@@ -55,6 +80,16 @@ describe("STRIP_HEIGHT", () => {
   it("is tall enough for the painted strip and taller than the band", () => {
     expect(STRIP_HEIGHT).toBe(30);
     expect(STRIP_HEIGHT).toBeGreaterThan(DRAG_BAND_HEIGHT);
+  });
+});
+
+describe("titlebarInset", () => {
+  it("insets the guest content by the strip height in titlebar mode", () => {
+    expect(titlebarInset(true)).toBe(STRIP_HEIGHT);
+  });
+
+  it("is zero in the default overlay layout", () => {
+    expect(titlebarInset(false)).toBe(0);
   });
 });
 

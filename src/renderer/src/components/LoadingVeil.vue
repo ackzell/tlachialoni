@@ -18,7 +18,10 @@ const label = computed(() => describeTarget(loadingTarget.value).label);
 <style scoped>
 .veil {
   position: fixed;
-  inset: 0;
+  top: var(--shell-inset, 0px);
+  right: 0;
+  bottom: 0;
+  left: 0;
   /* The shell root is pointer-transparent; the opaque veil takes input back. */
   pointer-events: auto;
   display: flex;

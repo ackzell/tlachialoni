@@ -19,6 +19,7 @@ export interface ShellState {
   dockMode: DockMode;
   devtoolsOpen: boolean;
   stripVisible: boolean;
+  titlebarMode: boolean;
   variant: string;
   colorMode: ColorMode;
   extensions: InstalledExtension[];

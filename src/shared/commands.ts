@@ -115,6 +115,14 @@ export const COMMANDS: CommandDef[] = [
     group: "other",
   },
   {
+    id: "titlebar.toggle",
+    label: "Toggle Titlebar Mode",
+    acceleratorLabel: "⇧⌘F",
+    accelerator: { meta: true, shift: true, code: "KeyF" },
+    palette: true,
+    group: "other",
+  },
+  {
     id: "view.reload",
     label: "Reload",
     acceleratorLabel: "⌘R",

@@ -40,7 +40,7 @@ const props = defineProps<{ direction: HistoryDirection; progress: number }>();
 <style scoped>
 .history-overlay {
   position: absolute;
-  top: 0;
+  top: var(--shell-inset, 0px);
   bottom: 0;
   width: 112px;
   /* Above the guest page (a separate view) and below the strip (z-index 2) and the
