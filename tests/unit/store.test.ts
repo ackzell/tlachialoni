@@ -237,6 +237,7 @@ describe("StateStore", () => {
         source: "folder",
         enabled: true,
         installedAt: 1,
+        mv3ServiceWorker: false,
       },
     ]);
     expect(new StateStore(file).get().extensions.map((e) => e.slug)).toEqual(["s"]);

@@ -118,3 +118,15 @@ export function readManifest(dir: string): ExtensionManifest {
   const version = typeof manifest.version === "string" ? manifest.version : "unknown";
   return { name, version, raw: manifest };
 }
+
+/**
+ * Detects whether a manifest is Manifest V3 with a service worker background.
+ * Electron does not support MV3 service workers, so such extensions load but
+ * their background logic crashes at runtime.
+ */
+export function detectMv3ServiceWorker(manifest: ExtensionManifest): boolean {
+  if (manifest.raw.manifest_version !== 3) return false;
+  const background = manifest.raw.background;
+  if (typeof background !== "object" || background === null) return false;
+  return "service_worker" in background;
+}

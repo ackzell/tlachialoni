@@ -305,6 +305,9 @@ export function sanitizeExtensions(raw: unknown): InstalledExtension[] {
       source: record.source as ExtensionSource,
       enabled: record.enabled,
       installedAt: record.installedAt,
+      // Additive and defaulted, so a record written before MV3 detection reads
+      // as "no badge" rather than being dropped; the next load re-derives it.
+      mv3ServiceWorker: record.mv3ServiceWorker === true,
     });
     if (extensions.length >= MAX_EXTENSIONS) break;
   }

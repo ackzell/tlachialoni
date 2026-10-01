@@ -211,8 +211,13 @@ function installMenu(manager: WindowManager): void {
 /**
  * Builds the process-wide state store, extension manager, and window manager,
  * loads the enabled extensions into the guest session, then restores the saved
- * window set (or a single default window). Extension loading must happen before
- * any guest view starts loading.
+ * window set (or a single default window).
+ *
+ * Extensions load before the window manager is built, so the session has its
+ * extensions registered before the first guest view starts loading — a restored
+ * page would otherwise miss its content scripts. The status surface needs no
+ * window here: the MV3 warning only fires on install or re-enable, both of which
+ * a window dispatches (specs/018, FR-005).
  */
 async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }> {
   const store = new StateStore(path.join(app.getPath("userData"), "state.json"));
@@ -221,6 +226,7 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
     session: session.defaultSession,
     root: path.join(app.getPath("userData"), "extensions"),
   });
+
   await extensions.loadAll();
 
   const manager = new WindowManager(store, extensions);

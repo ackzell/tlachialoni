@@ -71,6 +71,13 @@ export interface Row {
   detail?: string;
   accelerator?: string;
   arg?: string;
+  /**
+   * Short persistent marker rendered before `detail` (e.g. `MV3`). Unlike
+   * `detail`, which describes the row's current action, a badge states a standing
+   * property of the thing — it stays put instead of being replaced by whatever
+   * the row does (specs/018, FR-010).
+   */
+  badge?: string;
   /** Host-grouped recent: the origin this row summarizes. */
   host?: string;
   /** Host-grouped recent: whether the row can expand into its pages. */
@@ -266,6 +273,9 @@ export function buildRows(
           label: toggleLabel,
           matches: toggle.indices,
           detail: extension.enabled ? "enabled" : "disabled",
+          // The standing reminder that this one's background service worker
+          // will not run, replacing the one-time install warning (FR-010).
+          badge: extension.mv3ServiceWorker ? "MV3" : undefined,
           arg: extension.slug,
         });
       }

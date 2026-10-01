@@ -259,6 +259,9 @@ export class WindowManager {
   }
 
   private routeStatus(status: ExtensionStatus): void {
+    // Every status now originates from a command a window dispatched (install,
+    // re-enable, remove, reload), so `statusInitiator` is always the right target.
+    // Boot deliberately emits none — it would have nowhere to route.
     const target = this.statusInitiator ?? this.focused();
     target?.setExtensionStatus(status);
   }

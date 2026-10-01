@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from "vue";
-import type { ExtensionPhase } from "@shared/extensions";
+import { shouldAutoDismiss, type ExtensionPhase } from "@shared/extensions";
 import { useShell } from "../composables/useShell";
 
 /**
@@ -20,15 +20,27 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 
 const phase = computed<ExtensionPhase | null>(() => extensionStatus.value?.phase ?? null);
 
+/**
+ * Identity of the current status, so two different statuses of the same phase
+ * still read as a change. Watching the phase alone would miss a second
+ * `Removed X` arriving while the first is still on screen, leaving that toast
+ * with no auto-dismiss timer and stuck until clicked.
+ */
+const statusKey = computed(() => {
+  const status = extensionStatus.value;
+  return status ? `${status.phase}:${status.message}` : "";
+});
+
 const busy = computed(() => {
   const current = phase.value;
-  return current !== null && current !== "done" && current !== "error";
+  return current !== null && current !== "done" && current !== "error" && current !== "warning";
 });
 
 const title = computed(() => {
   const status = extensionStatus.value;
   if (!status) return "";
-  if (status.phase === "done" || status.phase === "error") return status.message;
+  if (status.phase === "done" || status.phase === "error" || status.phase === "warning")
+    return status.message;
   return "Installing extension";
 });
 
@@ -37,6 +49,7 @@ const subtitle = computed(() => {
   if (!status) return "";
   if (status.phase === "done") return "";
   if (status.phase === "error") return status.error ?? "";
+  if (status.phase === "warning") return "";
   return status.message;
 });
 
@@ -66,10 +79,31 @@ function dismiss(): void {
   void api.runCommand("extensions.dismissStatus");
 }
 
-watch(phase, (current) => {
-  clearTimer();
-  if (current === "done") timer = setTimeout(dismiss, DONE_DISMISS_MS);
-});
+/**
+ * Arms the auto-dismiss for a status that should leave on its own.
+ *
+ * `immediate` is load-bearing, not a nicety: `App.vue` mounts this component
+ * only while a status exists, so a status that is already finished on arrival —
+ * `Removed <name>`, the first and only status a removal emits — is the
+ * component's *initial* value rather than a change, and a plain change watcher
+ * never runs for it. Without `immediate` the removal toast never leaves on its
+ * own, while install and disable still worked, because their earlier `loading`
+ * status had already mounted the component and made the later `done` a genuine
+ * change.
+ *
+ * Keying on `statusKey` (phase *and* message) rather than the phase also covers
+ * a second `done` arriving while one is already on screen: `Removed A` followed
+ * by `Removed B` re-arms instead of reusing the first toast's timer.
+ */
+watch(
+  statusKey,
+  () => {
+    clearTimer();
+    const current = phase.value;
+    if (current && shouldAutoDismiss(current)) timer = setTimeout(dismiss, DONE_DISMISS_MS);
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(clearTimer);
 </script>
@@ -80,6 +114,7 @@ onBeforeUnmount(clearTimer);
       <div class="status__row">
         <span v-if="busy" class="status__spinner" aria-hidden="true" />
         <span v-else-if="phase === 'done'" class="status__glyph status__glyph--done">✓</span>
+        <span v-else-if="phase === 'warning'" class="status__glyph status__glyph--warning">!</span>
         <span v-else class="status__glyph status__glyph--error">!</span>
         <div class="status__text">
           <p class="status__title">{{ title }}</p>
@@ -91,7 +126,9 @@ onBeforeUnmount(clearTimer);
         <div v-if="determinate" class="status__fill" :style="{ width: `${percent}%` }" />
       </div>
 
-      <p v-if="phase === 'error'" class="status__hint">Press Esc or click to dismiss</p>
+      <p v-if="phase === 'error' || phase === 'warning'" class="status__hint">
+        Press Esc or click to dismiss
+      </p>
     </div>
   </div>
 </template>
@@ -268,6 +305,11 @@ onBeforeUnmount(clearTimer);
   background: var(--tb-error);
 }
 
+.status__glyph--warning {
+  color: var(--tb-bg);
+  background: var(--tb-warning, #f59e0b);
+}
+
 .status__text {
   min-width: 0;
 }
@@ -276,6 +318,8 @@ onBeforeUnmount(clearTimer);
   margin: 0;
   color: var(--tb-fg);
   font-size: 13px;
+  /* A multi-extension warning carries a bulleted list in the same text. */
+  white-space: pre-line;
 }
 
 .status__subtitle {

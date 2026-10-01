@@ -462,6 +462,7 @@ function onLeave(el: Element, done: () => void): void {
                   {{ char }}
                 </div>
               </div>
+              <span v-if="row.badge" class="palette__badge">{{ row.badge }}</span>
               <div>{{ row.detail }}</div>
             </div>
           </li>
@@ -615,6 +616,18 @@ function onLeave(el: Element, done: () => void): void {
   padding: 0 6px;
   border: 1px solid var(--tb-border);
   border-radius: 3px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* A standing caveat about the extension, not the action the row performs. Amber
+   matches the install warning it stands in for, so the two read as one fact. */
+.palette__badge {
+  align-self: center;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--tb-warning, #f59e0b) 55%, transparent);
+  border-radius: 3px;
+  color: var(--tb-warning, #f59e0b);
   font-size: 10px;
   line-height: 1.4;
 }

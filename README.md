@@ -46,7 +46,10 @@ palette as a row you can enable, disable, update, or remove.
 Extensions load only into the guest page, never into the shell UI. Electron
 supports a subset of extension APIs (content scripts, DevTools pages, and
 Manifest V2 backgrounds — not Manifest V3 background service workers), so some
-store extensions run only partially. See
+store extensions run only partially. Installing or re-enabling an extension that
+needs an MV3 service worker warns once that its background will not run while its
+content scripts and DevTools pages still will; from then on that extension's
+palette row carries an `MV3` badge. See
 `specs/007-extension-support/spec.md` for the details and limits.
 
 ## Requirements

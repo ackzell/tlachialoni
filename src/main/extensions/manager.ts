@@ -10,7 +10,7 @@
  * reachable from here (constitution II, FR-009).
  */
 
-import { dialog, shell } from "electron";
+import { app, dialog, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { parseExtensionId } from "@shared/extension-id";
@@ -21,7 +21,7 @@ import type {
   InstalledExtension,
 } from "@shared/extensions";
 import type { StateStore } from "../state/store";
-import { extractCrxToDir, readManifest } from "./crx";
+import { detectMv3ServiceWorker, extractCrxToDir, readManifest } from "./crx";
 import { crxDownloadUrl, downloadCrx } from "./store";
 
 export interface ExtensionManagerOptions {
@@ -29,6 +29,13 @@ export interface ExtensionManagerOptions {
   session: Electron.Session;
   /** Absolute path to the directory holding unpacked extension folders. */
   root: string;
+}
+
+/** What a load resolved to: the display name and whether Electron will run it. */
+interface LoadedExtension {
+  name: string;
+  /** True for an MV3 manifest with a background service worker (specs/018). */
+  usesMv3ServiceWorker: boolean;
 }
 
 /** Filesystem-safe folder name derived from an extension name. */
@@ -71,6 +78,11 @@ export class ExtensionManager {
    * Loads every enabled extension. A record whose folder has vanished is kept
    * but disabled so it stops failing on every launch and stays visible for the
    * developer to remove or reinstall.
+   *
+   * Boot deliberately does NOT warn about MV3 service workers: the warning fires
+   * once when the extension is installed or re-enabled, and from then on the
+   * list row carries an `MV3` badge. Re-warning on every launch would just train
+   * the developer to dismiss it unread (specs/018, FR-005).
    */
   async loadAll(): Promise<void> {
     for (const record of this.store.get().extensions) {
@@ -200,9 +212,16 @@ export class ExtensionManager {
         name: record.name,
         message: enabled ? `Enabling ${record.name}` : `Disabling ${record.name}`,
       });
-      if (enabled) await this.load(slug);
-      else this.unload(slug);
+      const loaded = enabled ? await this.load(slug) : null;
+      if (!enabled) this.unload(slug);
       this.patch(slug, { enabled });
+      // Re-enabling is the same moment as installing: the background service
+      // worker still will not run, so this is the one place besides install where
+      // the warning is worth repeating (specs/018, FR-005).
+      if (loaded?.usesMv3ServiceWorker) {
+        this.warnAboutMv3(loaded.name);
+        return { ok: true };
+      }
       this.emit({
         phase: "done",
         name: record.name,
@@ -235,6 +254,8 @@ export class ExtensionManager {
       this.unload(slug);
       fs.rmSync(this.dirFor(slug), { recursive: true, force: true });
       this.save(this.store.get().extensions.filter((entry) => entry.slug !== slug));
+      // A `done` status replaces whatever the surface was showing, so a warning
+      // left over from this extension's own load leaves with it.
       this.emit({ phase: "done", name: record.name, message: `Removed ${record.name}` });
       return { ok: true };
     } catch (error) {
@@ -251,6 +272,8 @@ export class ExtensionManager {
     try {
       this.emit({ phase: "loading", message: "Reloading extensions" });
       for (const record of this.store.get().extensions) this.unload(record.slug);
+      // A reload is not an install, so it does not re-warn; the badge in the
+      // list already carries the fact (specs/018, FR-005).
       await this.loadAll();
       this.emit({ phase: "done", message: "Reloaded extensions" });
       return { ok: true };
@@ -280,20 +303,30 @@ export class ExtensionManager {
     return this.store.get().extensions.find((entry) => entry.slug === slug) ?? null;
   }
 
-  /** Loads an installed extension and refreshes its manifest-derived metadata. */
-  private async load(slug: string): Promise<Electron.Extension> {
+  /**
+   * Loads an installed extension and refreshes its manifest-derived metadata,
+   * including the MV3 flag the list badges from (specs/018, FR-010). Re-deriving
+   * it on every load keeps the badge correct for records written before the
+   * field existed, and for an extension whose manifest changed underneath us.
+   */
+  private async load(slug: string): Promise<LoadedExtension> {
     const dir = this.dirFor(slug);
     const manifest = readManifest(dir);
     const extension = await this.session.extensions.loadExtension(dir);
     const existing = this.find(slug);
+    const name = extension.name || manifest.name;
+    // The extension loads either way; only the background service worker is
+    // unsupported, so this is never a failure (specs/018, FR-004).
+    const usesMv3ServiceWorker = detectMv3ServiceWorker(manifest);
     this.patch(slug, {
       // Keep the store ID so updates can re-resolve the store URL; otherwise use
       // the platform-assigned ID.
       id: existing?.source === "store" ? existing.id : extension.id,
-      name: extension.name || manifest.name,
+      name,
       version: extension.version || manifest.version,
+      mv3ServiceWorker: usesMv3ServiceWorker,
     });
-    return extension;
+    return { name, usesMv3ServiceWorker };
   }
 
   private unload(slug: string): void {
@@ -338,10 +371,29 @@ export class ExtensionManager {
       source,
       enabled: true,
       installedAt: existing?.installedAt ?? Date.now(),
+      mv3ServiceWorker: detectMv3ServiceWorker(manifest),
     };
     this.save([...this.store.get().extensions.filter((entry) => entry.slug !== slug), record]);
-    this.emit({ phase: "done", name: record.name, message: `Installed ${record.name}` });
+
+    // Install is the one moment the warning is worth interrupting for: the
+    // developer is deciding whether to keep the extension, and the badge in the
+    // list takes over from here (specs/018, FR-005).
+    if (record.mv3ServiceWorker) this.warnAboutMv3(record.name);
+    else this.emit({ phase: "done", name: record.name, message: `Installed ${record.name}` });
     return { ok: true };
+  }
+
+  /**
+   * Warns that an extension depends on an MV3 background service worker, which
+   * Electron does not run. Shown once per install/re-enable and then left to the
+   * list's `MV3` badge (specs/018, FR-003).
+   */
+  private warnAboutMv3(name: string): void {
+    this.emit({
+      phase: "warning",
+      name,
+      message: `This extension uses Manifest V3 service workers, which ${app.getName()} doesn't support. Its background functionality won't work, but content scripts and DevTools pages will.`,
+    });
   }
 
   private save(extensions: InstalledExtension[]): void {
@@ -358,7 +410,8 @@ export class ExtensionManager {
       next.id === record.id &&
       next.name === record.name &&
       next.version === record.version &&
-      next.enabled === record.enabled
+      next.enabled === record.enabled &&
+      next.mv3ServiceWorker === record.mv3ServiceWorker
     ) {
       return;
     }

@@ -17,6 +17,14 @@ export interface InstalledExtension {
   source: ExtensionSource;
   enabled: boolean;
   installedAt: number;
+  /**
+   * Whether the manifest is MV3 with a background service worker, which Electron
+   * does not run. Persisted so the list can badge the extension after the
+   * one-time install warning (specs/018, FR-010). Absent in records written
+   * before this field; those read as `false` and are corrected on the next load,
+   * which re-reads the manifest.
+   */
+  mv3ServiceWorker: boolean;
 }
 
 /**
@@ -29,6 +37,7 @@ export type ExtensionPhase =
   | "verifying"
   | "extracting"
   | "loading"
+  | "warning"
   | "done"
   | "error";
 
@@ -53,7 +62,24 @@ export interface ExtensionStatus {
 
 /** Phases during which an install is still running (the surface is "active"). */
 export function isActivePhase(phase: ExtensionPhase): boolean {
-  return phase !== "done" && phase !== "error";
+  return phase !== "done" && phase !== "error" && phase !== "warning";
+}
+
+/**
+ * Whether the status surface should dismiss this status on a timer.
+ *
+ * Only a `done` leaves on its own. A `warning` waits for the developer
+ * (specs/018, FR-006) and an `error` waits to be read.
+ *
+ * This is a predicate over the status *value* on purpose, not a test for a
+ * change in it. The surface component is mounted only while a status exists, so
+ * a status that is already terminal on arrival — `Removed <name>`, the sole
+ * status a removal emits — is the initial value and never fires a change
+ * watcher. Keying the dismissal off the value is what keeps removal and install
+ * behaving the same.
+ */
+export function shouldAutoDismiss(phase: ExtensionPhase): boolean {
+  return phase === "done";
 }
 
 /** Result of an extension command, matching the command registry's shape. */

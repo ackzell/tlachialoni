@@ -285,6 +285,7 @@ describe("extension rows", () => {
     source: "store" as const,
     enabled: true,
     installedAt: 1,
+    mv3ServiceWorker: false,
   };
 
   it("makes the store install the default row for a pasted store URL", () => {
@@ -316,6 +317,21 @@ describe("extension rows", () => {
       detail: "enabled",
     });
     expect(rows.find((row) => row.id === "extensions.remove")).toMatchObject({ arg: id });
+  });
+
+  it("badges an MV3 extension's toggle row and leaves other rows unbadged", () => {
+    // The badge is the standing reminder that replaced the per-launch warning,
+    // so it belongs on the row that toggles the extension (FR-010).
+    const rows = buildRows("", [], undefined, undefined, [
+      { ...extension, mv3ServiceWorker: true },
+    ]);
+    expect(rows.find((row) => row.id === "extensions.toggle")).toMatchObject({ badge: "MV3" });
+    expect(rows.find((row) => row.id === "extensions.remove")?.badge).toBeUndefined();
+  });
+
+  it("does not badge an extension without an MV3 service worker", () => {
+    const rows = buildRows("", [], undefined, undefined, [extension]);
+    expect(rows.find((row) => row.id === "extensions.toggle")?.badge).toBeUndefined();
   });
 
   it("namespaces extension row keys so they cannot collide", () => {
