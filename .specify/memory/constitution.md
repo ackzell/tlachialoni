@@ -12,14 +12,20 @@ or any always-visible browser chrome. When all shell surfaces are dismissed, the
 visible tool chrome is zero pixels. Chrome is counted by painted pixels: an
 invisible, pointer-only drag region across the top of the window is permitted and
 is not the strip — the strip itself remains hidden until toggled, or transiently
-revealed by the pointer. The zero-pixel rule constrains chrome over the guest
-page; a window that has never loaded a target has no page to obscure, so a
-decorative identity watermark on that empty page is permitted, provided it is
-removed as soon as a target commits and never intercepts input.
+revealed by the pointer. The strip MAY also be docked as a per-window,
+explicitly toggled title bar that stays visible until toggled off and displaces
+the guest page below it rather than overlaying it; this docked layout is opt-in,
+never the default, and is the layout analogue of the permitted pinned strip.
+Absent an explicit toggle, the default remains zero painted chrome. The
+zero-pixel rule constrains chrome over the guest page; a window that has never
+loaded a target has no page to obscure, so a decorative identity watermark on
+that empty page is permitted, provided it is removed as soon as a target commits
+and never intercepts input.
 
 Rationale: the entire value of this tool is a distraction-free viewport for a
 running app. Any permanent chrome erodes that value and duplicates the browser
-the developer already has.
+the developer already has — so the default stays chromeless, and the docked title
+bar exists only because the developer explicitly asked for it.
 
 ### II. The Guest Page is Sacred
 
@@ -66,7 +72,7 @@ multiplexing within a window are prohibited. Multiple independent windows MAY
 run concurrently — whether as separate application instances or as several
 windows opened from one instance — so parallel related projects can be open side
 by side. Windows do not control one another; each is responsible only for its own
-target, geometry, and DevTools and strip state. The default target is
+target, geometry, DevTools, and strip/titlebar state. The default target is
 `http://localhost:3000`; any other target is one palette edit away.
 
 Rationale: one target per window keeps the window and its DevTools pairing
@@ -101,11 +107,11 @@ source keeps the small UI coherent without a design system of its own.
 - **State**: a small JSON store under Electron's `userData` directory, safe for
   concurrent instances and multiple windows within one instance. Per-window state
   (the current target, window bounds, DevTools open state and dock side, strip
-  visibility, theme variant, and color mode) is independent per window; the
-  installed-extension list and recents are shared, with recents merged on write
-  and the shared list last-writer-wins. A window's color mode governs the tool's
-  own surfaces; the guest page's `prefers-color-scheme` and the docked DevTools
-  follow the OS. No database, no config-file editing by the user.
+  visibility, titlebar-mode layout, theme variant, and color mode) is independent
+  per window; the installed-extension list and recents are shared, with recents
+  merged on write and the shared list last-writer-wins. A window's color mode
+  governs the tool's own surfaces; the guest page's `prefers-color-scheme` and the
+  docked DevTools follow the OS. No database, no config-file editing by the user.
 
 ## Security & Isolation Requirements
 
@@ -175,4 +181,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.5 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-09-29
+**Version**: 2.2.6 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-01
