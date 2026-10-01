@@ -39,6 +39,9 @@ function goBack(): void {
 .failure {
   position: fixed;
   inset: 0;
+  /* The shell root is pointer-transparent; an opaque full-window surface takes
+     input back so it keeps swallowing the page behind it. */
+  pointer-events: auto;
   display: grid;
   place-items: center;
   background: var(--tb-bg);

@@ -26,4 +26,9 @@ button {
 
 .shell-root {
   height: 100%;
+  /* The shell spans the window whenever a full-window surface is up (the palette,
+     a veil, the armed history overlay). It is a transparent container, so it must
+     not swallow input meant for the guest page beneath it; each interactive
+     surface opts back in with `pointer-events: auto` (constitution I, FR-010). */
+  pointer-events: none;
 }

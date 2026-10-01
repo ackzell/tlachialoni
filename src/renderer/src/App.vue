@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { isHistoryArmedVisible } from "@shared/history";
 import { isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
 import BlankView from "./components/BlankView.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import DragBand from "./components/DragBand.vue";
 import DragStrip from "./components/DragStrip.vue";
 import FailureView from "./components/FailureView.vue";
+import HistoryOverlay from "./components/HistoryOverlay.vue";
 import InstallStatus from "./components/InstallStatus.vue";
 import LoadingVeil from "./components/LoadingVeil.vue";
 import {
@@ -24,6 +26,7 @@ const {
   paletteInitial,
   paletteScope,
   peeking,
+  historyArmed,
   extensionStatus,
 } = useShell();
 
@@ -45,11 +48,32 @@ const stripVisible = computed(() =>
 const blankVisible = computed(() =>
   state.value ? isBlankSurfaceVisible(state.value) && !loading.value && !failed.value : false,
 );
+
+// The armed history overlay: shown on the edge the history would move toward
+// (specs/015).
+const historyOverlayVisible = computed(() =>
+  isHistoryArmedVisible(historyArmed.value, paletteOpen.value),
+);
+const historyDirection = computed(() => historyArmed.value?.direction ?? "back");
+const historyProgress = computed(() => historyArmed.value?.progress ?? 0);
 </script>
 
 <template>
   <div class="shell-root">
     <BlankView v-if="blankVisible" />
+
+    <Transition
+      name="history"
+      @leave="markSurfaceLeaving"
+      @after-leave="markSurfaceLeft"
+      @leave-cancelled="markSurfaceLeaveCancelled"
+    >
+      <HistoryOverlay
+        v-if="historyOverlayVisible"
+        :direction="historyDirection"
+        :progress="historyProgress"
+      />
+    </Transition>
 
     <Transition
       name="veil"

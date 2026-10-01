@@ -4,7 +4,7 @@ import { useShell } from "../composables/useShell";
 import { describeTarget, splitTargetLabel } from "../utils/target";
 
 const api = window.tlachialoni;
-const { state, devtools } = useShell();
+const { state, devtools, historyAvailable } = useShell();
 
 const target = computed(() => state.value?.target ?? "");
 const display = computed(() => describeTarget(target.value));
@@ -16,6 +16,16 @@ function reload(): void {
 
 function toggleDevtools(): void {
   void api.runCommand("devtools.toggle");
+}
+
+function prevPage(): void {
+  if (!historyAvailable.value.canGoBack) return;
+  void api.runCommand("view.back");
+}
+
+function nextPage(): void {
+  if (!historyAvailable.value.canGoForward) return;
+  void api.runCommand("view.forward");
 }
 </script>
 
@@ -77,6 +87,37 @@ function toggleDevtools(): void {
       </TransitionGroup>
     </div>
     <div class="strip__actions">
+      <button
+        class="strip__btn"
+        :style="{ '--i': segments.length }"
+        title="Back"
+        :disabled="!historyAvailable.canGoBack"
+        @click="prevPage"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+          <!-- Icon from Fluent UI System Icons by Microsoft Corporation - https://github.com/microsoft/fluentui-system-icons/blob/main/LICENSE -->
+          <path
+            fill="currentColor"
+            d="M29 16c0 .69-.56 1.25-1.25 1.25H7.213l7.432 7.628a1.25 1.25 0 1 1-1.79 1.744l-9.497-9.747a1.246 1.246 0 0 1 0-1.75l9.497-9.747a1.25 1.25 0 0 1 1.79 1.744L7.213 14.75H27.75c.69 0 1.25.56 1.25 1.25"
+          />
+        </svg>
+      </button>
+      <button
+        class="strip__btn"
+        :style="{ '--i': segments.length }"
+        title="Forward"
+        :disabled="!historyAvailable.canGoForward"
+        @click="nextPage"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+          <!-- Icon from Fluent UI System Icons by Microsoft Corporation - https://github.com/microsoft/fluentui-system-icons/blob/main/LICENSE -->
+          <path
+            fill="currentColor"
+            d="M3 16c0-.69.56-1.25 1.25-1.25h20.537l-7.432-7.628a1.25 1.25 0 1 1 1.79-1.744l9.497 9.747a1.246 1.246 0 0 1 0 1.75l-9.497 9.747a1.25 1.25 0 1 1-1.79-1.744l7.432-7.628H4.25C3.56 17.25 3 16.69 3 16"
+          />
+        </svg>
+      </button>
+
       <button class="strip__btn" :style="{ '--i': segments.length }" title="Reload" @click="reload">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -132,6 +173,8 @@ function toggleDevtools(): void {
   background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-fg-subtle);
   user-select: none;
+  /* The shell root is pointer-transparent; the strip's controls opt back in. */
+  pointer-events: auto;
   /* Paints above the drag band (z-index 1) so its controls stay clickable; the
      band is always mounted now, including under full-window surfaces. */
   position: relative;
@@ -239,6 +282,18 @@ function toggleDevtools(): void {
 .strip__btn:hover {
   /* background: var(--tb-hover); */
   color: var(--tb-accent);
+}
+
+/* Unavailable history direction: the button stays in place but reads inert and
+   stops responding to hover (specs/015). */
+.strip__btn:disabled {
+  color: var(--tb-fg-subtle);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.strip__btn:disabled:hover {
+  color: var(--tb-fg-subtle);
 }
 
 .strip__btn.is-active {

@@ -20,6 +20,9 @@
      (z-index 2) so its controls stay clickable. */
   z-index: 1;
   user-select: none;
+  /* The shell root is pointer-transparent, so the band re-enables itself: the
+     window must stay draggable from the top edge in every shell mode. */
+  pointer-events: auto;
   -webkit-app-region: drag;
   app-region: drag;
 }

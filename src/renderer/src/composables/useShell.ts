@@ -1,6 +1,7 @@
 import { readonly, ref } from "vue";
 import type { Scope } from "@shared/commands";
 import type { ExtensionStatus, InstalledExtension } from "@shared/extensions";
+import type { HistoryArmed } from "@shared/history";
 import { applyTheme, type ResolvedMode } from "../theme/apply";
 
 export type DockMode = "bottom" | "right" | "left";
@@ -42,6 +43,13 @@ const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bo
 const extensionStatus = ref<ExtensionStatus | null>(null);
 /** Transient strip reveal driven by pointer proximity in main (specs/013). */
 const peeking = ref(false);
+/** Transient armed history signal; drives the edge overlay (specs/015). */
+const historyArmed = ref<HistoryArmed | null>(null);
+/** Whether the guest can move back/forward; drives the strip's nav buttons. */
+const historyAvailable = ref<{ canGoBack: boolean; canGoForward: boolean }>({
+  canGoBack: false,
+  canGoForward: false,
+});
 
 let initialised = false;
 
@@ -122,6 +130,12 @@ function init(): void {
   api.on("strip:peek", (payload) => {
     peeking.value = payload === true;
   });
+  api.on("history:armed", (payload) => {
+    historyArmed.value = (payload as HistoryArmed | null) ?? null;
+  });
+  api.on("history:availability", (payload) => {
+    historyAvailable.value = payload as { canGoBack: boolean; canGoForward: boolean };
+  });
   api.on("palette:open", (payload) => {
     const { initial, scope } = payload as { initial?: string; scope?: Scope };
     paletteInitial.value = initial ?? "";
@@ -165,6 +179,8 @@ export function useShell() {
     devtools: readonly(devtools),
     extensionStatus: readonly(extensionStatus),
     peeking: readonly(peeking),
+    historyArmed: readonly(historyArmed),
+    historyAvailable: readonly(historyAvailable),
     closePalette,
   };
 }

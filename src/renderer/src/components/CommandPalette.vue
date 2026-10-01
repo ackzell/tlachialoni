@@ -477,6 +477,8 @@ function onLeave(el: Element, done: () => void): void {
 .palette-backdrop {
   position: fixed;
   inset: 0;
+  /* The shell root is pointer-transparent; the palette takes input back. */
+  pointer-events: auto;
   display: flex;
   justify-content: center;
   align-items: flex-start;
