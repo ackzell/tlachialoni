@@ -22,6 +22,9 @@ The only UI is transient and keyboard-first:
 - `⌘⇧C` — element picker with hover highlight
 - `⌘R` / `⇧⌘R` — reload / hard reload
 - `⌘←` / `⌘→` — back / forward (native text behavior inside inputs)
+- Two-finger horizontal swipe on the trackpad — back / forward, with an armed
+  edge overlay that grows as the swipe commits and recedes as it cancels (the
+  strip's back/forward buttons reflect the same availability)
 
 Everything is themed with [Tlapalli](https://tlapalli.ackzell.dev) (eight mineral
 variants, dark/light following the system) in Source Code Pro. Theme is
@@ -71,6 +74,7 @@ representative state and holds it there so you can style it with live HMR:
 - **Preview Loading Veil**
 - **Preview Failure View**
 - **Preview Extension Install** (loops every phase, including progress)
+- **Preview History Navigation** (alternates the armed edge overlay)
 - **Stop Preview**
 
 The extension preview can also start with the app:
@@ -148,6 +152,7 @@ See:
 - `specs/012-multi-window/spec.md` — multiple independent windows
 - `specs/013-always-on-drag-region/spec.md` — always-draggable window with a hover-revealed strip
 - `specs/014-blank-watermark/spec.md` — the logo watermark on a blank, never-loaded window
+- `specs/015-trackpad-swipe-navigation/spec.md` — two-finger swipe history navigation
 
 ## License
 
