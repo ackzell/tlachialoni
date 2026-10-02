@@ -1,0 +1,38 @@
+# Local packaging variant: a fully separate app from the one in /Applications.
+#
+# `npm run package` produces Tlachialoni.app, the shipped identity. Running it
+# side by side with an installed copy confuses macOS: both carry the same bundle
+# id, so LaunchServices treats them as one app and `open`ing the second just
+# activates the first. This variant gives a build its own bundle id, its own
+# product name, its own ~/Library/Application Support entry, and its own
+# preferences domain, so it can be tested without touching real state.
+#
+# `extends` keeps this file a few overrides rather than a fork of
+# electron-builder.yml; see specs/003-standalone-packaging/contracts/app-identity.md.
+extends: ./electron-builder.yml
+
+appId: com.ackzell.tlachialoni.local
+
+# The bundle name macOS shows. Repeated under extraMetadata below because YAML
+# has no way to reference one value twice.
+productName: Tlachialoni Local
+
+# electron-builder reads this as the app's own package.json, and `app.getName()`
+# reads productName from there to resolve `userData`. Without it the bundle id
+# would differ while the profile directory stayed shared with the installed app,
+# which is the collision this file exists to prevent.
+extraMetadata:
+  productName: Tlachialoni Local
+
+directories:
+  # Separate from release/, so a local build never overwrites the real artifacts.
+  output: release-local
+
+mac:
+  # A bare scalar, which REPLACES the inherited `[dmg, zip]` rather than merging
+  # with it. This matters: electron-builder's config merge concatenates two
+  # arrays, so writing `target: [{target: dir}]` here would still produce a dmg
+  # and a zip, and `target: []` would not clear them either. Only a non-array
+  # value overwrites. The `--dir` flag is not used for this — it does not
+  # suppress configured targets.
+  target: dir

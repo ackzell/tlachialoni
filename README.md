@@ -107,6 +107,35 @@ npm run test       # unit tests (Vitest)
 
 The default target is `http://localhost:3000`.
 
+### Dev identity
+
+A development run is a separate app from the installed one, in every place macOS
+can tell two apps apart:
+
+|                   | Installed app   | `npm run dev`       |
+| ----------------- | --------------- | ------------------- |
+| Dock / ⌘Tab name  | Tlachialoni     | Tlachialoni Dev     |
+| Bundle identifier | `…tlachialoni`  | `…tlachialoni.dev`  |
+| Profile directory | `…/Tlachialoni` | `…/Tlachialoni Dev` |
+
+The separate profile is the point: cookies, installed extensions, and saved
+windows live in `~/Library/Application Support/<name>`, so a shared profile means
+an HMR session overwrites what the installed app restores on its next launch.
+
+`app.setName()` alone cannot rename the dev app, because macOS reads the visible
+name from the bundle. `scripts/dev-identity.mjs` (run automatically before
+`dev`, `preview`, and `screenshots`) rewrites the three relevant `Info.plist`
+keys in `node_modules/electron/dist/Electron.app` and re-signs it ad-hoc. Two
+consequences:
+
+- **Reinstalling `electron` reverts it.** Nothing breaks — the next `npm run dev`
+  detects the original plist and re-patches.
+- **Editing that plist invalidates its signature**, which is why the script
+  re-signs. Removing the re-sign makes Electron fail to launch with a message
+  that gives no hint of the cause.
+
+To start over, delete `~/Library/Application Support/Tlachialoni Dev`.
+
 ### Surface previews
 
 The transient shell surfaces are hard to trigger on demand (a slow server for
@@ -132,12 +161,25 @@ The Developer menu is absent from packaged builds. See
 ## Packaging
 
 ```sh
-npm run package    # build a standalone macOS app into release/
+npm run package      # build a standalone macOS app into release/
+npm run package:local  # build a testable variant into release-local/
 ```
 
 This produces `release/mac-arm64/Tlachialoni.app` plus a `.dmg` and a `.zip`.
 Copy the `.app` to `/Applications` and launch it like any other Mac app — no
 repository or terminal required.
+
+### Testing a build without touching your installed app
+
+`npm run package:local` builds `release-local/mac-arm64/Tlachialoni Local.app`,
+which differs from the shipped app in its bundle id, its Finder name, and its
+profile directory. Use it to check a build without disturbing real state.
+
+It exists because a build sitting in `release/` alongside an installed copy is
+its own hazard: both carry `com.ackzell.tlachialoni`, so macOS treats them as one
+app and opening the second activates the first rather than launching it. Either
+use `package:local`, or keep the installed app and delete
+`release/mac-arm64/Tlachialoni.app` — don't keep both.
 
 The build is unsigned (ad-hoc) for local use, so macOS blocks the first launch of
 a copy that carries a quarantine flag. To open it, right-click the app → **Open**,

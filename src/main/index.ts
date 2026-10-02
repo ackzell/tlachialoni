@@ -40,7 +40,23 @@ if (
   process.env.TLACHIALONI_EXTENSION_TEST === "1" ||
   process.env.TLACHIALONI_SCREENSHOTS === "1"
 ) {
+  // NB: deliberately the first branch. `npm run screenshots` launches an
+  // unpackaged build, so a plain second `if (!app.isPackaged)` would also match
+  // and pull a capture run onto the development profile below.
   app.setPath("userData", path.join(os.tmpdir(), `tlachialoni-docktest-${process.pid}`));
+} else if (!app.isPackaged) {
+  // A development run and the installed app resolve the same `productName`, so
+  // both would otherwise share ~/Library/Application Support/Tlachialoni — and
+  // with it one set of cookies, installed extensions, and saved windows. An HMR
+  // session then rewrites the state the shipped app restores on launch. Give
+  // development its own profile; the suffix is derived, never a second literal.
+  // See specs/003-standalone-packaging/contracts/app-identity.md.
+  const devName = `${app.getName()} Dev`;
+  // `setName` drives the About panel and default window title. It does not
+  // move `userData` on its own, so the path is set explicitly rather than
+  // relying on Electron's ordering here.
+  app.setName(devName);
+  app.setPath("userData", path.join(app.getPath("appData"), devName));
 }
 
 /**
