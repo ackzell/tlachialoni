@@ -45,10 +45,10 @@ palette as a row you can enable, disable, update, or remove.
 
 Extensions load only into the guest page, never into the shell UI. Electron
 cannot host Manifest V3 background service workers at all, which matters more
-than it sounds: framework developer tools use that background as the bus between
-their DevTools panel and the page, so without it Angular DevTools reports that
-your app isn't there while it can plainly see it. So when an extension needs one,
-the app writes an MV2 rewrite of its manifest alongside the installed copy and
+than it sounds: some framework developer tools use that background as the bus
+between their DevTools panel and the page, so without it Angular DevTools reports
+that your app isn't there while it can plainly see it. So when an extension needs
+one, the app writes an MV2 rewrite of its manifest alongside the installed copy and
 loads that instead, which gives Chromium a real background page to route those
 messages through. Only the manifest changes — no extension code is patched, and
 the installed copy stays exactly as the store served it. Because that changes how
@@ -58,12 +58,25 @@ a warning that stays until you dismiss it, and its palette row carries an
 rewrite fails to load, the app falls back to the authored copy and the row keeps
 its `MV3` badge, because at that point the background really is dead.
 
+The rewrite is not applied to everything, because Manifest V2 cannot express
+everything Manifest V3 can. Two cases are handled rather than converted: an
+extension that runs part of itself in the page's own JavaScript world
+(`world: "MAIN"`, which MV2 has no equivalent for) is left on its authored
+manifest, and a background worker that loads its code with `importScripts` (also
+MV3-only) has those imports hoisted into the MV2 `scripts` list. Converting the
+first kind would break the extension outright to fix a background it may not even
+need — Vue.js devtools is the case in point, as it reaches the page without its
+background at all, worked before, and would not have worked after.
+
 Two limits survive all of this. `chrome.debugger` and `chrome.scripting` are
 Chrome-only API surface Electron doesn't compile, so signal breakpoints inside
 framework debuggers won't work, and an extension that leans on `chrome.scripting`
-for injection still won't. See `specs/019-mv2-background-shim/spec.md` for the
-details and `spikes/mv2-background-shim/` for the spike that established this
-works on Electron 44.
+for injection still won't. axe DevTools leans on `chrome.debugger` for its entire
+product, and Electron does not ship that namespace at all, so expect its panel to
+open and then report that it cannot analyse the tab. That is the accurate outcome,
+not a bug to chase. See `specs/019-mv2-background-shim/spec.md` for the details
+and `spikes/mv2-background-shim/` for the spike that established this works on
+Electron 44.
 
 A rewritten extension only affects pages that load after it: content scripts are
 injected when a page loads, so an extension activated afterwards never reaches the

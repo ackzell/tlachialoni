@@ -45,6 +45,9 @@ polish; this is the feature working at all.
   is touched.
 - **Module service workers.** `background.type: "module"` cannot be expressed as
   MV2 classic `scripts`. Left alone.
+- **Extensions that need the main world.** MV2 has no `world` key, so a rewrite
+  demotes main-world content scripts to the isolated world. For Vue.js devtools
+  that is fatal and the extension is left on its authored manifest (FR-007a).
 - **Translating `declarative_net_request`.** If the MV2 parser rejects the
   manifest, the authored copy is loaded instead — today's behaviour.
 
@@ -79,9 +82,44 @@ polish; this is the feature working at all.
   object → extension-pages string, `action` → `browser_action`, wrapped
   `web_accessible_resources` → flat list, `host_permissions` → `permissions`,
   `optional_host_permissions` → `optional_permissions`, and content-script
-  `world` removed.
+  `world` removed. Removing `world` demotes a main-world script to the isolated
+  world, which is only safe where the extension reaches the page another way
+  (FR-007a).
 - **FR-007**: A manifest MV2 cannot express MUST be left untouched. Specifically:
-  MV2 manifests, MV3 without a service worker, and module service workers.
+  MV2 manifests, MV3 without a service worker, module service workers, and workers
+  whose top-level code is not only `importScripts`.
+- **FR-007c**: A worker that loads its code with `importScripts` MUST have those
+  imports hoisted into `background.scripts`, resolved relative to the worker's own
+  directory, in order. `importScripts` is a `WorkerGlobalScope` method and an MV2
+  background page has no equivalent, so carrying the worker across unchanged
+  produces a background page that throws on its first statement — an extension
+  that loads, registers, and is then silently missing everything the worker was
+  for. A worker mixing `importScripts` with other top-level code MUST be declined,
+  since no `scripts` list reproduces it.
+- **FR-007d**: The caller MUST supply the worker's source text. A rewrite decision
+  made from the manifest alone cannot see `importScripts`, which appears only in the
+  worker file, so omitting it silently reintroduces FR-007c's failure. A worker
+  that cannot be read MUST be declined rather than assumed empty.
+- **FR-007e**: Inspecting a worker MUST distinguish three outcomes — no
+  `importScripts` at all, an `importScripts` shim that translates, and one that
+  does not. The first two both produce a valid rewrite and MUST NOT be reported
+  alike, because collapsing "nothing to do" into "decline this" silently stops
+  rewriting every self-contained worker, which is the majority of them. A nullable
+  result MUST NOT carry two meanings that require opposite handling.
+- **FR-007a**: The rewrite MUST be declined for an extension whose main-world
+  content script is load-bearing, listed in `MAIN_WORLD_REQUIRED` in
+  `src/main/extensions/mv2-shim.ts`. No manifest field distinguishes such a
+  script from an incidental one — Angular and Vue DevTools declare identically
+  shaped ones and need opposite things — so the decision MUST be explicit data
+  rather than inferred. The list MUST default to rewriting for anything
+  unrecognised, and MUST be keyed on extension `name` rather than ID, since an
+  unpacked extension's ID is derived from its load directory and so differs
+  between the authored and rewritten copies.
+- **FR-007b**: `load` MUST delete a rewrite it would now decline, not merely
+  decline to refresh one. Eligibility depends on this code as well as on the
+  manifest, so a copy written by an earlier build would otherwise keep being
+  preferred forever, leaving a declined extension in exactly the state the
+  decline exists to undo.
 - **FR-008**: The extension record MUST persist whether the rewrite is currently
   loaded, as `mv2Shimmed`, alongside the existing `mv3ServiceWorker`.
 - **FR-009**: `mv3ServiceWorker` MUST continue to describe the **authored**
@@ -98,6 +136,12 @@ polish; this is the feature working at all.
 - **FR-011a**: The rewrite notice MUST NOT claim the extension is now fully
   functional. It MUST carry the same caveat the install path uses about MV3-only
   APIs.
+- **FR-011b**: Installing or re-enabling an extension whose rewrite was declined
+  for needing the main world MUST warn that its background will not run, that
+  keeping MV3 is deliberate, and that the rest of the extension does work. It
+  MUST NOT be worded as a failure: the same dead background leaves the same
+  `MV3` badge, but the extension is working, and telling the developer otherwise
+  is a claim they can disprove by opening the panel.
 - **FR-012**: Installing or re-enabling an extension whose rewrite did not load
   MUST warn that both the service worker and the rewrite are unavailable.
 - **FR-013**: Unloading and removing an extension MUST consider both the authored
@@ -132,8 +176,11 @@ polish; this is the feature working at all.
 
 - **SC-001**: Installing Angular DevTools 1.22.0 from the store yields a palette
   row badged `MV3→MV2`, and its DevTools panel shows the component tree.
-- **SC-002**: Vue.js devtools and axe DevTools behave the same way without any
-  extension-specific code.
+- **SC-002**: axe DevTools is rewritten like Angular DevTools, with no
+  extension-specific code. Vue.js devtools is **not** rewritten: its panel
+  reaches the page over `inspectedWindow.eval` rather than through the
+  background, so it works with a dead service worker and rewriting it breaks it
+  (see `spikes/mv2-background-shim/results.md`).
 - **SC-003**: Given a manifest Electron's MV2 parser rejects, the extension
   still loads and remains listed.
 - **SC-004**: Given a manifest the transform declines, nothing is written to
@@ -144,16 +191,65 @@ polish; this is the feature working at all.
   background after a relaunch, with no reinstall and no user action.
 - **SC-007**: The transform is verified against a real store extension manifest,
   not only synthetic ones — the field that broke during development (`content_security_policy`)
-  was not derivable from the schema.
+  was not derivable from the schema. Two further cases (`world: "MAIN"` and
+  `importScripts`) were found only after shipping, both by reading real extensions,
+  so this criterion is treated as a floor rather than as having been met once.
+- **SC-009**: axe DevTools' rewrite declares the imports of its `importScripts`
+  worker as `background.scripts`, and its `BackgroundRecorder` reaches the
+  background rather than reporting a missing context.
+- **SC-010**: Angular DevTools is still rewritten after the `importScripts` fix.
+  It was silently lost when the first version of that fix reported "no imports to
+  hoist" and "cannot translate" as the same value, and the badge did not
+  distinguish the two because `MV3` was already in use for an unrelated state.
+  Angular is the regression guard precisely because it was working before.
+- **SC-011**: axe DevTools' panel opens and reports that it cannot analyse the
+  tab, rather than throwing in the page. The scan itself cannot succeed: its
+  product *is* a `chrome.debugger` session, and that namespace is absent from
+  Electron entirely (see `results.md`). This criterion separates "the rewrite
+  works" from "the extension can work here", which are not the same claim.
 - **SC-008**: Installing a rewritten extension tells the developer to reload the
   page, and reloading does make the extension take effect.
+
+## Correction: Vue.js devtools was never part of this failure
+
+The problem statement above lists Vue.js devtools alongside Angular and axe as
+showing "the same class of failure." That was wrong, and the error is what shipped
+a regression. Vue does have a background service worker, but its panel reaches the
+page over `chrome.devtools.inspectedWindow.eval` rather than through a port, so it
+worked with that worker dead. Stripping `world` from its `prepare.js` — a
+main-world script that installs the hook the panel polls for — stopped the Vue
+panel being created at all.
+
+Angular declares a main-world script too, so no manifest field separates the two
+cases: Angular needs the background and its main-world script is incidental, Vue
+needs the main world and its background is unused. The decision is therefore
+explicit data (`MAIN_WORLD_REQUIRED`), defaulting to rewrite. Full evidence in
+`spikes/mv2-background-shim/results.md`.
+
+There was a second regression of the same shape, found after the Vue one was
+fixed. axe DevTools ships a 60-byte worker whose whole body is
+`importScripts("browser-polyfill.js","background.bundle.js")`. `importScripts` is a
+`WorkerGlobalScope` method that an MV2 background *page* does not have, so the
+rewrite loaded a background page which threw on its first statement. It surfaced
+inside the inspected page as `BackgroundRecorder is not running in a known context`,
+with nothing in the message to point at a background. The imports now become the
+`scripts` list (FR-007c), which is what `importScripts` was achieving.
+
+The durable lesson, and the reason this is recorded in the spec rather than only
+in the code: **a manifest rewrite is not done when the manifest parses.** The spike
+measured one extension and generalised from it, and `importScripts` is not visible
+in `manifest.json` at all — it only appears on opening the worker file. A transform
+has to be checked against every extension the product claims to support, and
+against the files those manifests point at, not just the one that motivated it.
 
 ## Risks
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
 | Electron drops MV2 support | Medium | Fallback (FR-004) degrades to today's behaviour, never to an error. The badge makes the state visible. Deprecation warnings surface in stderr. |
-| Rewrite loads but breaks subtly | Low | Manifest-only change; authored copy retained verbatim (FR-002). |
+| Rewrite loads but breaks subtly | **Realised** | Stripping `world` demoted Vue devtools' `prepare.js` and killed its panel. Declined per-extension instead (FR-007a); authored copy retained verbatim throughout (FR-002). |
+| A decline list becomes extension-specific | Medium | One declarative name list, defaulting to rewrite, with the evidence in `results.md`. No behaviour branches on identity anywhere else. |
+| A rewrite loads but is missing behaviour | **Realised** | Stripping `world` broke Vue; `importScripts` killed axe's worker. The rewrite is not judged on the manifest parsing, but on what the loaded background can actually run (FR-007c). |
 | MV3-only manifest field we don't translate | Medium | Parser rejects → fallback. Non-blocking. |
 | Extension behaviour depends on a *suspended* background | Low | `persistent: true` (FR-003). |
 
@@ -162,9 +258,12 @@ polish; this is the feature working at all.
 None required. `mv2Shimmed` is additive and defaults to `false`.
 
 Extensions installed before this feature are picked up on their next launch or
-**Extensions → Reload extensions**, because `load` backfills a missing rewrite
-(FR-016). No reinstall, and no action from the developer — the badge changing
-from `MV3` to `MV3→MV2` is the only visible difference.
+**Extensions → Reload extensions**, because `load` reconciles the rewrite against
+the manifest: it backfills a missing one (FR-016) and deletes one it would now
+decline (FR-007b). No reinstall, and no action from the developer — for most, the
+badge changing from `MV3` to `MV3→MV2` is the only visible difference. Vue.js
+devtools already carrying a rewrite from a build with this bug are cleaned up the
+same way, which is what makes the fix reach an existing install.
 
 Writing the rewrite only in `commit` would have left every pre-existing install
 loading exactly as before, with nothing in the log to say why: a missing rewrite

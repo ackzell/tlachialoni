@@ -10,6 +10,24 @@
 - [x] T006 Flatten and dedupe `web_accessible_resources`
 - [x] T007 Merge `host_permissions` into `permissions` and `optional_host_permissions` into `optional_permissions`
 - [x] T008 Strip `world` from content scripts
+- [x] T008a Decline the rewrite for extensions whose main-world content script is
+      load-bearing (Vue.js devtools), and delete a stale rewrite that a later
+      build would decline. Regression found after the spike: the spike only ever
+      ran Angular, so `world` stripping was verified against an extension that
+      does not need it.
+- [x] T008b Hoist an `importScripts` worker's imports into `background.scripts`.
+      Regression found the same way, and worse than T008a because it is invisible
+      in `manifest.json`: axe DevTools' worker is 60 bytes and delegates via
+      `importScripts`, which an MV2 background page does not have, so the rewrite
+      loaded a background that threw on its first statement and reported the
+      failure as `BackgroundRecorder is not running in a known context` in the
+      inspected page.
+- [x] T008c Return three outcomes from the worker inspection rather than two.
+      The first version of T008b reported "no `importScripts` to hoist" and
+      "cannot translate" as the same `null`, which declined every self-contained
+      worker and silently stopped Angular DevTools being rewritten. Caught in the
+      state file on a real machine, not by the tests, because every test had been
+      written alongside the change it covered.
 - [x] T009 Never mutate the input manifest
 
 ## 2. Loading

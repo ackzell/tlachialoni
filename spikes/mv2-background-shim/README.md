@@ -9,11 +9,17 @@ first and why. Shipped as `src/main/extensions/mv2-shim.ts`; the spec is
 
 ## Why it matters
 
-Angular DevTools, Vue devtools, and axe DevTools all relay messages between
-their DevTools panel and the page through a background service worker. Electron
-cannot run those, so the panels report that your app is missing while their own
-content scripts can see it perfectly well. This is not a cosmetic breakage —
-for a framework developer tool, it is the whole feature.
+Angular DevTools and axe DevTools relay messages between their DevTools panel and
+the page through a background service worker. Electron cannot run those, so their
+panels report that your app is missing while their own content scripts can see it
+perfectly well. This is not a cosmetic breakage — for a framework developer tool,
+it is the whole feature.
+
+Vue devtools turns out to be the counter-example, and the reason it is worth
+reading: it has a service worker too, but does **not** need it. Its panel reaches
+the page over `inspectedWindow.eval` instead, so it worked all along, with the
+worker dead. Rewriting its manifest fixed nothing and broke something else —
+see `results.md`.
 
 ## Running it
 

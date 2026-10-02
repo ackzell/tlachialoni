@@ -88,7 +88,7 @@ no Electron, no `node:fs`.
 | `web_accessible_resources: [{resources, matches}]` | `["a.js", …]` | MV2 takes a flat list. |
 | `host_permissions` | merged into `permissions` | No separate field in MV2. |
 | `optional_host_permissions` | merged into `optional_permissions` | Same. |
-| `content_scripts[].world` | removed | MV3-only. Costs a main-world view of the page. |
+| `content_scripts[].world` | removed | MV3-only; MV2 rejects the key. Demotes the script to the isolated world — see the decline below. |
 
 ### Declined (returns `null`)
 
