@@ -9,12 +9,14 @@
  * guest page's session. The shell runs in a different session and is never
  * reachable from here (constitution II, FR-009).
  *
- * Electron does not host Manifest V3 background service workers, so an MV3
- * extension installs with a permanently dead background. For extensions that use
- * it as a message bus — every framework developer tool — that is the whole
- * feature. So an install also writes an MV2 rewrite of the manifest to a
- * sibling directory and prefers it, falling back to the authored copy when the
- * rewrite does not load (specs/019).
+ * Electron hosts Manifest V3 background service workers, but a worker that
+ * throws while starting up is torn down — and `chrome.debugger` is not compiled
+ * into Electron, so an MV3 extension whose worker touches it loses its
+ * background entirely. For extensions that use the background as a message bus
+ * — every framework developer tool — that is the whole feature. So an install
+ * also writes an MV2 rewrite of the manifest to a sibling directory and prefers
+ * it, falling back to the authored copy when the rewrite does not load
+ * (specs/019). A background page survives the throw that kills a worker.
  */
 
 import { app, dialog, shell } from "electron";
@@ -576,7 +578,7 @@ export class ExtensionManager {
     this.emit({
       phase: "warning",
       name,
-      message: `${name} was rewritten from Manifest V3 to V2 so its background service worker can run here. Its manifest is the only thing that changed; the installed copy is untouched.\nReload the page for it to take effect — extensions only reach a page that loads after them. Some Manifest V3-only APIs are still unavailable, so parts of it may not work.`,
+      message: `${name} was rewritten from Manifest V3 to V2 so its background runs as a page, which survives an API error that would kill a service worker. Its manifest is the only thing that changed; the installed copy is untouched.\nReload the page for it to take effect — extensions only reach a page that loads after them. Some Manifest V3-only APIs are still unavailable, so parts of it may not work.`,
     });
   }
 
@@ -585,29 +587,29 @@ export class ExtensionManager {
    * JavaScript world, which MV2 cannot express.
    *
    * Kept apart from {@link warnAboutMv3} because the two leave the same visible
-   * state — a dead background, and therefore the same `MV3` badge — but not the
-   * same one: this extension is working, and saying so much less would be a lie
-   * the developer can disprove by looking at the panel.
+   * state — an at-risk background, and therefore the same `MV3` badge — but not
+   * the same one: this extension is working, and saying so much less would be a
+   * lie the developer can disprove by looking at the panel.
    */
   private warnAboutMainWorld(name: string): void {
     this.emit({
       phase: "warning",
       name,
-      message: `${name} keeps its Manifest V3 manifest on purpose. It runs part of itself in the page's own JavaScript world, which Manifest V2 cannot express, so converting it would break the extension outright. Its background service worker will not run, but the rest of it does.\nReload the page for it to take effect — extensions only reach a page that loads after them.`,
+      message: `${name} keeps its Manifest V3 manifest on purpose. It runs part of itself in the page's own JavaScript world, which Manifest V2 cannot express, so converting it would break the extension outright. Its background runs as authored and may not survive an API this app doesn't compile, but the rest of it does.\nReload the page for it to take effect — extensions only reach a page that loads after them.`,
     });
   }
 
   /**
-   * Warns that an extension's background service worker is dead *and* that our
-   * MV2 rewrite of it did not load either, so there is nothing left to fall
-   * back to. Shown once per install/re-enable, then left to the list's badge
-   * (specs/019, FR-003).
+   * Warns that our MV2 rewrite of an MV3 extension did not load, so the authored
+   * service worker is what runs — and that Electron tears down a service worker
+   * which hits an API it doesn't compile. Shown once per install/re-enable, then
+   * left to the list's badge (specs/019, FR-003).
    */
   private warnAboutMv3(name: string): void {
     this.emit({
       phase: "warning",
       name,
-      message: `This extension uses Manifest V3 service workers, which ${app.getName()} can't host, and the MV2 rewrite of it wouldn't load either. Most of it won't work.`,
+      message: `This extension's MV2 rewrite wouldn't load, so it keeps its Manifest V3 service worker. ${app.getName()} tears that worker down if it hits an API the app doesn't compile, so parts of it may not work.`,
     });
   }
 

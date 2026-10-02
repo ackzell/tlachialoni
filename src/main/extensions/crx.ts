@@ -121,8 +121,10 @@ export function readManifest(dir: string): ExtensionManifest {
 
 /**
  * Detects whether a manifest is Manifest V3 with a service worker background.
- * Electron does not support MV3 service workers, so such extensions load but
- * their background logic crashes at runtime.
+ * Electron hosts these, but tears a worker down if it throws while starting up
+ * — which is what happens when it touches an API Electron doesn't compile, such
+ * as `chrome.debugger`. The flag marks an extension whose background is at risk
+ * and may be rewritten to an MV2 background page (specs/018/019).
  */
 export function detectMv3ServiceWorker(manifest: ExtensionManifest): boolean {
   if (manifest.raw.manifest_version !== 3) return false;

@@ -39,5 +39,6 @@ With `⌘P`:
   a `.crx`; the download endpoint is unofficial and the folder path is the
   fallback.
 - Electron supports a subset of extension APIs, so some store extensions load
-  and run only partially (notably Manifest V3 background service workers).
+  and run only partially (notably anything that needs `chrome.debugger`, and an
+  MV3 service worker that throws while starting up).
 - Extensions run only against the guest page; the shell cannot be injected.

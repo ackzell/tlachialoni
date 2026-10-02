@@ -2,8 +2,9 @@
 
 Predecessor: `specs/018-mv3-extension-warning/research.md` R1, which recorded
 "Electron does not support Manifest V3 service workers" and treated that as a
-hard stop. It is still true. What changed is that it is no longer the end of the
-story.
+hard stop. That was wrong — Electron does host MV3 service workers; see
+`spec.md` "Correction". What follows is still the workaround, for the worker that
+dies on `chrome.debugger`.
 
 ## R1: Why the symptom looked like a detection bug
 
@@ -13,7 +14,8 @@ not a detection failure.
 **Rationale**: Angular DevTools' detection runs in the page and works. Its
 `detect_angular_bundle.js` reported `isAngular: true` — visible in the panel's
 own console during the spike. The result then had to travel to the panel through
-the background service worker, which never started. The panel polls
+the background service worker, which died at startup on `chrome.debugger`. The
+panel polls
 `queryNgAvailability` on a 500 ms interval and, after a fixed threshold, gives
 up and renders the "not detected" screen unconditionally.
 
@@ -75,8 +77,8 @@ generic).
 **Decision**: `background: { scripts: [...], persistent: true }`.
 
 **Rationale**: MV2 also permits non-persistent event pages, which unload after
-~30 seconds idle. That is the same class of failure as the service worker that
-never starts: the panel would connect, then silently lose its background
+~30 seconds idle. That is the same class of failure as a service worker that dies
+at startup: the panel would connect, then silently lose its background
 mid-session. Port longevity is the feature.
 
 ## R5: Which fields must be translated
@@ -169,12 +171,19 @@ cannot know the page is the reason it looks inert).
 
 **Decision**: Rewrite every eligible extension automatically.
 
-**Rationale**: An extension whose service worker never starts cannot be made
-worse by attempting a rewrite — the background it depends on is already dead, so
-there is no working behaviour to regress. Combined with the fallback (R6), every
-failure path lands on today's behaviour. Opt-in would have meant the developer
-hitting the exact problem this spec exists to fix, and having to know to look for
-a setting.
+**Rationale**: An extension whose service worker would die at startup cannot be
+made worse by attempting a rewrite — that background is already gone — and the
+fallback (R6) means every failure path lands on today's behaviour. Rewriting
+automatically rather than opt-in is deliberate: the developer hitting the exact
+problem this spec exists to fix should not have to know to look for a setting.
+
+The honest caveat, added after the mechanism was corrected (see spec.md
+"Correction"): a service worker and a background page are not the same thing, so
+an extension whose worker runs fine can still behave differently once it is a
+page. Rewriting is therefore a default, not a guarantee, and `MAIN_WORLD_REQUIRED`
+plus the load fallback exist to keep the known-bad cases out. Whether the rewrite
+should be narrower — applied only where a worker is known to die — is an open
+question this spec does not settle.
 
 The one cost is silence, which is why the badge and the install message report
 the conversion rather than making it invisible (FR-010, FR-011).

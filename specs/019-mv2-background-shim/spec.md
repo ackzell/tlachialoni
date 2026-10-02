@@ -3,25 +3,51 @@
 **Feature Branch**: `019-mv2-background-shim`
 **Created**: 2026-10-02
 **Status**: Implemented
+**Pending**: `specs/020-extension-load-narrowing/` — narrows *when* this rewrite
+is applied, so most extensions run as authored. Draft, spike-gated, not started.
 **Supersedes**: `specs/018-mv3-extension-warning/` (partially — the `MV3` badge
 remains, but only for extensions the rewrite could not save)
 
 ## Problem Statement
 
-Electron cannot host Manifest V3 background service workers. An MV3 extension
-still loads, but its background context never starts.
+Electron hosts Manifest V3 background service workers, but a worker that throws
+while evaluating its top level is torn down, and Chromium then reports the
+registration as failed (`Service worker registration failed. Status code: 15`).
+Electron does not compile `chrome.debugger`, so a worker that touches it throws
+and dies during startup — taking the extension's whole background context with
+it. That `status 15` line is the consequence of the death, not a refusal to host
+workers at all; see `spikes/mv2-background-shim/results.md` for the experiment.
 
 For most extensions this is a partial loss. For framework developer tools it is
 total, because they use that background as the message bus between their
 DevTools panel and the inspected page. Angular DevTools 1.22 routes every
 message through it: the panel opens a port, the content script opens another,
-and only the background joins them. With no background, the panel never learns a
-page exists and reports "Angular application not detected." — while its own
+and only the background joins them. With the worker dead, the panel never learns
+a page exists and reports "Angular application not detected." — while its own
 content script, in the same page, has correctly found the Angular app.
 
 The developer sees a broken tool and has no way to act on it. Reinstalling,
 reloading, or reopening the panel changes nothing, because the cause is not the
 page or the extension.
+
+## Correction: what actually kills the worker
+
+This spec was written from a spike that concluded Electron cannot host MV3
+background service workers. That is false, and the error is worth recording
+because the workaround is still correct while the stated cause is not.
+
+Electron 44.5.1 hosts MV3 service workers: they register, run, expose
+`chrome.storage`, and stay alive. A worker that throws during startup is torn
+down, and `Status code: 15` is reported *after* that death. `chrome.debugger` is
+absent from Electron outright, so Angular DevTools' worker runs its
+`PortMultiplexer.initialize()` and then throws on `chrome.debugger.onEvent` and
+dies. A Manifest V2 background page survives the same throw, which is why this
+rewrite works.
+
+The distinction matters for anything built on this spec: the rewrite is not a
+service-worker shim, it is an **error-tolerance shim**. The experiment is in
+`spikes/mv2-background-shim/results.md` ("Corrected mechanism") and
+`worker-hosting-probe.mjs` reproduces it.
 
 ## User Story
 
@@ -137,13 +163,16 @@ polish; this is the feature working at all.
   functional. It MUST carry the same caveat the install path uses about MV3-only
   APIs.
 - **FR-011b**: Installing or re-enabling an extension whose rewrite was declined
-  for needing the main world MUST warn that its background will not run, that
-  keeping MV3 is deliberate, and that the rest of the extension does work. It
-  MUST NOT be worded as a failure: the same dead background leaves the same
-  `MV3` badge, but the extension is working, and telling the developer otherwise
-  is a claim they can disprove by opening the panel.
+  for needing the main world MUST warn that its background runs as authored and
+  may not survive an API Electron does not compile, that keeping MV3 is
+  deliberate, and that the rest of the extension does work. It MUST NOT be
+  worded as a failure: the same at-risk background leaves the same `MV3` badge,
+  but the extension is working, and telling the developer otherwise is a claim
+  they can disprove by opening the panel.
 - **FR-012**: Installing or re-enabling an extension whose rewrite did not load
-  MUST warn that both the service worker and the rewrite are unavailable.
+  MUST warn that the MV2 rewrite is unavailable and that the authored MV3
+  service worker is what runs, which Electron tears down if it hits an API the
+  app does not compile.
 - **FR-013**: Unloading and removing an extension MUST consider both the authored
   and rewritten directories, so no orphaned copy stays registered.
 - **FR-014**: The rewrite MUST be regenerated on update, since `commit` is the
@@ -215,9 +244,9 @@ polish; this is the feature working at all.
 The problem statement above lists Vue.js devtools alongside Angular and axe as
 showing "the same class of failure." That was wrong, and the error is what shipped
 a regression. Vue does have a background service worker, but its panel reaches the
-page over `chrome.devtools.inspectedWindow.eval` rather than through a port, so it
-worked with that worker dead. Stripping `world` from its `prepare.js` — a
-main-world script that installs the hook the panel polls for — stopped the Vue
+page over `chrome.devtools.inspectedWindow.eval` rather than through a port, so
+its panel never depended on the worker. Stripping `world` from its `prepare.js` —
+a main-world script that installs the hook the panel polls for — stopped the Vue
 panel being created at all.
 
 Angular declares a main-world script too, so no manifest field separates the two

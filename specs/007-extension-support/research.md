@@ -13,9 +13,10 @@ From the Electron docs (`Chrome Extension Support`) and `electron.d.ts`:
   `loadExtension` every boot.
 - Supported manifest keys are narrow: `content_scripts`, `devtools_page`,
   `background` (Manifest V2), `host_permissions` (MV3), `permissions`,
-  `default_locale`, `name`, `version`, etc. **`background.service_worker`
-  (MV3) is not supported**, so modern service-worker extensions lose their
-  background logic.
+  `default_locale`, `name`, `version`, etc. **`background.service_worker` (MV3)
+  is hosted, but a worker that throws while starting up is torn down**, so a
+  modern service-worker extension that touches an API Electron doesn't compile —
+  `chrome.debugger` — loses its background logic.
 - `extensions` events: `extension-loaded`, `extension-ready`,
   `extension-unloaded`. `loadExtension` resolves with `{ id, name, version,
   path, url, manifest }` and logs warnings for unsupported APIs.

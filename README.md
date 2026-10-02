@@ -44,19 +44,23 @@ stage, and a download progress bar; each installed extension also appears in the
 palette as a row you can enable, disable, update, or remove.
 
 Extensions load only into the guest page, never into the shell UI. Electron
-cannot host Manifest V3 background service workers at all, which matters more
-than it sounds: some framework developer tools use that background as the bus
-between their DevTools panel and the page, so without it Angular DevTools reports
-that your app isn't there while it can plainly see it. So when an extension needs
-one, the app writes an MV2 rewrite of its manifest alongside the installed copy and
-loads that instead, which gives Chromium a real background page to route those
-messages through. Only the manifest changes — no extension code is patched, and
-the installed copy stays exactly as the store served it. Because that changes how
-your extension declares itself, it says so: installing or re-enabling one raises
-a warning that stays until you dismiss it, and its palette row carries an
-`MV3→MV2` badge so you can see at a glance which extensions were converted. If a
-rewrite fails to load, the app falls back to the authored copy and the row keeps
-its `MV3` badge, because at that point the background really is dead.
+runs Manifest V3 background service workers, but a worker that throws while
+starting up is torn down — and Electron doesn't compile `chrome.debugger`, so a
+worker that touches it dies and takes its registration with it. That matters
+more than it sounds: some framework developer tools use that background as the
+bus between their DevTools panel and the page, so with the worker dead Angular
+DevTools reports that your app isn't there while it can plainly see it. A
+Manifest V2 background page survives the same throw, so when an extension has a
+service worker background the app writes an MV2 rewrite of its manifest
+alongside the installed copy and loads that instead, which gives the extension a
+background context that stays alive. Only the manifest changes — no extension
+code is patched, and the installed copy stays exactly as the store served it.
+Because that changes how your extension declares itself, it says so: installing
+or re-enabling one raises a warning that stays until you dismiss it, and its
+palette row carries an `MV3→MV2` badge so you can see at a glance which
+extensions were converted. If a rewrite fails to load, the app falls back to the
+authored copy and the row keeps its `MV3` badge, because then the authored
+worker is what runs and may not survive.
 
 The rewrite is not applied to everything, because Manifest V2 cannot express
 everything Manifest V3 can. Two cases are handled rather than converted: an
@@ -68,15 +72,17 @@ first kind would break the extension outright to fix a background it may not eve
 need — Vue.js devtools is the case in point, as it reaches the page without its
 background at all, worked before, and would not have worked after.
 
-Two limits survive all of this. `chrome.debugger` and `chrome.scripting` are
-Chrome-only API surface Electron doesn't compile, so signal breakpoints inside
-framework debuggers won't work, and an extension that leans on `chrome.scripting`
-for injection still won't. axe DevTools leans on `chrome.debugger` for its entire
+Two limits survive all of this. `chrome.debugger` is the reason the rewrite
+exists at all — Electron doesn't compile the namespace, so signal breakpoints
+inside framework debuggers won't work — and `chrome.scripting` is Chrome-only
+surface Electron doesn't compile either, so an extension that leans on it for
+injection still won't. axe DevTools leans on `chrome.debugger` for its entire
 product, and Electron does not ship that namespace at all, so expect its panel to
 open and then report that it cannot analyse the tab. That is the accurate outcome,
 not a bug to chase. See `specs/019-mv2-background-shim/spec.md` for the details
 and `spikes/mv2-background-shim/` for the spike that established this works on
-Electron 44.
+Electron 44 — and the correction below it, which records that Electron does host
+MV3 service workers and that `chrome.debugger` is what kills them.
 
 A rewritten extension only affects pages that load after it: content scripts are
 injected when a page loads, so an extension activated afterwards never reaches the
@@ -192,6 +198,9 @@ See:
 - `specs/015-trackpad-swipe-navigation/spec.md` — two-finger swipe history navigation
 - `specs/017-macos-dock-menu/spec.md` — the macOS Dock window menu and Dock-icon behavior
   (macOS now stays open when the last window closes, so the Dock stays available)
+- `specs/019-mv2-background-shim/spec.md` — running extensions whose MV3 background dies here
+- `specs/020-extension-load-narrowing/spec.md` — **pending**: narrow that rewrite to the
+  extensions that need it, so most run as authored
 
 ## License
 

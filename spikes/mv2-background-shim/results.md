@@ -3,6 +3,48 @@
 Established by hand on **Electron 44.4.5 / Chromium 152.0.7977.130**, macOS
 arm64. Every claim below is from that run, not from documentation.
 
+> **Correction (2026-10-02): the worker was running.** The headline conclusion
+> below — that Electron cannot host Manifest V3 background service workers — is
+> wrong. Electron does host them. A worker that throws while evaluating its top
+> level is torn down, and `Service worker registration failed. Status code: 15`
+> is what Chromium reports _after_ that death, not a refusal to host the worker
+> at all. Angular DevTools' worker starts, runs `PortMultiplexer.initialize()`,
+> and then throws on `chrome.debugger.onEvent` — the one namespace Electron does
+> not compile. The MV2 rewrite still works, but because a background _page_
+> survives a top-level throw that kills a service worker, not because it enables
+> service workers. The sections that follow are kept as written, with the false
+> claims corrected in place; "Corrected mechanism" below has the experiment that
+> settles it, and `worker-hosting-probe.mjs` reproduces it.
+
+## Corrected mechanism
+
+Re-verified on **Electron 44.5.1 / Chromium 152.0.7977.130** with minimal
+extensions differing only in background shape and in whether they touch
+`chrome.debugger`:
+
+| Extension | Background          | Touches `chrome.debugger` | Result                                                     |
+| --------- | ------------------- | ------------------------- | ---------------------------------------------------------- |
+| A2        | MV3 service worker  | no                        | registers, runs, stays alive                               |
+| A3        | MV3 service worker  | no (`chrome.storage`)     | registers, runs, `chrome.storage` works                    |
+| B         | MV3 service worker  | unguarded                 | runs to the throw, then dies; registration reported failed |
+| D         | MV3 service worker  | guarded (`try`/`catch`)   | registers, runs, stays alive                               |
+| C         | MV2 background page | unguarded                 | loads; no fatal error is reported                          |
+
+B and D are the decisive pair: identical bodies, one `try`/`catch` apart. The
+worker is not missing from Electron — one unguarded access to an API Electron
+does not ship is enough to kill it. `chrome.debugger` is absent outright: zero
+`"namespace":"debugger"` and zero `Debuggee` entries in the Electron 44 binary,
+against one `"namespace":"scripting"`.
+
+The C row is the one this probe cannot settle alone: it shows the page loads and
+reports no fatal error, but that listeners registered before the throw keep
+working is established by the end-to-end result — the rewritten Angular extension
+shows its full component tree (Approach 2, below).
+
+```sh
+./node_modules/.bin/electron spikes/mv2-background-shim/worker-hosting-probe.mjs
+```
+
 ## The symptom
 
 Angular DevTools 1.22.0, installed through the app's own extension flow, showed
@@ -27,7 +69,7 @@ background service worker. Traced through the installed extension:
    → `chrome.runtime.onConnect` → `doublePipe()`. It relays
    `contentScriptConnected`, `frameConnected`, `backendReady`.
 
-With no worker, the panel never learns a page exists. It polls
+With the worker dead, the panel never learns a page exists. It polls
 `queryNgAvailability` every 500 ms, and after its give-up threshold renders
 Angie — which is why the message appears ~10 seconds in rather than instantly.
 
@@ -35,19 +77,25 @@ Detection itself was never broken. `app/detect_angular_bundle.js` found the
 `[ng-version]` element correctly and reported `isAngular: true`; the result just
 had nowhere to go.
 
-## Evidence the worker never ran
+## Evidence the worker started, then died
 
-Chrome profile at `~/Library/Application Support/Tlachialoni`:
+The original reading of this section concluded the worker never ran. That was
+wrong — see the correction at the top of this file. The same evidence, read with
+the worker's own error in view:
 
-- `Service Worker/Database/000003.log` holds many `:REG:` /
-  `;REG:chrome-extension://ienfalfjdbdpebioblfackkekamfmbnh/` pairs —
-  registered and torn down repeatedly — and **no**
-  `INITDATA_UNIQUE_ORIGIN` entry for that origin, which every extension whose
-  worker actually started did get.
-- `app/background_bundle.js` appears nowhere in the profile except its own
-  manifest. It was never compiled.
-- Loading the extension logs Chromium's own verdict:
-  `Service worker registration failed. Status code: 15`.
+- Loading the extension logs the worker's own uncaught error first:
+  `chrome-extension://ienfalfjdbdpebioblfackkekamfmbnh/app/background_bundle.js`
+  → `Cannot read properties of undefined (reading 'onEvent')`, and only then
+  `Service worker registration failed. Status code: 15`. A worker that never ran
+  cannot produce the first line.
+- `app/background_bundle.js` executes, reaches `chrome.debugger.onEvent` —
+  absent from Electron — and throws while starting up, so Chromium tears the
+  worker down and reports the registration as failed.
+- The profile holds many `:REG:` /
+  `;REG:chrome-extension://ienfalfjdbdpebioblfackkekamfmbnh/` pairs, registered
+  and torn down repeatedly, and no `INITDATA_UNIQUE_ORIGIN` entry for that
+  origin. That is consistent with a worker that died during startup, not with one
+  that was never accepted.
 
 ## Approach 1 — host the worker in a page we create. Failed.
 
@@ -114,8 +162,8 @@ chrome.devtools.inspectedWindow.eval(
 ```
 
 `inspectedWindow.eval` reads the page's own JavaScript world directly. No
-background, no port, no service worker. So Vue worked with its worker dead —
-as it always did — and the "same class of failure" reading was simply wrong.
+background, no port, no service worker. So Vue's panel never depended on its
+worker, and the "same class of failure" reading was simply wrong.
 
 The rewrite then broke it, because of a field the spike never had to reason
 about. Vue's manifest declares:
@@ -258,7 +306,11 @@ friends). It is absent, and the bundle throws on it:
 Uncaught TypeError: Cannot read properties of undefined (reading 'onEvent')
 ```
 
-Electron states it directly on load: `Permission 'debugger' is unknown`.
+That throw is also the reason the rewrite exists: it happens during the worker's
+startup, so under the authored MV3 manifest it does not merely disable signal
+breakpoints — it kills the whole background context. The MV2 rewrite is what
+makes the rest of the worker survivable. Electron states the absence directly on
+load: `Permission 'debugger' is unknown`.
 `chrome.debugger` and `chrome.scripting` live in `chrome/browser/extensions/api/`
 — the Chrome-only layer. Electron compiles
 `electron/shell/browser/extensions/api/` instead, which exists (control: 2
@@ -309,7 +361,8 @@ Worth recording, because it cost real time and presented as a Dock-mode bug.
 The first implementation wrote the rewrite only in `commit()` — at install and
 update time. `load()` merely preferred one if it happened to exist. So an
 extension installed _before_ the feature shipped loaded exactly as it always had:
-authored MV3 copy, dead background, "application not detected". The rewrite
+authored MV3 copy, its worker dead on `chrome.debugger`, "application not
+detected". The rewrite
 directory did not exist to be found, and nothing in the log said so.
 
 Worse, once `.shim/` did get populated, a **stale** rewrite and the authored copy
@@ -331,6 +384,11 @@ Two lessons, both now in the spec:
 ## Re-verifying
 
 ```sh
+# The platform question: does Electron host MV3 background service workers?
+# No extension needs to be installed; the probe builds its own fixtures.
+./node_modules/.bin/electron spikes/mv2-background-shim/worker-hosting-probe.mjs
+
+# The end-to-end question: does the rewrite make Angular DevTools' panel work?
 ./node_modules/.bin/electron spikes/mv2-background-shim/probe.mjs      # baseline: not detected
 ./node_modules/.bin/electron spikes/mv2-background-shim/probe.mjs mv2  # rewritten: full tree
 ```

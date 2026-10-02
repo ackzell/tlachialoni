@@ -18,20 +18,21 @@ export interface InstalledExtension {
   enabled: boolean;
   installedAt: number;
   /**
-   * Whether the manifest is MV3 with a background service worker, which Electron
-   * does not run. Persisted so the list can badge the extension after the
-   * one-time install warning (specs/018, FR-010). Absent in records written
-   * before this field; those read as `false` and are corrected on the next load,
-   * which re-reads the manifest.
+   * Whether the manifest is MV3 with a background service worker. Electron hosts
+   * these, but tears a worker down if it throws while starting up, so the flag
+   * marks an extension whose background may not survive. Persisted so the list
+   * can badge the extension after the one-time install warning (specs/018,
+   * FR-010). Absent in records written before this field; those read as `false`
+   * and are corrected on the next load, which re-reads the manifest.
    */
   mv3ServiceWorker: boolean;
   /**
    * Whether the app rewrote this extension's manifest from MV3 to MV2 so its
-   * background could run, and the rewritten copy is the one currently loaded
-   * (specs/019). False both for extensions that never needed it and for ones
-   * whose rewrite Electron refused — the latter keep the `MV3` badge, because
-   * their background really is dead. Persisted so the list can say which of the
-   * two happened.
+   * background would survive a startup throw, and the rewritten copy is the one
+   * currently loaded (specs/019). False both for extensions that never needed it
+   * and for ones whose rewrite Electron refused — the latter keep the `MV3`
+   * badge, because that is the case where the authored worker is what runs and
+   * may not survive. Persisted so the list can say which of the two happened.
    */
   mv2Shimmed: boolean;
 }

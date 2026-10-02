@@ -31,7 +31,7 @@ They answer different questions, and the palette needs both:
 | --- | --- | --- | --- |
 | `false` | `false` | Never needed a rewrite | none |
 | `true` | `true` | Authored MV3, running as an MV2 rewrite | `MV3→MV2` |
-| `true` | `false` | Authored MV3, rewrite declined or rejected. Background is dead. | `MV3` |
+| `true` | `false` | Authored MV3, rewrite declined or rejected. The authored worker runs and may not survive. | `MV3` |
 | `false` | `true` | Not reachable — a rewrite implies MV3 | (defensive) |
 
 `mv3ServiceWorker` is derived from the **authored** manifest on disk and never

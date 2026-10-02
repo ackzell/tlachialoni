@@ -8,6 +8,15 @@
 
 **Input**: User description: "When I install a Manifest V3 extension that uses a service worker background, it loads but the background script crashes with confusing errors like 'Cannot read properties of undefined (reading onEvent)' and 'Service worker registration failed. Status code: 15'. I want the app to detect MV3 extensions and warn me that they won't work properly, so I'm not confused by runtime errors."
 
+> **Correction (2026-10-02):** the premise here is wrong. Electron does host
+> Manifest V3 background service workers; what kills one is a top-level throw,
+> and `chrome.debugger` is the namespace Electron does not compile that makes
+> Angular DevTools' worker throw. `Status code: 15` is reported *after* that
+> death, not instead of hosting the worker. The detection, warning, and badge
+> this spec describes still behave as written; only the stated cause is wrong.
+> See `specs/019-mv2-background-shim/spec.md` ("Correction") and
+> `spikes/mv2-background-shim/results.md`.
+
 ## Clarifications
 
 ### Session 2026-10-01
@@ -116,7 +125,7 @@ The developer installs an MV3 extension. The warning is shown, but the extension
 
 ## Assumptions
 
-- Electron does not support MV3 service workers, and this is unlikely to change in the near term.
+- Electron hosts MV3 service workers but tears down one that throws during startup, and `chrome.debugger` is not compiled into it. See the correction at the top of this spec.
 - MV3 extensions with content scripts and DevTools pages are still useful and should not be blocked.
 - The existing status surface infrastructure (007) is sufficient for showing the warning; no new UI surface is needed.
 - The command palette's existing extension rows are where the badge lives; no separate extensions panel exists or is planned for this feature.

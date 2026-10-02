@@ -273,10 +273,10 @@ export function buildRows(
           label: toggleLabel,
           matches: toggle.indices,
           detail: extension.enabled ? "enabled" : "disabled",
-          // The standing note on this row's background. A rewrite that
-          // loaded says so rather than warning about a service worker that is in
-          // fact running (specs/019); `MV3` is reserved for the rewrite failing,
-          // where the background really is dead.
+          // The standing note on this row's background. A rewrite that loaded
+          // says so rather than flagging the authored manifest (specs/019);
+          // `MV3` is reserved for the rewrite failing, where the authored
+          // worker is what runs and may not survive.
           badge: extension.mv2Shimmed ? "MV3→MV2" : extension.mv3ServiceWorker ? "MV3" : undefined,
           arg: extension.slug,
         });

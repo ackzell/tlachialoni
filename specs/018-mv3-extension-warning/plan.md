@@ -15,7 +15,7 @@ Detect Manifest V3 extensions that use service worker backgrounds and tell the d
 ## Technical Context
 
 - **Runtime**: Electron 44 (Chromium/Node from `process.versions`), macOS.
-- **Extension API**: `session.extensions.loadExtension(path)`. No MV3 background service workers.
+- **Extension API**: `session.extensions.loadExtension(path)`. MV3 service workers are hosted, but Electron tears one down if it throws while starting up, and `chrome.debugger` is not compiled in.
 - **State**: one additive field, `InstalledExtension.mv3ServiceWorker`, defaulted on read so no migration is needed. It is re-derived from the manifest on every load.
 - **UI**: Vue 3 shell renderer; the existing `InstallStatus.vue` component gains a "warning" phase, and `CommandPalette.vue` gains an optional row badge.
 - **New dependencies**: none.

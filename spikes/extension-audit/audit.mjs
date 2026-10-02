@@ -29,6 +29,12 @@ import { basename, join } from "node:path";
  * which is the same method `spikes/mv2-background-shim/results.md` used to show
  * `debugger` is missing outright while `scripting` is present.
  *
+ * Absence here is also what kills an MV3 worker that touches the namespace: the
+ * access throws while the worker is starting up, and Chromium tears the whole
+ * worker down — `Service worker registration failed. Status code: 15` is the
+ * report that follows, not a refusal to host workers. See
+ * `spikes/mv2-background-shim/results.md` ("Corrected mechanism").
+ *
  * Kept as data with the method recorded, because this is a fact about a specific
  * Electron build that will change. `probe.mjs` re-derives it at runtime, which is
  * the authoritative check.

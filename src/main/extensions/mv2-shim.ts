@@ -1,18 +1,26 @@
 /**
- * Manifest rewriting for extensions Electron cannot host as authored.
+ * Manifest rewriting for extensions Electron cannot run as authored.
  *
- * Electron does not run Manifest V3 background service workers. Registration
- * fails outright, so an MV3 extension still loads but its background context
- * never starts. Framework developer tools are the painful case: they relay
- * every message between their DevTools panel and the inspected page through
- * that background, so with it dead the panel sits there reporting that no
- * application was found — while the page in front of it is an Angular or Vue
+ * Electron does host Manifest V3 background service workers, but a worker that
+ * throws while evaluating its top level is torn down, and Chromium then reports
+ * the registration as failed (`Service worker registration failed. Status code:
+ * 15`). Electron does not compile `chrome.debugger`, so a worker that touches it
+ * throws and dies at startup, taking the extension's whole background context
+ * with it. `status 15` is the consequence of that death, not a refusal to host
+ * workers at all — see `spikes/mv2-background-shim/results.md`.
+ *
+ * A Manifest V2 background *page* is a DOM document and survives the same throw:
+ * the listeners registered before it keep working. That is the difference this
+ * rewrite buys. Framework developer tools are the painful case, because they
+ * relay every message between their DevTools panel and the inspected page
+ * through that background, so with it dead the panel sits there reporting that
+ * no application was found — while the page in front of it is an Angular or Vue
  * app the extension's own content script can see perfectly well.
  *
- * The workaround is to declare the extension as MV2 with a persistent
- * background page. Electron does host those, and once the background is a real
- * declared context Chromium delivers `runtime.onConnect` ports to it natively,
- * which is the part no amount of our own plumbing could have reproduced.
+ * So the workaround is to declare the extension as MV2 with a persistent
+ * background page. Once the background is a real declared context Chromium
+ * delivers `runtime.onConnect` ports to it natively, which is the part no amount
+ * of our own plumbing could have reproduced.
  *
  * Only the manifest changes. No extension code is patched, and the rewrite is
  * written to a sibling directory so the installed copy stays byte-identical to
@@ -146,9 +154,9 @@ function joinPosix(dir: string, target: string): string {
  * `inspectedWindow.eval`, not a port; the one path that *does* use the
  * background (`runtime.connect` paired with `chrome.scripting.executeScript` of
  * `dist/proxy.js`) cannot work in Electron either way, since `chrome.scripting`
- * is not compiled in. So before this feature Vue worked with a dead worker, and
- * the rewrite removed the one thing it needed in order to supply the one thing
- * it did not.
+ * is not compiled in. So Vue worked whether or not its worker ran, and the
+ * rewrite removed the one thing it needed in order to supply the one thing it
+ * did not.
  *
  * Keyed on `name` because that is the one field stable across versions and
  * install paths — an unpacked extension's ID is derived from the directory it
@@ -163,7 +171,8 @@ const MAIN_WORLD_REQUIRED = new Set(["Vue.js devtools"]);
  * the rewrite is declined deliberately rather than by a parser rejection.
  *
  * Callers use this to tell the developer *which* of the two things happened: a
- * deliberate trade still leaves a dead background, but not a broken extension.
+ * deliberate trade still leaves an at-risk background, but not a broken
+ * extension.
  */
 export function requiresMainWorld(manifest: ExtensionManifest): boolean {
   return MAIN_WORLD_REQUIRED.has(manifest.name);

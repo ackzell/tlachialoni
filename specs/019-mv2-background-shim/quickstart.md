@@ -42,7 +42,7 @@ time when missing. Watch for the badge changing from `MV3` to `MV3→MV2`.
 | Badge | Meaning |
 | --- | --- |
 | `MV3→MV2` | Converted, running as an MV2 background page. |
-| `MV3` | Could not convert. The extension's background is dead. |
+| `MV3` | Could not convert. The authored MV3 worker is what runs and may not survive. |
 
 ## If the panel still says "not detected"
 

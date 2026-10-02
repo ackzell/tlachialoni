@@ -65,8 +65,8 @@ the feature safe to enable for every extension without opt-in (FR-005):
 
 The last row is pre-existing behaviour: a genuinely broken install is not
 resurrected. The three above it are new, and all of them are strictly better
-than the status quo, where the extension loads with a dead background and no
-explanation.
+than the status quo, where the extension loads with whatever background Electron
+can run and no explanation.
 
 ## Commit
 
@@ -98,9 +98,9 @@ The phase is a promise about outcome, not about mechanism:
 
 | Outcome | Phase | Message |
 | --- | --- | --- |
-| Rewritten and loaded | `warning` | `X was rewritten from Manifest V3 to V2 so its background service worker can run here. …` |
+| Rewritten and loaded | `warning` | `X was rewritten from Manifest V3 to V2 so its background runs as a page, which survives an API error that would kill a service worker. …` |
 | Authored, no rewrite needed | `done` | `Installed X` |
-| Authored, rewrite failed | `warning` | `This extension uses Manifest V3 service workers, which Tlachialoni can't host, and the MV2 rewrite of it wouldn't load either. Most of it won't work.` |
+| Authored, rewrite failed | `warning` | `This extension's MV2 rewrite wouldn't load, so it keeps its Manifest V3 service worker. Tlachialoni tears that worker down if it hits an API the app doesn't compile, so parts of it may not work.` |
 
 ## A successful rewrite is still a `warning`
 
@@ -132,8 +132,9 @@ badge: mv2Shimmed ? "MV3→MV2" : mv3ServiceWorker ? "MV3" : undefined
 ```
 
 On the toggle row only. This ordering matters: an extension that is both authored
-MV3 *and* successfully rewritten must report the rewrite, because the service
-worker warning would be a false statement about something that is running.
+MV3 *and* successfully rewritten must report the rewrite, because the loaded copy
+is the MV2 page — flagging the authored manifest would describe something other
+than what runs.
 
 ## teardown
 

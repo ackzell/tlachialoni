@@ -20,8 +20,9 @@ show it.
 
 - **Runtime**: Electron 44 (Chromium/Node from `process.versions`), macOS.
 - **Extension API**: `session.extensions.loadExtension(path)`. Unpacked only;
-  persistent sessions only; must be re-loaded every launch. No MV3 background
-  service workers.
+  persistent sessions only; must be re-loaded every launch. MV3 service workers
+  are hosted, but Electron tears one down if it throws while starting up, and
+  `chrome.debugger` is not compiled in.
 - **New dependency**: `fflate` (pure JS, already transitively present) for CRX
   payload extraction; promoted to a direct dependency.
 - **State**: existing JSON `StateStore`, schema version 1 → 2.

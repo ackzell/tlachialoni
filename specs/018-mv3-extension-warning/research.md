@@ -2,11 +2,20 @@
 
 ## R1: Electron MV3 service worker support
 
-**Decision**: Electron does not support Manifest V3 background service workers. This is a known limitation of Electron's extension API.
+**Decision (corrected 2026-10-02)**: Electron hosts Manifest V3 background
+service workers. It tears one down if it throws while evaluating its top level,
+and `chrome.debugger` is not compiled into Electron, so a worker that touches it
+dies at startup.
 
-**Rationale**: Electron implements a subset of Chrome extension APIs. MV3 extensions use `background.service_worker` as their background process, but Electron only supports Manifest V2 background pages. When an MV3 extension is loaded, the service worker registration fails with status code 15, and the background script crashes.
+**Rationale**: The original entry here claimed Electron does not support MV3
+service workers and read `Service worker registration failed. Status code: 15` as
+proof. That was wrong — the worker runs first, and the status is reported after
+it throws. A probe on Electron 44.5.1 shows a clean MV3 worker registering,
+running, and staying alive, and an unguarded `chrome.debugger` access killing it.
+See `spikes/mv2-background-shim/results.md` ("Corrected mechanism").
 
-**Alternatives considered**: None — this is a platform limitation, not a choice.
+**Alternatives considered**: None — the absent namespace is a platform
+limitation, not a choice. The MV2 rewrite that works around it is `specs/019`.
 
 ## R2: Detection approach
 

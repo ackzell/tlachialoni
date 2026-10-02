@@ -187,6 +187,6 @@ present after a relaunch.
 ## Assumptions
 
 - Electron supports only unpacked extensions, so store installs download and unpack a `.crx` container; the download uses Google's public update endpoint and may be unavailable or change, in which case the folder install path remains.
-- Electron implements a subset of Chrome extension APIs (content scripts, DevTools pages, and Manifest V2 backgrounds; not Manifest V3 background service workers), so some store extensions will load and function only partially. The tool reports load success, not full compatibility.
+- Electron implements a subset of Chrome extension APIs (content scripts, DevTools pages, Manifest V3 background service workers, and Manifest V2 background pages), but omits `chrome.debugger` and `chrome.scripting`, and tears down an MV3 service worker that throws while starting up — which an unguarded `chrome.debugger` access does. So some store extensions will load and function only partially. The tool reports load success, not full compatibility.
 - The primary platform remains macOS; the store download and folder copy add no platform-specific behavior beyond the existing directory picker and file manager reveal.
 - Extensions are installed only by the developer; the tool ships with none and never installs one on the developer's behalf.
