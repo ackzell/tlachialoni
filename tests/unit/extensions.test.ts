@@ -12,7 +12,11 @@ import {
   isCrx,
   readManifest,
 } from "../../src/main/extensions/crx";
-import { shimMv3ToMv2 } from "../../src/main/extensions/mv2-shim";
+import {
+  requiresMainWorld,
+  shimMv3ToMv2,
+  workerScriptsFor,
+} from "../../src/main/extensions/mv2-shim";
 import { isActivePhase, shouldAutoDismiss } from "@shared/extensions";
 import { crxDownloadUrl, downloadCrx } from "../../src/main/extensions/store";
 import { sanitizeExtensions } from "../../src/main/state/schema";
@@ -201,10 +205,13 @@ describe("isActivePhase", () => {
 describe("detectMv3ServiceWorker", () => {
   /** A manifest built from `raw`, as `readManifest` would return it. */
   function manifest(raw: Record<string, unknown>) {
+    // Mirrors `readManifest`, including deriving the top-level `name` from the
+    // manifest — callers that key on the extension name depend on that.
+    const name = typeof raw.name === "string" ? raw.name : "Demo";
     return {
-      name: "Demo",
+      name,
       version: "1.0",
-      raw: { name: "Demo", version: "1.0", ...raw },
+      raw: { name, version: "1.0", ...raw },
     };
   }
 
@@ -250,10 +257,13 @@ describe("detectMv3ServiceWorker", () => {
 describe("shimMv3ToMv2", () => {
   /** A manifest built from `raw`, as `readManifest` would return it. */
   function manifest(raw: Record<string, unknown>) {
+    // Mirrors `readManifest`, including deriving the top-level `name` from the
+    // manifest — callers that key on the extension name depend on that.
+    const name = typeof raw.name === "string" ? raw.name : "Demo";
     return {
-      name: "Demo",
+      name,
       version: "1.0",
-      raw: { name: "Demo", version: "1.0", ...raw },
+      raw: { name, version: "1.0", ...raw },
     };
   }
 
@@ -361,6 +371,158 @@ describe("shimMv3ToMv2", () => {
       { matches: ["<all_urls>"], js: ["a.js"], run_at: "document_start" },
       { matches: ["<all_urls>"], js: ["b.js"] },
     ]);
+  });
+
+  it("expands an importScripts worker into the background scripts list", () => {
+    // axe DevTools' worker is 60 bytes and its whole body is this call.
+    // `importScripts` is a WorkerGlobalScope method: an MV2 background page is a
+    // DOM document, has no such function, and dies on the first statement — which
+    // is why axe reported "BackgroundRecorder is not running in a known context"
+    // rather than anything about a background.
+    expect(
+      workerScriptsFor(
+        "background-worker.bundle.js",
+        'importScripts("browser-polyfill.js","background.bundle.js");',
+      ),
+    ).toEqual({
+      kind: "imports",
+      scripts: ["browser-polyfill.js", "background.bundle.js"],
+    });
+
+    // A worker in a subdirectory resolves its imports relative to itself.
+    expect(workerScriptsFor("app/sw.js", 'importScripts("polyfill.js", "./bg.js");')).toEqual({
+      kind: "imports",
+      scripts: ["app/polyfill.js", "app/bg.js"],
+    });
+
+    // Tolerates what bundlers and minifiers emit around the call.
+    expect(
+      workerScriptsFor("sw.js", '// prelude\n/* header */\nimportScripts( "a.js" , "b.js" ) ;\n'),
+    ).toEqual({ kind: "imports", scripts: ["a.js", "b.js"] });
+  });
+
+  it("tells a self-contained worker apart from one it cannot translate", () => {
+    // This distinction is the whole point of the three-way result. Reporting both
+    // as "no rewrite" silently declined every self-contained worker, which is how
+    // Angular DevTools stopped being rewritten at all.
+    expect(workerScriptsFor("app/bg.js", "(()=>{var g=class{tabs;runtime};})();")).toEqual({
+      kind: "self-contained",
+    });
+    expect(workerScriptsFor("sw.js", "")).toEqual({ kind: "self-contained" });
+    expect(workerScriptsFor("sw.js", "// only a comment\n")).toEqual({ kind: "self-contained" });
+    // Mentions `importScripts` only in a comment: still self-contained.
+    expect(workerScriptsFor("sw.js", "/* calls importScripts() in the worker */\nfoo();")).toEqual({
+      kind: "self-contained",
+    });
+
+    // Uses it, and cannot be translated faithfully.
+    for (const source of [
+      "importScripts(x);", // not a literal
+      'importScripts("/rooted.js");', // absolute, would not resolve
+      'importScripts("a.js"); doSomethingElse();', // not a pure shim
+      'console.log("hi"); importScripts("a.js");', // leading code
+      'addEventListener("install", () => importScripts("a.js"));', // nested
+      'importScripts("a.js"', // unterminated
+      'importScripts("a.js"); importScripts(x);', // second call untranslatable
+    ]) {
+      expect(workerScriptsFor("sw.js", source)).toEqual({ kind: "untranslatable" });
+    }
+  });
+
+  it("still rewrites a self-contained worker once its source is supplied", () => {
+    // The regression guard for Angular DevTools: passing `workerSource` must not
+    // cost an ordinary extension its rewrite.
+    const shim = shimMv3ToMv2(manifest(mv3Worker), {
+      workerSource: "(()=>{var g=class{tabs;runtime};})();",
+    });
+    expect(shim).not.toBeNull();
+    expect(shim!.manifest.background).toEqual({ scripts: ["bg.js"], persistent: true });
+  });
+
+  it("declines a worker that mixes importScripts with other top-level code", () => {
+    // Half-translating would give an extension that loads and is silently missing
+    // the half we dropped, which is worse than not converting it.
+    expect(
+      shimMv3ToMv2(manifest(mv3Worker), {
+        workerSource: 'importScripts("bg-real.js");\nregisterSomething();',
+      }),
+    ).toBeNull();
+  });
+
+  it("rewrites a store extension that builds its background with importScripts", () => {
+    // Replayed from axe DevTools 4.138, whose worker delegates to two scripts.
+    const axe = manifest({
+      name: "axe DevTools - Web Accessibility Testing",
+      version: "4.138.0",
+      manifest_version: 3,
+      background: { service_worker: "background-worker.bundle.js" },
+      content_security_policy: { extension_pages: "script-src 'self'; object-src 'self'" },
+      devtools_page: "devtools.html",
+      permissions: ["tabs", "debugger", "storage", "unlimitedStorage"],
+      action: { default_popup: "popup.html" },
+    });
+
+    const shim = shimMv3ToMv2(axe, {
+      workerSource: 'importScripts("browser-polyfill.js","background.bundle.js");',
+    });
+    expect(shim).not.toBeNull();
+    expect(shim!.manifest.background).toEqual({
+      scripts: ["browser-polyfill.js", "background.bundle.js"],
+      persistent: true,
+    });
+    // Provenance still names what the store actually shipped.
+    expect(shim!.workerScript).toBe("background-worker.bundle.js");
+  });
+
+  it("declines an extension whose main-world content script is load-bearing", () => {
+    // The regression this guards: MV2 has no `world` key at all, so rewriting
+    // demotes `prepare.js` into the isolated world, where the hook it installs
+    // is invisible to the page — and Vue's DevTools page only creates its panel
+    // once `inspectedWindow.eval` can see that hook.
+    const vue = manifest({
+      name: "Vue.js devtools",
+      version: "7.7.7",
+      manifest_version: 3,
+      background: { service_worker: "dist/background.js" },
+      devtools_page: "pages/devtools-background.html",
+      host_permissions: ["<all_urls>"],
+      permissions: ["scripting"],
+      content_scripts: [
+        {
+          matches: ["<all_urls>"],
+          js: ["dist/prepare.js"],
+          run_at: "document_start",
+          world: "MAIN",
+        },
+        { matches: ["<all_urls>"], js: ["dist/devtools-overlay.js"], run_at: "document_idle" },
+      ],
+    });
+    expect(shimMv3ToMv2(vue)).toBeNull();
+    expect(requiresMainWorld(vue)).toBe(true);
+
+    // And the mirror image: Angular declares the same main-world script, but only
+    // as a flag, so it is still rewritten — that is the feature's whole point.
+    const angular = manifest({
+      name: "Angular DevTools",
+      manifest_version: 3,
+      background: { service_worker: "app/background_bundle.js" },
+      content_scripts: [
+        {
+          matches: ["<all_urls>"],
+          js: ["app/devtools_connected_flag_bundle.js"],
+          run_at: "document_start",
+          world: "MAIN",
+          all_frames: true,
+        },
+      ],
+    });
+    expect(shimMv3ToMv2(angular)).not.toBeNull();
+    expect(requiresMainWorld(angular)).toBe(false);
+  });
+
+  it("rewrites by default, so an unrecognised main-world script is not a free pass out", () => {
+    expect(requiresMainWorld(manifest({ name: "Something Else" }))).toBe(false);
+    expect(requiresMainWorld(manifest({ name: "Vue.js DevTools" }))).toBe(false);
   });
 
   it("round-trips a real store extension's manifest into something Electron accepts", () => {

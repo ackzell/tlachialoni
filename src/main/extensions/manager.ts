@@ -34,7 +34,7 @@ import {
   readManifest,
   type ExtensionManifest,
 } from "./crx";
-import { shimMv3ToMv2, type Mv2Shim } from "./mv2-shim";
+import { requiresMainWorld, shimMv3ToMv2, type Mv2Shim } from "./mv2-shim";
 import { crxDownloadUrl, downloadCrx } from "./store";
 
 export interface ExtensionManagerOptions {
@@ -51,6 +51,13 @@ interface LoadedExtension {
   usesMv3ServiceWorker: boolean;
   /** True when the loaded copy is our MV2 rewrite, not the authored one (019). */
   shimmed: boolean;
+  /**
+   * True when no rewrite was attempted because this extension's main-world
+   * content script is load-bearing. Derived from the authored manifest on every
+   * load rather than persisted: it only colours the install/re-enable notice,
+   * and the badge it would otherwise change is already correct.
+   */
+  mainWorldRequired: boolean;
 }
 
 /** Filesystem-safe folder name derived from an extension name. */
@@ -237,6 +244,10 @@ export class ExtensionManager {
         this.emitShimmed(record.name);
         return { ok: true };
       }
+      if (loaded?.mainWorldRequired) {
+        this.warnAboutMainWorld(record.name);
+        return { ok: true };
+      }
       if (loaded?.usesMv3ServiceWorker) {
         this.warnAboutMv3(record.name);
         return { ok: true };
@@ -348,13 +359,24 @@ export class ExtensionManager {
     const manifest = readManifest(dir);
     const shimDir = this.shimDirFor(slug);
 
-    // Write the rewrite on demand. `commit` writes it at install time, but an
-    // extension installed before this feature existed has none, and without this
-    // it would load exactly as it did before — silently, since a missing rewrite
-    // is indistinguishable from one that was declined. Regenerating here also
-    // picks up a manifest that changed underneath us.
-    if (!fs.existsSync(path.join(shimDir, "manifest.json"))) {
-      this.writeRewrite(dir, shimDir, manifest);
+    // The rewrite is derived state, so it is reconciled against the manifest on
+    // every load rather than trusted. `commit` writes it at install time, but an
+    // extension installed before this feature existed has none, and without the
+    // backfill it would load exactly as it did before — silently, since a missing
+    // rewrite is indistinguishable from one that was declined.
+    //
+    // A rewrite we would refuse to write today is deleted outright, not left to
+    // be found. Eligibility is not only a property of the manifest: it is a
+    // function of this code, so a rewrite written by an earlier build can be one
+    // we have since learned to refuse — Vue.js devtools' `world: "MAIN"` was
+    // rewritten before we knew it was load-bearing. Preferring such a copy would
+    // keep running exactly the state the decline exists to undo, and it would look
+    // like the fix did not take.
+    const shim = this.shimFor(manifest, dir);
+    if (!shim) {
+      fs.rmSync(shimDir, { recursive: true, force: true });
+    } else if (!fs.existsSync(path.join(shimDir, "manifest.json"))) {
+      this.tryWriteShim(dir, shimDir, shim, manifest.name);
     }
 
     let extension: Electron.Extension | null = null;
@@ -378,6 +400,7 @@ export class ExtensionManager {
     // which is exactly what the badge needs: it distinguishes "converted and
     // working" from "converted and failed".
     const usesMv3ServiceWorker = detectMv3ServiceWorker(manifest);
+    const mainWorldRequired = requiresMainWorld(manifest);
     this.patch(slug, {
       // Keep the store ID so updates can re-resolve the store URL; otherwise use
       // the platform-assigned ID.
@@ -387,7 +410,7 @@ export class ExtensionManager {
       mv3ServiceWorker: usesMv3ServiceWorker,
       mv2Shimmed: shimmed,
     });
-    return { name, usesMv3ServiceWorker, shimmed };
+    return { name, usesMv3ServiceWorker, shimmed, mainWorldRequired };
   }
 
   /**
@@ -406,20 +429,49 @@ export class ExtensionManager {
   }
 
   /**
-   * Writes the MV2 rewrite of `manifest` into `shimDir` if it is eligible and
-   * missing. Never throws: a rewrite we cannot produce is not a reason to fail a
-   * load, and the authored copy is always a working fallback.
+   * Writes a rewrite, reporting rather than throwing: a rewrite we cannot
+   * produce is not a reason to fail a load, and the authored copy is always a
+   * working fallback.
    */
-  private writeRewrite(dir: string, shimDir: string, manifest: ExtensionManifest): void {
-    const shim = shimMv3ToMv2(manifest);
-    if (!shim) return;
+  /**
+   * The rewrite this manifest's worker supports, or `null` if it has none.
+   *
+   * The worker's own source is read here rather than inside the transform so
+   * that module stays pure, but it is not optional: a worker that loads its code
+   * with `importScripts` cannot run as an MV2 background page, and rewriting it
+   * anyway produces an extension that loads and is silently missing everything
+   * that worker was for.
+   */
+  private shimFor(manifest: ExtensionManifest, dir: string): Mv2Shim | null {
+    const background = manifest.raw.background;
+    const worker =
+      typeof background === "object" && background !== null && !Array.isArray(background)
+        ? (background as Record<string, unknown>).service_worker
+        : "";
+    const name = typeof worker === "string" ? worker : "";
+    let workerSource = "";
+    if (name) {
+      try {
+        // Split on `/` so a manifest path resolves segment by segment on every
+        // platform; `path.join` would not treat `/` as a separator on Windows.
+        workerSource = fs.readFileSync(path.join(dir, ...name.split("/")), "utf8");
+      } catch (error) {
+        // Unreadable is not the same as empty: guessing would risk rewriting an
+        // extension whose worker we never actually read.
+        const reason = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[extensions] ${manifest.name}: could not read ${name} (${reason})\n`);
+        return null;
+      }
+    }
+    return shimMv3ToMv2(manifest, { workerSource });
+  }
+
+  private tryWriteShim(dir: string, shimDir: string, shim: Mv2Shim, name: string): void {
     try {
       this.writeShim(dir, shimDir, shim);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      process.stderr.write(
-        `[extensions] ${manifest.name}: could not write the MV2 rewrite (${reason})\n`,
-      );
+      process.stderr.write(`[extensions] ${name}: could not write the MV2 rewrite (${reason})\n`);
     }
   }
 
@@ -452,14 +504,14 @@ export class ExtensionManager {
     const shimDir = this.shimDirFor(slug);
 
     // Computed before the swap so a manifest we cannot rewrite is never written.
-    const shim = shimMv3ToMv2(manifest);
+    const shim = this.shimFor(manifest, staging);
 
     this.unload(slug);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(shimDir, { recursive: true, force: true });
     fs.renameSync(staging, dir);
 
-    if (shim) this.writeRewrite(dir, shimDir, manifest);
+    if (shim) this.tryWriteShim(dir, shimDir, shim, manifest.name);
 
     this.emit({ phase: "loading", name: manifest.name, message: "Loading extension" });
     let extension: Electron.Extension | null = null;
@@ -504,6 +556,7 @@ export class ExtensionManager {
     // Install is the one moment this is worth interrupting for: the developer is
     // deciding whether to keep the extension, and the badge takes over after.
     if (shimmed) this.emitShimmed(record.name);
+    else if (requiresMainWorld(manifest)) this.warnAboutMainWorld(record.name);
     else if (record.mv3ServiceWorker) this.warnAboutMv3(record.name);
     else this.emit({ phase: "done", name: record.name, message: `Installed ${record.name}` });
     return { ok: true };
@@ -524,6 +577,23 @@ export class ExtensionManager {
       phase: "warning",
       name,
       message: `${name} was rewritten from Manifest V3 to V2 so its background service worker can run here. Its manifest is the only thing that changed; the installed copy is untouched.\nReload the page for it to take effect — extensions only reach a page that loads after them. Some Manifest V3-only APIs are still unavailable, so parts of it may not work.`,
+    });
+  }
+
+  /**
+   * Reports that no rewrite was attempted because this extension needs the main
+   * JavaScript world, which MV2 cannot express.
+   *
+   * Kept apart from {@link warnAboutMv3} because the two leave the same visible
+   * state — a dead background, and therefore the same `MV3` badge — but not the
+   * same one: this extension is working, and saying so much less would be a lie
+   * the developer can disprove by looking at the panel.
+   */
+  private warnAboutMainWorld(name: string): void {
+    this.emit({
+      phase: "warning",
+      name,
+      message: `${name} keeps its Manifest V3 manifest on purpose. It runs part of itself in the page's own JavaScript world, which Manifest V2 cannot express, so converting it would break the extension outright. Its background service worker will not run, but the rest of it does.\nReload the page for it to take effect — extensions only reach a page that loads after them.`,
     });
   }
 
