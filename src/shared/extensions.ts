@@ -25,6 +25,15 @@ export interface InstalledExtension {
    * which re-reads the manifest.
    */
   mv3ServiceWorker: boolean;
+  /**
+   * Whether the app rewrote this extension's manifest from MV3 to MV2 so its
+   * background could run, and the rewritten copy is the one currently loaded
+   * (specs/019). False both for extensions that never needed it and for ones
+   * whose rewrite Electron refused — the latter keep the `MV3` badge, because
+   * their background really is dead. Persisted so the list can say which of the
+   * two happened.
+   */
+  mv2Shimmed: boolean;
 }
 
 /**

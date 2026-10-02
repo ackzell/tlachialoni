@@ -308,6 +308,9 @@ export function sanitizeExtensions(raw: unknown): InstalledExtension[] {
       // Additive and defaulted, so a record written before MV3 detection reads
       // as "no badge" rather than being dropped; the next load re-derives it.
       mv3ServiceWorker: record.mv3ServiceWorker === true,
+      // Same additive treatment: a record written before the MV2 rewrite
+      // existed reads as "not shimmed", and the next load re-derives it.
+      mv2Shimmed: record.mv2Shimmed === true,
     });
     if (extensions.length >= MAX_EXTENSIONS) break;
   }

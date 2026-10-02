@@ -44,13 +44,31 @@ stage, and a download progress bar; each installed extension also appears in the
 palette as a row you can enable, disable, update, or remove.
 
 Extensions load only into the guest page, never into the shell UI. Electron
-supports a subset of extension APIs (content scripts, DevTools pages, and
-Manifest V2 backgrounds — not Manifest V3 background service workers), so some
-store extensions run only partially. Installing or re-enabling an extension that
-needs an MV3 service worker warns once that its background will not run while its
-content scripts and DevTools pages still will; from then on that extension's
-palette row carries an `MV3` badge. See
-`specs/007-extension-support/spec.md` for the details and limits.
+cannot host Manifest V3 background service workers at all, which matters more
+than it sounds: framework developer tools use that background as the bus between
+their DevTools panel and the page, so without it Angular DevTools reports that
+your app isn't there while it can plainly see it. So when an extension needs one,
+the app writes an MV2 rewrite of its manifest alongside the installed copy and
+loads that instead, which gives Chromium a real background page to route those
+messages through. Only the manifest changes — no extension code is patched, and
+the installed copy stays exactly as the store served it. Because that changes how
+your extension declares itself, it says so: installing or re-enabling one raises
+a warning that stays until you dismiss it, and its palette row carries an
+`MV3→MV2` badge so you can see at a glance which extensions were converted. If a
+rewrite fails to load, the app falls back to the authored copy and the row keeps
+its `MV3` badge, because at that point the background really is dead.
+
+Two limits survive all of this. `chrome.debugger` and `chrome.scripting` are
+Chrome-only API surface Electron doesn't compile, so signal breakpoints inside
+framework debuggers won't work, and an extension that leans on `chrome.scripting`
+for injection still won't. See `specs/019-mv2-background-shim/spec.md` for the
+details and `spikes/mv2-background-shim/` for the spike that established this
+works on Electron 44.
+
+A rewritten extension only affects pages that load after it: content scripts are
+injected when a page loads, so an extension activated afterwards never reaches the
+page already open. Reload the page, then re-select the extension's DevTools panel
+— it stops looking for the application after about ten seconds.
 
 ## Requirements
 

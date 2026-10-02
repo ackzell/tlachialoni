@@ -12,6 +12,7 @@ import {
   isCrx,
   readManifest,
 } from "../../src/main/extensions/crx";
+import { shimMv3ToMv2 } from "../../src/main/extensions/mv2-shim";
 import { isActivePhase, shouldAutoDismiss } from "@shared/extensions";
 import { crxDownloadUrl, downloadCrx } from "../../src/main/extensions/store";
 import { sanitizeExtensions } from "../../src/main/state/schema";
@@ -145,6 +146,9 @@ describe("shouldAutoDismiss", () => {
     // mount, so this has to hold for the value present on arrival, not just for
     // a transition into it.
     expect(shouldAutoDismiss("done")).toBe(true);
+    // `warning` also carries the MV3→MV2 rewrite notice, which must survive a
+    // glance (specs/019, FR-011). It uses the phase for "needs your attention",
+    // not for severity.
     expect(shouldAutoDismiss("warning")).toBe(false);
     expect(shouldAutoDismiss("error")).toBe(false);
     for (const phase of [
@@ -240,6 +244,192 @@ describe("detectMv3ServiceWorker", () => {
     expect(
       detectMv3ServiceWorker(manifest({ manifest_version: 3, background: { service_worker: "" } })),
     ).toBe(true);
+  });
+});
+
+describe("shimMv3ToMv2", () => {
+  /** A manifest built from `raw`, as `readManifest` would return it. */
+  function manifest(raw: Record<string, unknown>) {
+    return {
+      name: "Demo",
+      version: "1.0",
+      raw: { name: "Demo", version: "1.0", ...raw },
+    };
+  }
+
+  const mv3Worker = { manifest_version: 3, background: { service_worker: "bg.js" } };
+
+  it("declares a persistent MV2 background page from the worker script", () => {
+    const shim = shimMv3ToMv2(manifest(mv3Worker));
+    expect(shim).not.toBeNull();
+    expect(shim!.manifest.manifest_version).toBe(2);
+    // Persistent, not an event page: a 30s-suspending background drops the very
+    // ports this rewrite exists to keep alive.
+    expect(shim!.manifest.background).toEqual({ scripts: ["bg.js"], persistent: true });
+    expect(shim!.workerScript).toBe("bg.js");
+  });
+
+  it("declines manifests MV2 cannot express", () => {
+    // Already MV2, MV3 with no worker, and a module worker — `scripts` loads
+    // classic scripts, so a module worker has no equivalent.
+    expect(
+      shimMv3ToMv2(manifest({ manifest_version: 2, background: { scripts: ["bg.js"] } })),
+    ).toBeNull();
+    expect(shimMv3ToMv2(manifest({ manifest_version: 3 }))).toBeNull();
+    expect(shimMv3ToMv2(manifest({ manifest_version: 3, background: {} }))).toBeNull();
+    expect(
+      shimMv3ToMv2(
+        manifest({ manifest_version: 3, background: { service_worker: "bg.js", type: "module" } }),
+      ),
+    ).toBeNull();
+    expect(shimMv3ToMv2(manifest({ manifest_version: 3, background: "bg.js" }))).toBeNull();
+    expect(
+      shimMv3ToMv2(manifest({ manifest_version: 3, background: { service_worker: "" } })),
+    ).toBeNull();
+  });
+
+  it("flattens the MV3 content security policy object into a string", () => {
+    // Electron rejects the MV3 object form outright: "Invalid value for
+    // 'content_security_policy'". This was the first real failure in the spike.
+    const shim = shimMv3ToMv2(
+      manifest({
+        ...mv3Worker,
+        content_security_policy: { extension_pages: "script-src 'self'; object-src 'self'" },
+      }),
+    );
+    expect(shim!.manifest.content_security_policy).toBe("script-src 'self'; object-src 'self'");
+  });
+
+  it("drops a content security policy with no usable extension_pages string", () => {
+    const shim = shimMv3ToMv2(
+      manifest({ ...mv3Worker, content_security_policy: { sandbox: "sandbox allow-scripts" } }),
+    );
+    expect(shim!.manifest.content_security_policy).toBeUndefined();
+  });
+
+  it("renames the MV3 action to the MV2 browser_action", () => {
+    const shim = shimMv3ToMv2(manifest({ ...mv3Worker, action: { default_popup: "p.html" } }));
+    expect(shim!.manifest.browser_action).toEqual({ default_popup: "p.html" });
+    expect(shim!.manifest.action).toBeUndefined();
+  });
+
+  it("flattens wrapped web_accessible_resources and deduplicates", () => {
+    const shim = shimMv3ToMv2(
+      manifest({
+        ...mv3Worker,
+        web_accessible_resources: [
+          { resources: ["a.js", "b.js"], matches: ["<all_urls>"], extension_ids: [] },
+          { resources: ["b.js", "c.js"], matches: ["<all_urls>"] },
+        ],
+      }),
+    );
+    expect(shim!.manifest.web_accessible_resources).toEqual(["a.js", "b.js", "c.js"]);
+  });
+
+  it("accepts an already-flat web_accessible_resources list", () => {
+    const shim = shimMv3ToMv2(manifest({ ...mv3Worker, web_accessible_resources: ["a.js"] }));
+    expect(shim!.manifest.web_accessible_resources).toEqual(["a.js"]);
+  });
+
+  it("merges host patterns into permissions and drops the MV3 keys", () => {
+    const shim = shimMv3ToMv2(
+      manifest({
+        ...mv3Worker,
+        permissions: ["storage", "<all_urls>"],
+        host_permissions: ["http://localhost/*", "storage"],
+        optional_host_permissions: ["https://example.com/*"],
+        optional_permissions: ["idle"],
+      }),
+    );
+    expect(shim!.manifest.permissions).toEqual(["storage", "<all_urls>", "http://localhost/*"]);
+    expect(shim!.manifest.host_permissions).toBeUndefined();
+    expect(shim!.manifest.optional_permissions).toEqual(["idle", "https://example.com/*"]);
+    expect(shim!.manifest.optional_host_permissions).toBeUndefined();
+  });
+
+  it("drops the MV3-only content script world and keeps the rest", () => {
+    const shim = shimMv3ToMv2(
+      manifest({
+        ...mv3Worker,
+        content_scripts: [
+          { matches: ["<all_urls>"], js: ["a.js"], run_at: "document_start", world: "MAIN" },
+          { matches: ["<all_urls>"], js: ["b.js"] },
+        ],
+      }),
+    );
+    expect(shim!.manifest.content_scripts).toEqual([
+      { matches: ["<all_urls>"], js: ["a.js"], run_at: "document_start" },
+      { matches: ["<all_urls>"], js: ["b.js"] },
+    ]);
+  });
+
+  it("round-trips a real store extension's manifest into something Electron accepts", () => {
+    // The whole feature rests on this shape being loadable, and the one field
+    // that broke in the spike was not guessable from the schema. Replaying
+    // Angular DevTools 1.22's manifest is the regression guard for it.
+    const angular = manifest({
+      manifest_version: 3,
+      name: "Angular DevTools",
+      background: { service_worker: "app/background_bundle.js" },
+      content_security_policy: { extension_pages: "script-src 'self'; object-src 'self'" },
+      action: { default_popup: "popups/not-angular.html" },
+      devtools_page: "devtools.html",
+      host_permissions: ["<all_urls>"],
+      permissions: ["scripting", "activeTab", "storage", "debugger"],
+      web_accessible_resources: [
+        {
+          resources: ["app/backend_bundle.js", "app/detect_angular_bundle.js"],
+          matches: ["<all_urls>"],
+          extension_ids: [],
+        },
+      ],
+      content_scripts: [
+        { matches: ["<all_urls>"], js: ["a.js"], run_at: "document_start", world: "MAIN" },
+      ],
+      // The store ships a `key`, and dropping it would change the extension ID.
+      key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC",
+    });
+
+    const shim = shimMv3ToMv2(angular);
+    expect(shim).not.toBeNull();
+    const out = shim!.manifest;
+
+    // The fields Electron's MV2 parser rejects or misreads.
+    expect(out.manifest_version).toBe(2);
+    expect(out.content_security_policy).toBe("script-src 'self'; object-src 'self'");
+    expect(typeof out.content_security_policy).toBe("string");
+    expect(out.background).toEqual({ scripts: ["app/background_bundle.js"], persistent: true });
+    expect(out.action).toBeUndefined();
+    expect(out.browser_action).toMatchObject({ default_popup: "popups/not-angular.html" });
+    expect(out.host_permissions).toBeUndefined();
+    expect(out.permissions).toContain("<all_urls>");
+    expect(out.web_accessible_resources).toEqual([
+      "app/backend_bundle.js",
+      "app/detect_angular_bundle.js",
+    ]);
+    expect((out.content_scripts as Record<string, unknown>[])[0].world).toBeUndefined();
+
+    // Carried through untouched, because losing either breaks the panel.
+    expect(out.key).toBe("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC");
+    expect(out.devtools_page).toBe("devtools.html");
+
+    // The panel reaches the page through the worker script, so it must still be
+    // declared exactly as the extension shipped it.
+    expect(shim!.workerScript).toBe("app/background_bundle.js");
+  });
+
+  it("never mutates the manifest it was given", () => {
+    // Guard the backfill too: `load()` calls this on an already-installed
+    // extension, so a partial rewrite would corrupt the authored copy's read.
+    const source = manifest({
+      ...mv3Worker,
+      permissions: ["storage"],
+      host_permissions: ["<all_urls>"],
+      action: { default_popup: "p.html" },
+    });
+    const before = JSON.stringify(source.raw);
+    shimMv3ToMv2(source);
+    expect(JSON.stringify(source.raw)).toBe(before);
   });
 });
 

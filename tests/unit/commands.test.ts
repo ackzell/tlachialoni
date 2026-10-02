@@ -286,6 +286,7 @@ describe("extension rows", () => {
     enabled: true,
     installedAt: 1,
     mv3ServiceWorker: false,
+    mv2Shimmed: false,
   };
 
   it("makes the store install the default row for a pasted store URL", () => {
@@ -332,6 +333,18 @@ describe("extension rows", () => {
   it("does not badge an extension without an MV3 service worker", () => {
     const rows = buildRows("", [], undefined, undefined, [extension]);
     expect(rows.find((row) => row.id === "extensions.toggle")?.badge).toBeUndefined();
+  });
+
+  it("badges a successfully rewritten extension as converted, not broken", () => {
+    // The authored manifest is still MV3, so both flags are true. The row must
+    // report the rewrite that worked, because `MV3` here would be a lie: the
+    // service worker is not running, but the background is (specs/019).
+    const rows = buildRows("", [], undefined, undefined, [
+      { ...extension, mv3ServiceWorker: true, mv2Shimmed: true },
+    ]);
+    expect(rows.find((row) => row.id === "extensions.toggle")).toMatchObject({
+      badge: "MV3→MV2",
+    });
   });
 
   it("namespaces extension row keys so they cannot collide", () => {
