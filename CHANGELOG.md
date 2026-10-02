@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.11](///compare/v0.1.10...v0.1.11) (2026-10-02)
+
+### Features
+
+* **extensions:** rewrite MV3 backgrounds to MV2 so extensions run (019) 33d1775
+
+### Bug Fixes
+
+* **extensions:** stop the MV2 rewrite breaking Vue and axe (019) 143c49a
+* **packaging:** stop dev and packaged builds sharing one profile (003) 8118064
+
 ## [0.1.10](///compare/v0.1.9...v0.1.10) (2026-10-01)
 
 ### Features
