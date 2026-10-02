@@ -65,21 +65,21 @@ extensions, and restored windows that the shipped app loads on its next launch.
 
 ## Development bundle identity
 
-`npm run dev` executes `node_modules/electron/dist/Electron.app`, whose
+`pnpm dev` executes `node_modules/electron/dist/Electron.app`, whose
 `Info.plist` reads `Electron` / `com.github.Electron`. `app.setName()` cannot
 change what macOS shows, because AppKit reads `CFBundleName` from the bundle.
 `scripts/dev-identity.mjs` therefore rewrites the three plist keys and re-signs
-the bundle ad-hoc (editing the plist invalidates the signature npm ships). It is
-idempotent, so `npm install electron` silently reverting the plist is repaired on
-the next run.
+the bundle ad-hoc (editing the plist invalidates the signature the Electron
+package ships). It is idempotent, so a `pnpm install` that replaces the bundle
+and reverts the plist is repaired on the next run.
 
 ## Verification (see `quickstart.md`)
 
-1. `npm run dev` → Dock shows the app icon; the app menu and ⌘Tab read
+1. `pnpm dev` → Dock shows the app icon; the app menu and ⌘Tab read
    "Tlachialoni Dev". `ls ~/Library/Application\ Support/` shows no new writes to
    `Tlachialoni`.
-2. `npm run package:local` → produces
+2. `pnpm package:local` → produces
    `release-local/mac-arm64/Tlachialoni Local.app` only — no dmg, no zip.
-3. `npm run package` → install `release/…/Tlachialoni.app` to `/Applications`.
+3. `pnpm package` → install `release/…/Tlachialoni.app` to `/Applications`.
 4. Launch from Spotlight → bundle name and icon are the app's own in the Dock,
    ⌘Tab, menu, and About panel.

@@ -4,7 +4,7 @@ A capture of the shell's states, so the look and behaviour can be reviewed or
 shared without recording a video. Regenerate them with:
 
 ```sh
-npm run screenshots
+pnpm screenshots
 ```
 
 That builds the app and runs it with `TLACHIALONI_SCREENSHOTS=1`, which walks a
@@ -17,7 +17,7 @@ Page-backed shots use a small in-process stub page until a real dev server is
 supplied. Point the run at a running app to use it instead:
 
 ```sh
-TLACHIALONI_SCREENSHOTS_URL=http://localhost:3000 npm run screenshots
+TLACHIALONI_SCREENSHOTS_URL=http://localhost:3000 pnpm screenshots
 ```
 
 > Capture is development tooling only: the entry point is gated on the env var in

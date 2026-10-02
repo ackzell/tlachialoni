@@ -13,7 +13,7 @@ repository into the packaged app. The rules below keep one source per value.
   written by hand or by a tool.
 - **Consumers**: `app.getVersion()` (About panel), electron-builder (bundle and
   artifact filenames), the tag name `v<version>`.
-- **Produced by**: `npm run tag` / `tag:minor` / `tag:major` (bump);
+- **Produced by**: `pnpm tag` / `tag:minor` / `tag:major` (bump);
   `tag:first` leaves it unchanged for the baseline.
 
 ### Release tag
@@ -45,18 +45,18 @@ repository into the packaged app. The rules below keep one source per value.
 ### Artifact
 
 - **Meaning**: the packaged output a user installs (`Tlachialoni.app` inside a
-  `.dmg` and `.zip`) produced by `npm run package`.
+  `.dmg` and `.zip`) produced by `pnpm package`.
 - **Version stamp**: bundle version and filenames derive from `package.json`.
 
 ## State transitions
 
 ```text
 commits since vX.Y.Z
-        │  npm run tag
+        │  pnpm tag
         ▼
  version bumped ──► CHANGELOG entry ──► release commit ──► tag vX'.Y'.Z'
         │
-        │  npm run package  (build after tagging)
+        │  pnpm package  (build after tagging)
         ▼
  artifact stamped with version; About resolves release date from the tag
 ```

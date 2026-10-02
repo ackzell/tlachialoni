@@ -7,14 +7,14 @@ only pure helpers (e.g. metadata/icon-path resolution).
 ## Prerequisites
 
 - macOS 13+ on Apple silicon.
-- Dependencies installed: `npm install` (pulls the `electron-builder` devDependency).
+- Dependencies installed: `pnpm install` (pulls the `electron-builder` devDependency).
 - A local dev server for a target if you want to test rendering, e.g. something on
   `http://localhost:3000`.
 
 ## 0. Dev parity (identity before packaging)
 
 ```sh
-npm run dev
+pnpm dev
 ```
 
 **Expected**: the Dock shows the app's own icon (not the default Electron icon),
@@ -25,7 +25,7 @@ confirming the `?asset` icon path resolves in development. See
 
 ```sh
 rm -rf release
-time npm run package
+time pnpm package
 ```
 
 **Expected**:
@@ -47,7 +47,7 @@ Then open **Tlachialoni** from Spotlight/Launchpad/Dock (double-click).
 
 **Expected**:
 
-- The app window opens and renders the default target exactly as under `npm run dev`.
+- The app window opens and renders the default target exactly as under `pnpm dev`.
 - With the source checkout renamed/moved, the app still launches — it does not read
   from the repository (FR-002/FR-005).
 - If macOS blocks the first launch (unsigned), right-click → **Open**, or run
@@ -94,9 +94,9 @@ In the installed app, re-run the `001` core checks:
 ## 7. Checks stay green (FR-008)
 
 ```sh
-npm run check
-npm run test
-npm run dev        # and confirm the normal dev flow still works
+pnpm check
+pnpm test
+pnpm dev        # and confirm the normal dev flow still works
 ```
 
 **Expected**: all pass; packaging added no regressions.

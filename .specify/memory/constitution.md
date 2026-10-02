@@ -164,7 +164,7 @@ it is now proven, so shipping is part of the product.
   dev-only, MUST be absent from packaged builds, and are exempt from the
   palette-listing principle because they are not shipped capabilities (see
   `specs/008-surface-preview/`).
-- The repository is MIT-licensed. The app runs from source (`npm run dev`)
+- The repository is MIT-licensed. The app runs from source (`pnpm dev`)
   during development and MUST also be packageable into a standalone artifact
   (see Packaging & Distribution).
 - All changes MUST pass `vp check`, and `vp test` where tests exist, before

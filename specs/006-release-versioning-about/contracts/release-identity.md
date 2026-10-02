@@ -8,7 +8,7 @@ About panel from drifting away from the tag and the bundle.
 | Value         | Declaration site                                             | Example value            |
 | ------------- | ------------------------------------------------------------ | ------------------------ |
 | `version`     | `package.json` → `version`                                   | `0.2.0`                  |
-| release tag   | git tag `v<version>` (created by `npm run tag`)              | `v0.2.0`                 |
+| release tag   | git tag `v<version>` (created by `pnpm tag`)              | `v0.2.0`                 |
 | release date  | `electron.vite.config.ts` → `creatordate` of `refs/tags/v<version>` | `2026-09-28`      |
 | injected date | `__APP_RELEASE_DATE__` (electron-vite `define`, main bundle)  | `"2026-09-28"`           |
 | About credits | `src/main/index.ts` → `formatReleaseDate(__APP_RELEASE_DATE__)` | `Released September 28, 2026` |
@@ -30,7 +30,7 @@ About panel from drifting away from the tag and the bundle.
 
 ## Verification (see `quickstart.md`)
 
-1. `npm run tag:first` (or a later `npm run tag`) → `git tag` shows `vX.Y.Z`.
-2. `npm run package` → install and open the About panel.
+1. `pnpm tag:first` (or a later `pnpm tag`) → `git tag` shows `vX.Y.Z`.
+2. `pnpm package` → install and open the About panel.
 3. The panel's version equals `package.json`; its release date equals the tag's
    date; the logo is unchanged.

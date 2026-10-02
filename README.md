@@ -92,17 +92,17 @@ page already open. Reload the page, then re-select the extension's DevTools pane
 ## Requirements
 
 - macOS 13+ (Apple silicon)
-- Node 24.21+ and npm
+- Node 24.21+ and pnpm 11+
 
 ## Development
 
 ```sh
-npm install
-npm run dev        # build and launch with renderer HMR
-npm run build      # production build
-npm run preview    # run the production build
-npm run check      # format, lint, and type checks (Vite+)
-npm run test       # unit tests (Vitest)
+pnpm install
+pnpm dev        # build and launch with renderer HMR
+pnpm build      # production build
+pnpm preview    # run the production build
+pnpm check      # format, lint, and type checks (Vite+)
+pnpm test       # unit tests (Vitest)
 ```
 
 The default target is `http://localhost:3000`.
@@ -112,7 +112,7 @@ The default target is `http://localhost:3000`.
 A development run is a separate app from the installed one, in every place macOS
 can tell two apps apart:
 
-|                   | Installed app   | `npm run dev`       |
+|                   | Installed app   | `pnpm dev`          |
 | ----------------- | --------------- | ------------------- |
 | Dock / ⌘Tab name  | Tlachialoni     | Tlachialoni Dev     |
 | Bundle identifier | `…tlachialoni`  | `…tlachialoni.dev`  |
@@ -128,7 +128,7 @@ name from the bundle. `scripts/dev-identity.mjs` (run automatically before
 keys in `node_modules/electron/dist/Electron.app` and re-signs it ad-hoc. Two
 consequences:
 
-- **Reinstalling `electron` reverts it.** Nothing breaks — the next `npm run dev`
+- **Reinstalling `electron` reverts it.** Nothing breaks — the next `pnpm dev`
   detects the original plist and re-patches.
 - **Editing that plist invalidates its signature**, which is why the script
   re-signs. Removing the re-sign makes Electron fail to launch with a message
@@ -152,7 +152,7 @@ representative state and holds it there so you can style it with live HMR:
 The extension preview can also start with the app:
 
 ```sh
-TLACHIALONI_DEMO_STATUS=1 npm run dev
+TLACHIALONI_DEMO_STATUS=1 pnpm dev
 ```
 
 The Developer menu is absent from packaged builds. See
@@ -161,8 +161,8 @@ The Developer menu is absent from packaged builds. See
 ## Packaging
 
 ```sh
-npm run package      # build a standalone macOS app into release/
-npm run package:local  # build a testable variant into release-local/
+pnpm package        # build a standalone macOS app into release/
+pnpm package:local  # build a testable variant into release-local/
 ```
 
 This produces `release/mac-arm64/Tlachialoni.app` plus a `.dmg` and a `.zip`.
@@ -171,7 +171,7 @@ repository or terminal required.
 
 ### Testing a build without touching your installed app
 
-`npm run package:local` builds `release-local/mac-arm64/Tlachialoni Local.app`,
+`pnpm package:local` builds `release-local/mac-arm64/Tlachialoni Local.app`,
 which differs from the shipped app in its bundle id, its Finder name, and its
 profile directory. Use it to check a build without disturbing real state.
 
@@ -201,16 +201,16 @@ publishing involved. The version lives only in `package.json` and drives the app
 bundle, the artifact filenames, and the About panel.
 
 ```sh
-npm run tag:first   # once: tag the current version as the baseline (e.g. v0.1.0)
-npm run tag         # bump by the commits since the last tag, update CHANGELOG.md, commit, tag vX.Y.Z
-npm run tag:minor   # force a minor bump
-npm run tag:major   # force a major bump
+pnpm tag:first   # once: tag the current version as the baseline (e.g. v0.1.0)
+pnpm tag         # bump by the commits since the last tag, update CHANGELOG.md, commit, tag vX.Y.Z
+pnpm tag:minor   # force a minor bump
+pnpm tag:major   # force a major bump
 ```
 
 Tag first, then package, so the artifact carries the release's date:
 
 ```sh
-npm run tag && npm run package
+pnpm tag && pnpm package
 ```
 
 The About panel shows the logo, the version, and the release date taken from the

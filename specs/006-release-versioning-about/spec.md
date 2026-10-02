@@ -13,7 +13,7 @@
 ### User Story 1 - Cut a release with one command (Priority: P1)
 
 The maintainer finishes a batch of work, commits it with Conventional Commit
-messages, and runs `npm run tag`. The command reads the commits since the last
+messages, and runs `pnpm tag`. The command reads the commits since the last
 release, decides the next semantic version, writes that version into
 `package.json`, generates/updates `CHANGELOG.md`, commits the version bump, and
 creates the `vX.Y.Z` git tag — all in one step, with no hand-edited files and no
@@ -23,21 +23,21 @@ network access.
 ritual at all: `package.json` sits at `0.1.0` and there are no tags, so there is
 no record of what shipped. Everything else builds on having tagged releases.
 
-**Independent Test**: From a clean tree, run `npm run tag`, confirm the version
+**Independent Test**: From a clean tree, run `pnpm tag`, confirm the version
 changed in `package.json`, `CHANGELOG.md` gained an entry for it, and
 `git tag` lists the new `vX.Y.Z` tag pointing at a release commit.
 
 **Acceptance Scenarios**:
 
 1. **Given** committed `feat:`/`fix:` work since the last tag, **When** the
-   maintainer runs `npm run tag`, **Then** the version bumps by the rule implied
+   maintainer runs `pnpm tag`, **Then** the version bumps by the rule implied
    by those commits (minor for features, patch for fixes), `CHANGELOG.md` records
    the change, and a `vX.Y.Z` tag is created.
 2. **Given** the maintainer wants a specific level, **When** they run
-   `npm run tag:minor` or `npm run tag:major`, **Then** the version is forced to
+   `pnpm tag:minor` or `pnpm tag:major`, **Then** the version is forced to
    that level regardless of the commit mix.
 3. **Given** a repository that has never been tagged, **When** the maintainer
-   runs `npm run tag:first`, **Then** the current version is tagged as the
+   runs `pnpm tag:first`, **Then** the current version is tagged as the
    baseline without an invented bump, so every later `tag` computes from it.
 4. **Given** the command runs, **When** it finishes, **Then** the working tree
    contains no changes beyond the version and changelog files the command wrote.
@@ -81,13 +81,13 @@ a downloaded file identifies itself.
 useful without a publishing pipeline; they are cheap once the version is the
 single source of truth.
 
-**Independent Test**: Run `npm run package` for a bumped version and confirm the
+**Independent Test**: Run `pnpm package` for a bumped version and confirm the
 bundle reports that version and the `.dmg`/`.zip` names include it.
 
 **Acceptance Scenarios**:
 
 1. **Given** a bumped version in `package.json`, **When** the maintainer runs
-   `npm run package`, **Then** the produced `.dmg`/`.zip` filenames contain the
+   `pnpm package`, **Then** the produced `.dmg`/`.zip` filenames contain the
    version and the installed app reports the same version in the About panel.
 
 ---
@@ -112,11 +112,11 @@ bundle reports that version and the `.dmg`/`.zip` names include it.
 
 ### Functional Requirements
 
-- **FR-001**: `npm run tag` MUST bump the version according to the Conventional
+- **FR-001**: `pnpm tag` MUST bump the version according to the Conventional
   Commit messages since the last tag, write it to `package.json`, update
   `CHANGELOG.md`, commit those files, and create an annotated `vX.Y.Z` tag.
-- **FR-002**: `npm run tag:minor` and `npm run tag:major` MUST force the bump
-  level; `npm run tag:first` MUST tag the current version as the initial baseline
+- **FR-002**: `pnpm tag:minor` and `pnpm tag:major` MUST force the bump
+  level; `pnpm tag:first` MUST tag the current version as the initial baseline
   without bumping.
 - **FR-003**: Version changes MUST be produced only by the tag commands (no
   hand-edited version), and `package.json` MUST remain the single declaration
@@ -130,7 +130,7 @@ bundle reports that version and the `.dmg`/`.zip` names include it.
 - **FR-007**: Version and release date MUST be resolved at build time and baked
   into the artifact; the packaged app MUST NOT read git, the source tree, or the
   network to obtain them.
-- **FR-008**: `npm run package` MUST continue to produce the standalone macOS
+- **FR-008**: `pnpm package` MUST continue to produce the standalone macOS
   artifact and MUST stamp the version into the bundle and artifact filenames.
 - **FR-009**: The existing development, build, check, and test workflows MUST
   continue to work unchanged.
@@ -161,7 +161,7 @@ bundle reports that version and the `.dmg`/`.zip` names include it.
   `package.json` equals the version in the artifact filename, in 100% of releases.
 - **SC-004**: No new runtime dependency, network call, or source-tree read is
   introduced for release metadata (offline UI is preserved).
-- **SC-005**: `npm run dev`, `npm run build`, `npm run check`, and `npm run test`
+- **SC-005**: `pnpm dev`, `pnpm build`, `pnpm check`, and `pnpm test`
   all still succeed after the change.
 
 ## Assumptions
