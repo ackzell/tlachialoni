@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.12](///compare/v0.1.11...v0.1.12) (2026-10-04)
+
+### Bug Fixes
+
+* restore mouse back/forward thumb buttons on macOS 3c6f008
+
 ## [0.1.11](///compare/v0.1.10...v0.1.11) (2026-10-02)
 
 ### Features
