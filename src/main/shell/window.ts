@@ -301,16 +301,20 @@ export class AppWindow implements SwipeWindow {
     this.siteView.webContents.on("before-input-event", this.handleInput);
     this.shellView.webContents.on("before-input-event", this.handleInput);
 
-    // Two-finger history gesture (specs/015). Driven entirely by wheel events
-    // from the preload: the machine manages its own lifecycle via idle timing,
-    // so there is no dependency on input-event gesture phases (which are
-    // unreliable on some MacBooks — missing, late, or out-of-order).
-    // Mouse back/forward thumb buttons. The trackpad swipe is handled entirely
-    // by the native addon (see swipe/navigation.ts); the OS `swipe` event is
-    // intentionally not used, so one physical swipe can never navigate twice.
+    // Mouse back/forward thumb buttons. On Windows/Linux the OS surfaces them as
+    // app commands; on macOS mouse drivers (Logitech Options+ and friends)
+    // deliver the thumb buttons as synthesized swipe events, the same way Safari
+    // and Chrome receive them.
     this.win.on("app-command", (_event, command) => {
       if (command === "browser-backward") void this.commands.run("view.back");
       else if (command === "browser-forward") void this.commands.run("view.forward");
+    });
+    // On macOS the native addon (specs/015) consumes trackpad swipes via
+    // trackSwipeEventWithOptions, so they never reach this handler — only mouse
+    // thumb buttons arrive here.
+    this.win.on("swipe", (_event, direction) => {
+      if (direction === "left") void this.commands.run("view.back");
+      else if (direction === "right") void this.commands.run("view.forward");
     });
 
     // A gesture is meaningless once the window is gone or unfocused.
