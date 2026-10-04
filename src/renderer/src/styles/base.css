@@ -24,6 +24,10 @@ button {
   color: inherit;
 }
 
+::selection {
+  background: var(--tb-selection);
+}
+
 .shell-root {
   height: 100%;
   /* The shell spans the window whenever a full-window surface is up (the palette,
