@@ -92,6 +92,8 @@ export class AppWindow implements SwipeWindow {
   private settleTimer: NodeJS.Timeout | null = null;
   /** Whether the strip is currently revealed by pointer proximity (transient). */
   private peek = false;
+  /** Dev-only: holds the pointer-reveal sampler still for an automated capture. */
+  private proximityFrozen = false;
   private readonly proximity = new ProximityTracker();
   private proximityTimer: NodeJS.Timeout | null = null;
   /** True briefly after a window move, so a drag does not trigger a peek. */
@@ -818,6 +820,17 @@ export class AppWindow implements SwipeWindow {
     this.picker.arm();
   }
 
+  /**
+   * Dev-only: holds the pointer-reveal sampler still. A window capture is whatever
+   * the window server shows, so an automated run must not have the strip appear
+   * just because the cursor happened to be resting near the top edge (specs/013).
+   */
+  freezeProximity(frozen: boolean): void {
+    if (this.proximityFrozen === frozen) return;
+    this.proximityFrozen = frozen;
+    if (frozen) this.setPeek(false);
+  }
+
   pickerDisarm(): void {
     this.picker.disarm();
   }
@@ -1234,6 +1247,7 @@ export class AppWindow implements SwipeWindow {
   private proximityPaused(): boolean {
     return (
       !this.win.isFocused() ||
+      this.proximityFrozen ||
       this.titlebarActive() ||
       this.paletteOpen ||
       this.showLoading ||

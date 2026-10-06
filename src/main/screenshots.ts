@@ -1,21 +1,44 @@
 /**
- * Dev-only screenshot capture. Triggered by `TLACHIALONI_SCREENSHOTS=1`, it
- * walks the shell through its states and writes a PNG per state so the UI can be
- * reviewed and shared without a person at the screen.
+ * Dev-only screenshot capture. Triggered by `TLACHIALONI_SCREENSHOTS=1`, it walks
+ * a window through the shell's states and writes a PNG per state so the app can be
+ * shown without a person at the screen.
  *
- * A window is a `BaseWindow` holding two stacked `WebContentsView`s (the guest
- * page under a fully transparent shell overlay), and `BaseWindow` has no
- * `capturePage`. So a window frame has to be composed: we capture the page and
- * the shell separately and draw them onto one canvas *inside the shell
- * renderer*, where the result is 1:1 with what the window shows. Nothing here is
- * reachable in a packaged build (index.ts gates the entry point on the env var).
+ * The pixels come from the window server, not from a webContents. A window is a
+ * `BaseWindow` holding two stacked `WebContentsView`s and it has no `capturePage`
+ * at all; and even `webContents.capturePage()` could never show the traffic
+ * lights, the window's rounded corners or the docked DevTools panel, because none
+ * of them belongs to a webContents. `screencapture -o -x -l <windowID>` captures
+ * the whole window, chrome included, so that is the primary backend:
+ *
+ *   - `-l` takes a CGWindowID, resolved from `GetWindowID` when that helper is
+ *     installed and from Electron's own `getMediaSourceId()` otherwise;
+ *   - `-o` omits the drop shadow;
+ *   - `-x` silences the shutter.
+ *
+ * A layer-compositing backend is kept as a fallback for when Screen Recording
+ * access is unavailable — chosen automatically when macOS reports the access is
+ * denied, or when the first window frame does not even cover the window — and can
+ * be forced with `TLACHIALONI_SCREENSHOTS_CAPTURE=contents`.
+ *
+ * Nothing here is reachable in a packaged build (index.ts gates the entry point on
+ * the env var).
  */
 
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { nativeTheme, BrowserWindow, type NativeImage, type WebContents } from "electron";
+import { promisify } from "node:util";
+import {
+  app,
+  nativeTheme,
+  screen,
+  systemPreferences,
+  BrowserWindow,
+  type NativeImage,
+  type WebContents,
+} from "electron";
 import { THEME_VARIANTS } from "@shared/commands";
 import type { DockMode, VariantSlug } from "./state/schema";
 import type { AppWindow } from "./shell/window";
@@ -30,6 +53,13 @@ const DEVTOOLS_SETTLE_MS = 1_800;
 const MAX_OUTPUT_WIDTH = 1440;
 const WINDOW_WIDTH = 1440;
 const WINDOW_HEIGHT = 900;
+
+const SCREENCAPTURE = "/usr/sbin/screencapture";
+const GET_WINDOW_ID = "/opt/homebrew/bin/GetWindowID";
+const SIPS = "/usr/bin/sips";
+const SRGB_PROFILE = "/System/Library/ColorSync/Profiles/sRGB Profile.icc";
+
+const exec = promisify(execFile);
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -64,6 +94,9 @@ export function seedScreenshotState(userDataDir: string): void {
         source: "store",
         enabled: true,
         installedAt: now - 86_400_000,
+        // Badges the row `MV3` (specs/018).
+        mv3ServiceWorker: true,
+        mv2Shimmed: false,
       },
       {
         slug: "vue-js-devtools",
@@ -73,6 +106,9 @@ export function seedScreenshotState(userDataDir: string): void {
         source: "store",
         enabled: false,
         installedAt: now - 172_800_000,
+        // Badges the row `MV3→MV2` (specs/019).
+        mv3ServiceWorker: true,
+        mv2Shimmed: true,
       },
       {
         slug: "axe-devtools",
@@ -82,6 +118,8 @@ export function seedScreenshotState(userDataDir: string): void {
         source: "folder",
         enabled: true,
         installedAt: now - 259_200_000,
+        mv3ServiceWorker: false,
+        mv2Shimmed: false,
       },
     ],
     windows: [
@@ -93,6 +131,7 @@ export function seedScreenshotState(userDataDir: string): void {
         dockMode: "bottom",
         devtoolsOpen: false,
         stripVisible: false,
+        titlebarMode: false,
         variant: "obsidian",
         colorMode: "dark",
       },
@@ -295,6 +334,73 @@ async function evalInShell<T>(shell: WebContents, code: string): Promise<T> {
 }
 
 /**
+ * Resolves the CGWindowID that `screencapture -l` takes.
+ *
+ * `GetWindowID` is the helper the editor captures use, and returns a real
+ * CGWindowID, so it is preferred — but it needs Homebrew and the window's title.
+ * Electron's own `getMediaSourceId()` needs neither, and gives the same number as
+ * long as Chromium's window number is the CGWindowID. Both are resolved and logged
+ * together, so a run settles that assumption instead of leaving it implicit.
+ *
+ * The helper matches on the app's macOS bundle name, which
+ * `scripts/dev-identity.mjs` renames for unpackaged runs — so it is derived here
+ * rather than hard-coded.
+ */
+async function resolveWindowId(win: AppWindow): Promise<number | null> {
+  const mediaSourceId = win.win.isDestroyed() ? "" : win.win.getMediaSourceId();
+  const fromElectron = Number(mediaSourceId.split(":")[1]);
+
+  let fromHelper: number | null = null;
+  try {
+    const bundle = app.isPackaged ? app.getName() : `${app.getName()} Dev`;
+    const title = win.win.isDestroyed() ? "" : win.win.getTitle();
+    const { stdout } = await exec(GET_WINDOW_ID, [bundle, title], { timeout: 5_000 });
+    const parsed = Number(String(stdout).trim());
+    if (Number.isInteger(parsed) && parsed > 0) fromHelper = parsed;
+  } catch {
+    // Helper not installed, or it found no matching window.
+  }
+
+  trace(
+    `window id: electron="${mediaSourceId}" (${fromElectron}) helper=${fromHelper ?? "unavailable"}`,
+  );
+  if (fromHelper !== null) return fromHelper;
+  return Number.isInteger(fromElectron) && fromElectron > 0 ? fromElectron : null;
+}
+
+/** Captures one window into `file`, at the display's pixel density. */
+async function captureWindow(windowId: number, file: string): Promise<void> {
+  await exec(SCREENCAPTURE, ["-o", "-x", "-l", String(windowId), file], { timeout: 20_000 });
+}
+
+/**
+ * Caps the long edge so the committed images stay shareable, and normalises the
+ * colour profile so a capture taken on a P3 display matches the rest of the set.
+ */
+async function normaliseImage(file: string): Promise<void> {
+  await exec(SIPS, ["-Z", String(MAX_OUTPUT_WIDTH), file], { timeout: 20_000 });
+  try {
+    await exec(SIPS, ["-m", SRGB_PROFILE, file], { timeout: 20_000 });
+  } catch {
+    // Profile conversion is best-effort; the PNG is still perfectly usable.
+  }
+}
+
+/** `sips` pixel dimensions, for the sanity check on the first window capture. */
+async function imagePixelSize(file: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const { stdout } = await exec(SIPS, ["-g", "pixelWidth", "-g", "pixelHeight", file], {
+      timeout: 10_000,
+    });
+    const width = Number(/pixelWidth:\s*(\d+)/.exec(stdout)?.[1]);
+    const height = Number(/pixelHeight:\s*(\d+)/.exec(stdout)?.[1]);
+    return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Renders `url` in a hidden window at an exact size and captures it. Hidden
  * windows still paint (the `paintWhenInitiallyHidden` default), which is what
  * makes `capturePage` work for them.
@@ -366,9 +472,41 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       "getComputedStyle(document.documentElement).getPropertyValue('--tb-bg').trim()",
     )) || "#000000";
 
-  // One fixed frame for every shot, regardless of the host display.
+  // Which backend supplies the pixels: the window server (default), or the
+  // composited webContents layers, which need no Screen Recording access.
+  const requestedBackend = process.env.TLACHIALONI_SCREENSHOTS_CAPTURE ?? "window";
+  const screenAccess = systemPreferences.getMediaAccessStatus("screen");
+  const accessBlocked = screenAccess === "denied" || screenAccess === "restricted";
+  if (accessBlocked && requestedBackend !== "contents") {
+    trace(
+      `Screen Recording access is "${screenAccess}"; using the composited backend. ` +
+        `Grant it to "${app.getName()} Dev" in System Settings → Privacy & Security → Screen Recording.`,
+    );
+  }
+  let windowId =
+    requestedBackend === "contents" || accessBlocked ? null : await resolveWindowId(win);
+  let backend: "window" | "contents" = windowId === null ? "contents" : "window";
+  trace(`capture backend: ${backend} (screen access "${screenAccess}")`);
+
+  // A window capture is whatever the window server shows, so put the window at a
+  // known place, sized to the display, and keep it in front for the whole run. The
+  // pointer-reveal sampler is frozen too: a cursor resting near the top edge would
+  // otherwise add the strip to every frame.
+  win.freezeProximity(true);
   if (!win.win.isDestroyed()) {
-    win.win.setBounds({ x: 120, y: 120, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
+    if (backend === "window") {
+      const area = screen.getPrimaryDisplay().workArea;
+      const width = Math.min(WINDOW_WIDTH, Math.max(480, area.width - 80));
+      const height = Math.min(WINDOW_HEIGHT, Math.max(360, area.height - 120));
+      win.win.setBounds({ x: area.x + 40, y: area.y + 60, width, height });
+      win.win.setAlwaysOnTop(true, "floating");
+    } else {
+      win.win.setBounds({ x: 120, y: 120, width: WINDOW_WIDTH, height: WINDOW_HEIGHT });
+    }
+  }
+  if (backend === "window") {
+    app.focus({ steal: true });
+    if (!win.win.isDestroyed()) win.win.focus();
   }
 
   const openPalette = async (): Promise<void> => {
@@ -436,6 +574,20 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
         }
       }
       await wait(200);
+    }
+    return false;
+  };
+
+  /**
+   * Polls the window's composed state until `predicate` holds, so a layout change
+   * is confirmed applied rather than assumed after a sleep.
+   */
+  const waitForState = async (
+    predicate: (state: { titlebarMode: boolean; stripVisible: boolean }) => boolean,
+  ): Promise<boolean> => {
+    for (let i = 0; i < 30; i++) {
+      if (predicate(win.getState())) return true;
+      await wait(100);
     }
     return false;
   };
@@ -515,7 +667,15 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     }
   };
 
-  const shot = async (name: string, mode: "window" | DockMode = "window"): Promise<void> => {
+  /**
+   * The fallback backend: takes a webContents snapshot of each layer and draws the
+   * stack in the shell renderer. Needs no Screen Recording access, but cannot show
+   * anything the window server owns, so the traffic lights are drawn back in.
+   */
+  const composeContents = async (
+    name: string,
+    mode: "window" | DockMode = "window",
+  ): Promise<void> => {
     const { width, height } = win.win.getContentBounds();
     const spec: CompositeSpec = {
       width,
@@ -576,12 +736,68 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       path.join(outDir, `${name}.png`),
       Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"),
     );
+  };
+
+  /**
+   * Captures one state. The window backend takes the whole window, chrome and all,
+   * so `mode` only matters to the compositing fallback.
+   */
+  const shot = async (name: string, mode: "window" | DockMode = "window"): Promise<void> => {
+    if (backend === "window" && windowId !== null) {
+      const file = path.join(outDir, `${name}.png`);
+      await captureWindow(windowId, file);
+      if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
+        throw new Error("screencapture produced no image");
+      }
+
+      const expected = win.win.getContentBounds();
+      const size = await imagePixelSize(file);
+      if (shots.length === 0) {
+        trace(
+          `first window capture: ${size ? `${size.width}x${size.height}` : "unknown"} px ` +
+            `(window ${expected.width}x${expected.height} DIP)`,
+        );
+      }
+      // A capture taken without screen access can still "succeed" while holding
+      // nothing but the desktop. If the first frame does not even cover the
+      // window, stop trusting the backend rather than write out a set of wrong
+      // images.
+      if (size && (size.width < expected.width * 0.5 || size.height < expected.height * 0.5)) {
+        trace("window capture is implausibly small; using the composited backend from here");
+        backend = "contents";
+      } else {
+        await normaliseImage(file);
+        shots.push(name);
+        return;
+      }
+    }
+    await composeContents(name, mode);
     shots.push(name);
   };
 
-  const capture = async (name: string): Promise<void> => {
+  /**
+   * Waits for a state to be on screen before capturing it — the same
+   * verify-then-capture the editor captures do — so a frame is never taken
+   * mid-transition, or from a state that silently failed to apply.
+   */
+  const capture = async (
+    name: string,
+    expect?: { shell?: string; site?: string },
+  ): Promise<void> => {
     try {
       await wait(SETTLE_MS);
+      for (const [where, selector] of Object.entries(expect ?? {})) {
+        const contents = where === "site" ? site : shell;
+        let mounted = false;
+        for (let i = 0; i < 30; i++) {
+          mounted = await contents
+            .executeJavaScript(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)
+            .catch(() => false);
+          if (mounted) break;
+          await wait(100);
+        }
+        if (!mounted) trace(`${name}: expected ${where} selector ${selector} was not on screen`);
+      }
       trace(`capturing ${name}`);
       await shot(name);
     } catch (error) {
@@ -599,11 +815,11 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
 
     // ---- blank window -----------------------------------------------------
     // A fresh blank window arms the location palette on its own.
-    await capture("01-blank-location-armed");
+    await capture("01-blank-location-armed", { shell: ".palette" });
     await closePalette();
-    await capture("02-blank-watermark-dark");
+    await capture("02-blank-watermark-dark", { shell: ".blank" });
     win.setColorMode("light");
-    await capture("03-blank-watermark-light");
+    await capture("03-blank-watermark-light", { shell: ".blank" });
     win.setColorMode("dark");
     await wait(SETTLE_MS);
 
@@ -611,39 +827,39 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     await openPalette();
     await wait(SETTLE_MS);
     await chooseScope("All");
-    await capture("04-palette-all");
+    await capture("04-palette-all", { shell: ".palette" });
 
     await chooseScope("Location");
     await expandFirstHost();
-    await capture("05-palette-location-recents");
+    await capture("05-palette-location-recents", { shell: ".palette" });
 
     await chooseScope("DevTools");
-    await capture("06-palette-devtools");
+    await capture("06-palette-devtools", { shell: ".palette" });
 
     await chooseScope("View");
-    await capture("07-palette-view");
+    await capture("07-palette-view", { shell: ".palette" });
 
     await chooseScope("Theme");
-    await capture("08-palette-theme");
+    await capture("08-palette-theme", { shell: ".palette" });
 
     await chooseScope("Extensions");
-    await capture("09-palette-extensions");
+    await capture("09-palette-extensions", { shell: ".palette" });
 
     await chooseScope("Other");
-    await capture("10-palette-other");
+    await capture("10-palette-other", { shell: ".palette" });
 
     // A query with no in-group match widens to every group. Location can never
     // be empty (a typed-target row is always offered), so this is scoped to a
     // command group and typed with a query that only matches elsewhere.
     await chooseScope("DevTools");
     await typeQuery("reload");
-    await capture("11-palette-fallback");
+    await capture("11-palette-fallback", { shell: ".palette__hint" });
 
     // A rejected target reports inline instead of navigating.
     await chooseScope("All");
     await typeQuery("example.com");
     await pressInPalette("Enter");
-    await capture("12-palette-error");
+    await capture("12-palette-error", { shell: ".palette__error" });
     await closePalette();
     await wait(SETTLE_MS);
 
@@ -652,7 +868,9 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     await wait(SETTLE_MS);
     for (const [index, variant] of THEME_VARIANTS.entries()) {
       win.setVariant(variant.slug as VariantSlug);
-      await capture(`${String(13 + index).padStart(2, "0")}-theme-${variant.slug}`);
+      await capture(`${String(13 + index).padStart(2, "0")}-theme-${variant.slug}`, {
+        shell: ".palette",
+      });
     }
     await closePalette();
     win.setVariant("obsidian");
@@ -660,12 +878,12 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
 
     // ---- transient surfaces ----------------------------------------------
     win.previewLoadingVeil();
-    await capture("21-loading-veil");
+    await capture("21-loading-veil", { shell: ".veil" });
     win.stopSurfacePreview();
     await wait(SETTLE_MS);
 
     win.previewFailureView();
-    await capture("22-failure");
+    await capture("22-failure", { shell: ".failure" });
     win.stopSurfacePreview();
     await wait(SETTLE_MS);
 
@@ -705,10 +923,19 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
           error: "The store returned HTTP 404",
         },
       ],
+      [
+        "28-status-warning",
+        {
+          phase: "warning",
+          name: "React Developer Tools",
+          message:
+            "React Developer Tools keeps its Manifest V3 service worker, which Tlachialoni tears down if it hits an API the app doesn't compile. Its background runs as authored and may not survive, but the rest of it does.",
+        },
+      ],
     ];
     for (const [name, status] of statuses) {
       win.setExtensionStatus(status);
-      await capture(name);
+      await capture(name, { shell: ".status" });
       await wait(SETTLE_MS);
     }
     win.dismissExtensionStatus();
@@ -719,23 +946,36 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     for (let i = 0; i < 120 && site.isLoading(); i++) await wait(100);
     // Client-rendered apps are still hydrating when `did-stop-loading` fires.
     await wait(1_500);
-    await capture("28-page-loaded");
+    await capture("29-page-loaded");
 
     win.runCommand("strip.toggle");
-    await capture("29-strip-dark");
+    await capture("30-strip-dark", { shell: ".strip" });
     win.setColorMode("light");
-    await capture("30-strip-light");
+    await capture("31-strip-light", { shell: ".strip" });
     win.setColorMode("dark");
     win.runCommand("strip.toggle");
     await wait(SETTLE_MS);
 
+    // ---- titlebar mode (016) ----------------------------------------------
+    // The strip docks permanently and the guest page is laid out below it. The
+    // class and the state flag are both checked, so a half-applied toggle cannot
+    // be captured as if it were the layout.
+    await win.runCommand("titlebar.toggle");
+    await waitForState((state) => state.titlebarMode);
+    await capture("32-titlebar-mode", { shell: ".shell-root.is-titlebar .strip" });
+    await win.runCommand("titlebar.toggle");
+    await waitForState((state) => !state.titlebarMode);
+    await wait(SETTLE_MS);
+
     // ---- DevTools, docked on each side ------------------------------------
+    // With the window backend the panel is simply part of the window; `mode` is
+    // only passed on for the compositing fallback.
     for (const [index, mode] of (["bottom", "right", "left"] as DockMode[]).entries()) {
       await win.runCommand(`devtools.dock.${mode}`);
       const landed = await waitForDock(mode);
       await wait(DEVTOOLS_SETTLE_MS);
       trace(`devtools dock ${mode} landed=${landed}`);
-      await shot(`${String(31 + index).padStart(2, "0")}-devtools-${mode}`, mode);
+      await shot(`${String(33 + index).padStart(2, "0")}-devtools-${mode}`, mode);
     }
     await win.runCommand("devtools.toggle");
     await wait(SETTLE_MS);
@@ -750,14 +990,31 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     );
     site.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
     await wait(400);
-    await capture("34-picker-hover");
+    await capture("36-picker-hover", { site: "[data-tlachialoni-picker]" });
     win.pickerDisarm();
+
+    // ---- history overlay (015) --------------------------------------------
+    // The real detector is a native trackpad addon, so the surface is driven by
+    // the dev preview and each direction is shot only once it is actually up.
+    win.previewHistoryArm();
+    await capture("37-history-overlay-back", { shell: ".history-overlay--back" });
+    await capture("38-history-overlay-forward", { shell: ".history-overlay--forward" });
+    win.stopSurfacePreview();
   } finally {
+    win.freezeProximity(false);
+    if (!win.win.isDestroyed()) win.win.setAlwaysOnTop(false);
     nativeTheme.themeSource = previousThemeSource;
     stub.close();
   }
 
-  const report = { dir: outDir, count: shots.length, shots, errors };
+  const report = {
+    dir: outDir,
+    backend,
+    screenAccess,
+    count: shots.length,
+    shots,
+    errors,
+  };
   fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify(report, null, 2));
   process.stdout.write(`SCREENSHOTS ${JSON.stringify(report)}\n`);
 }
