@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.13](https://github.com/ackzell/tlachialoni/compare/v0.1.12...v0.1.13) (2026-10-06)
+
+### Features
+
+* add GitHub Actions release workflow ([1ea30cd](https://github.com/ackzell/tlachialoni/commit/1ea30cdf1db7b6b8ce36b5e7a9168dccd5d42c96))
+* **screenshots:** capture the whole window, chrome included ([1a4bd2d](https://github.com/ackzell/tlachialoni/commit/1a4bd2dfb4b44fad46930d37bcd001bf2bf346c2))
+
 ## [0.1.12](///compare/v0.1.11...v0.1.12) (2026-10-04)
 
 ### Bug Fixes
