@@ -122,7 +122,9 @@ bundle reports that version and the `.dmg`/`.zip` names include it.
   hand-edited version), and `package.json` MUST remain the single declaration
   site for the version.
 - **FR-004**: Releasing MUST be local-only in this feature: no publishing step, no
-  remote push, and no CI workflow is added or required.
+  remote push, and no CI workflow is added or required. **Note**: This requirement
+  is superseded by `specs/021-github-release-artifacts/spec.md`, which adds a
+  GitHub Actions workflow for automated releases.
 - **FR-005**: The About panel MUST show the app logo, the application name, the
   version, and the release date.
 - **FR-006**: The release date MUST be the date of the git tag matching the

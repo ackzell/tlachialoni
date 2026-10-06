@@ -1,30 +1,42 @@
 # Tlachialoni
 
-Tlachialoni — from Nahuatl, "a device for viewing, for seeing" — is a minimal
-local browser for frontend development: a frameless window that renders a local
-dev server edge-to-edge with real Chromium DevTools docked inside the same window
-— and essentially no other browser chrome. Each window is one target, and you can
-open as many windows as you have dev servers (`⌘N`), each fully independent.
+<p align="center">
+  <br>
+  <img src="resources/icon.png" alt="tlachialoni-logo" width="200" />
+</p>
+
+> **[tlah-chia-LO-nee](https://nahuatl.wired-humanities.org/content/tlachialoni)** in Nahuatl means _viewer_ (a device for viewing, seeing)
+
+
+A minimal local browser for frontend development: a frameless window that renders a local dev server edge-to-edge with real Chromium DevTools docked inside the same window, and essentially no other browser chrome. 
+
+Each window is one target, and you can open as many windows as you have dev servers (`⌘N`), each fully independent.
 
 The only UI is transient and keyboard-first:
 
-- `⌘N` — open a new window (blank, with the location entry focused and the logo
+<p align="center">
+  <br>
+  <img src="docs/screenshots/04-palette-all.png" alt="thachialoni-logo" width="500" />
+</p>
+
+
+- `⌘N`: open a new window (blank, with the location entry focused and the logo
   watermark on the empty page); `⌘W` closes it
-- `⌘P` — toggle the command palette (type a target like `:5173`, or run a command)
-- `⌘L` — edit the current target, with recent pages listed and grouped by origin
-- `⌘T` — jump to the theme picker
-- `Tab` / `Shift+Tab` — cycle the palette's groups (Location, DevTools, View, Theme, Extensions, Other)
+- `⌘P`: toggle the command palette (type a target like `:5173`, or run a command)
+- `⌘L`: edit the current target, with recent pages listed and grouped by origin
+- `⌘T`: jump to the theme picker
+- `Tab` / `Shift+Tab`: cycle the palette's groups (Location, DevTools, View, Theme, Extensions, Other)
 - Drag from the top of the window at any time, pointer only; hovering the top
   edge or resting there briefly reveals the strip
-- `⌘B` — pin the window strip on screen (and, with it, the macOS window controls)
-- `⇧⌘F` — toggle titlebar mode: the strip docks permanently as a title bar and the
+- `⌘B`: pin the window strip on screen (and, with it, the macOS window controls)
+- `⇧⌘F`: toggle titlebar mode: the strip docks permanently as a title bar and the
   page moves below it, so the target and controls are always visible without covering
   the page
-- `⌘⌥J` — toggle DevTools; `⌘1/2/3` dock it bottom/right/left
-- `⌘J` — toggle keyboard focus between the page and DevTools
-- `⌘⇧C` — element picker with hover highlight
-- `⌘R` / `⇧⌘R` — reload / hard reload
-- `⌘←` / `⌘→` — back / forward (native text behavior inside inputs)
+- `⌘⌥J`: toggle DevTools; `⌘1/2/3` dock it bottom/right/left
+- `⌘J`: toggle keyboard focus between the page and DevTools
+- `⌘⇧C`: element picker with hover highlight
+- `⌘R` / `⇧⌘R`: reload / hard reload
+- `⌘←` / `⌘→`: back / forward (native text behavior inside inputs)
 - Two-finger horizontal swipe on the trackpad — back / forward, with an armed
   edge overlay that grows as the swipe commits and recedes as it cancels (the
   strip's back/forward buttons reflect the same availability)
@@ -196,9 +208,9 @@ room for them.
 
 ## Releasing
 
-Releases are cut locally from Conventional Commit messages — no CI and no
-publishing involved. The version lives only in `package.json` and drives the app
-bundle, the artifact filenames, and the About panel.
+Releases are cut from Conventional Commit messages. The version lives only in
+`package.json` and drives the app bundle, the artifact filenames, and the About
+panel.
 
 ```sh
 pnpm tag:first   # once: tag the current version as the baseline (e.g. v0.1.0)
@@ -215,8 +227,22 @@ pnpm tag && pnpm package
 
 The About panel shows the logo, the version, and the release date taken from the
 `v<version>` tag's date (a build made before the tag is created falls back to the
-build date). Tags and artifacts are local; pushing tags is a deliberate manual
-step (`git push --follow-tags`) left for later.
+build date).
+
+### GitHub Releases
+
+Pushing a `v*` tag to GitHub triggers a workflow that builds the app and creates a
+GitHub Release with the `.dmg` and `.zip` artifacts attached:
+
+```sh
+git push --follow-tags
+```
+
+The workflow (`.github/workflows/release.yml`) runs on a macOS runner, verifies
+the tag version matches `package.json`, builds with `pnpm package`, and publishes
+the release with the changelog as the release notes. Artifacts are ad-hoc signed
+(no Developer ID), matching local builds. See `specs/021-github-release-artifacts/spec.md`
+for details.
 
 ## Design docs
 

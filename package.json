@@ -19,6 +19,7 @@
     "package": "electron-vite build && electron-builder --mac",
     "package:mac": "electron-builder --mac",
     "package:local": "electron-vite build && electron-builder --mac --config electron-builder.local.yml",
+    "publish": "git push --follow-tags",
     "tag:first": "commit-and-tag-version --first-release -- --no-verify",
     "tag": "commit-and-tag-version -- --no-verify",
     "tag:minor": "commit-and-tag-version --release-as minor -- --no-verify",
