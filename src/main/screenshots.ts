@@ -54,6 +54,31 @@ const MAX_OUTPUT_WIDTH = 1440;
 const WINDOW_WIDTH = 1440;
 const WINDOW_HEIGHT = 900;
 
+/**
+ * Scene capture (`TLACHIALONI_SCREENSHOTS_MODE=scenes`) drives one real
+ * interaction per command and records an ordered set of frames, which
+ * `scripts/build-gifs.mjs` assembles into the README GIFs.
+ *
+ * A storyboard frame holds long enough to read; a burst frame is taken back to
+ * back with almost no settle so an entrance animation is sampled across several
+ * frames instead of skipped over.
+ */
+const FRAME_SETTLE_MS = 320;
+const BURST_SETTLE_MS = 70;
+/** How long a storyboard frame lingers in the assembled GIF. */
+const FRAME_HOLD_MS = 900;
+/** How long each burst frame lingers — short, so the run of them reads as motion. */
+const BURST_HOLD_MS = 110;
+/**
+ * Scenes run the page on `localhost:3000` (the default target the docs talk
+ * about) rather than an ephemeral port, so a typed target and the recents group
+ * read the way they do on a real machine. The port is only borrowed when it is
+ * free — a running dev server there is used instead.
+ */
+const SCENE_STUB_PORT = 3000;
+/** The page the themed-DevTools scene loads, so chrome + syntax are on screen. */
+const SHOWCASE_URL = "http://localhost:3000/en/reactivity/reactive";
+
 const SCREENCAPTURE = "/usr/sbin/screencapture";
 const GET_WINDOW_ID = "/opt/homebrew/bin/GetWindowID";
 const SIPS = "/usr/bin/sips";
@@ -314,18 +339,43 @@ const STUB_PAGE = `<!doctype html>
   </body>
 </html>`;
 
-async function startStubServer(): Promise<{ url: string; close: () => void }> {
+async function startStubServer(
+  port = 0,
+): Promise<{ url: string; close: () => void; external: boolean }> {
   const server = http.createServer((_request, response) => {
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(STUB_PAGE);
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const listening = await new Promise<boolean>((resolve) => {
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => resolve(true));
+  });
+  if (!listening) {
+    // The requested port is taken — in a scenes run that means a real dev server
+    // already owns the origin the docs talk about, so use it as the page source
+    // rather than failing the run.
+    server.close();
+    return { url: `http://localhost:${port}/`, close: () => {}, external: true };
+  }
   const address = server.address();
-  const port = typeof address === "object" && address ? address.port : 0;
+  const bound = typeof address === "object" && address ? address.port : 0;
   return {
-    url: `http://127.0.0.1:${port}/`,
+    // The random port reads as `127.0.0.1`; a borrowed one is the default target.
+    url: port === 0 ? `http://127.0.0.1:${bound}/` : `http://localhost:${bound}/`,
     close: () => server.close(),
+    external: false,
   };
+}
+
+/** Whether a URL answers over HTTP, so a scene that needs a real server can skip. */
+async function isReachable(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(2_500) });
+    await response.body?.cancel();
+    return response.status < 500;
+  } catch {
+    return false;
+  }
 }
 
 /** Runs a snippet in the shell renderer and resolves its value. */
@@ -457,7 +507,13 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
   const win = primary;
   const shell = win.shellView.webContents;
   const site = win.siteView.webContents;
-  const stub = await startStubServer();
+  // One file, two runs: `states` writes the static PNG set (the default), and
+  // `scenes` drives one interaction per command and records frames for the README
+  // GIFs. Scenes borrow the default target's port so a typed target and the
+  // recents read `localhost:3000`; the state walk keeps an ephemeral port so it can
+  // never collide with a dev server that happens to be running.
+  const mode = process.env.TLACHIALONI_SCREENSHOTS_MODE === "scenes" ? "scenes" : "states";
+  const stub = await startStubServer(mode === "scenes" ? SCENE_STUB_PORT : 0);
   const shots: string[] = [];
   const errors: string[] = [];
 
@@ -675,6 +731,7 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
   const composeContents = async (
     name: string,
     mode: "window" | DockMode = "window",
+    dir: string = outDir,
   ): Promise<void> => {
     const { width, height } = win.win.getContentBounds();
     const spec: CompositeSpec = {
@@ -732,19 +789,26 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       `(${COMPOSITOR_SOURCE})(${JSON.stringify(spec)})`,
     );
     trace(`composed ${name} (${dataUrl.length} bytes)`);
+    fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
-      path.join(outDir, `${name}.png`),
+      path.join(dir, `${name}.png`),
       Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"),
     );
   };
 
   /**
    * Captures one state. The window backend takes the whole window, chrome and all,
-   * so `mode` only matters to the compositing fallback.
+   * so `mode` only matters to the compositing fallback. `dir` is the states run's
+   * output directory by default; a scenes run passes a per-scene folder.
    */
-  const shot = async (name: string, mode: "window" | DockMode = "window"): Promise<void> => {
+  const shot = async (
+    name: string,
+    mode: "window" | DockMode = "window",
+    dir: string = outDir,
+  ): Promise<void> => {
+    fs.mkdirSync(dir, { recursive: true });
     if (backend === "window" && windowId !== null) {
-      const file = path.join(outDir, `${name}.png`);
+      const file = path.join(dir, `${name}.png`);
       await captureWindow(windowId, file);
       if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
         throw new Error("screencapture produced no image");
@@ -771,7 +835,7 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
         return;
       }
     }
-    await composeContents(name, mode);
+    await composeContents(name, mode, dir);
     shots.push(name);
   };
 
@@ -806,13 +870,8 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     }
   };
 
-  try {
-    for (let i = 0; i < SHELL_TIMEOUT_MS / SHELL_POLL_MS && !win.isShellReady(); i++) {
-      await wait(SHELL_POLL_MS);
-    }
-    await wait(SETTLE_MS);
-    trace("shell ready");
-
+  /** The static walk: one PNG per shell state, in a fixed order. */
+  const captureStates = async (): Promise<void> => {
     // ---- blank window -----------------------------------------------------
     // A fresh blank window arms the location palette on its own.
     await capture("01-blank-location-armed", { shell: ".palette" });
@@ -1000,6 +1059,498 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     await capture("37-history-overlay-back", { shell: ".history-overlay--back" });
     await capture("38-history-overlay-forward", { shell: ".history-overlay--forward" });
     win.stopSurfacePreview();
+  };
+
+  /**
+   * The scene walk: drives one real interaction per command and records an
+   * ordered set of frames per scene, plus a manifest that `scripts/build-gifs.mjs`
+   * assembles into the README GIFs.
+   *
+   * A scene is a storyboard — a few frames that each hold long enough to read —
+   * with a *burst* of back-to-back frames wherever something animates (the palette
+   * opening, a page reloading), so the run of them reads as motion instead of a
+   * jump. Every storyboard frame is verified against a selector first, the same
+   * guarantee the state walk makes, so a frame is never taken from a state that
+   * silently failed to apply.
+   *
+   * Page-backed scenes run on `localhost:3000` (the default target), so a typed
+   * target and the recents group read the way they do on a real machine. The
+   * themed-DevTools scene needs the real showcase and is skipped — loudly, with a
+   * warning in the manifest — when it is not reachable.
+   */
+  const captureScenes = async (): Promise<void> => {
+    interface SceneFrame {
+      step: string;
+      file: string;
+      holdMs: number;
+    }
+    interface Scene {
+      name: string;
+      title: string;
+      frames: SceneFrame[];
+    }
+    interface Expect {
+      shell?: string;
+      site?: string;
+    }
+
+    const framesRoot =
+      process.env.TLACHIALONI_SCREENSHOTS_FRAMES_DIR ?? path.join(outDir, ".frames");
+    fs.rmSync(framesRoot, { recursive: true, force: true });
+    fs.mkdirSync(framesRoot, { recursive: true });
+
+    const scenes: Scene[] = [];
+    const warnings: string[] = [];
+    const only = (process.env.TLACHIALONI_SCREENSHOTS_SCENES ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const wanted = (name: string): boolean => only.length === 0 || only.includes(name);
+
+    const showcaseUrl = process.env.TLACHIALONI_SCREENSHOTS_SHOWCASE_URL ?? SHOWCASE_URL;
+    const showcaseUp = await isReachable(showcaseUrl);
+    const pageUrl =
+      process.env.TLACHIALONI_SCREENSHOTS_URL ?? (showcaseUp ? showcaseUrl : stub.url);
+
+    const loadTarget = async (url: string): Promise<void> => {
+      win.navigate(url);
+      for (let i = 0; i < 120 && site.isLoading(); i++) await wait(100);
+      // A client-rendered app is still hydrating when `did-stop-loading` fires.
+      await wait(1_500);
+    };
+
+    /** Waits for a navigation the app started itself, rather than driving one. */
+    const settleNavigation = async (): Promise<void> => {
+      for (let i = 0; i < 120 && site.isLoading(); i++) await wait(100);
+      await wait(1_500);
+    };
+
+    /** The scene walk's copy of the state walk's verify-before-capture check. */
+    const verify = async (scene: string, label: string, expect?: Expect): Promise<void> => {
+      for (const [where, selector] of Object.entries(expect ?? {})) {
+        if (!selector) continue;
+        const contents = where === "site" ? site : shell;
+        let mounted = false;
+        for (let i = 0; i < 30; i++) {
+          mounted = await contents
+            .executeJavaScript(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)
+            .catch(() => false);
+          if (mounted) break;
+          await wait(100);
+        }
+        if (!mounted) {
+          const note = `${scene}/${label}: ${where} selector ${selector} was not on screen`;
+          warnings.push(note);
+          trace(note);
+        }
+      }
+    };
+
+    const openScene = (name: string, title: string) => {
+      const dir = path.join(framesRoot, name);
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(dir, { recursive: true });
+      const frames: SceneFrame[] = [];
+
+      // A frame byte-identical to the one before it carries nothing — an action
+      // that changed no pixels, or a burst that outran a transition — so it is
+      // dropped rather than padding the GIF with a duplicate.
+      let previousBytes: Buffer | null = null;
+
+      const record = async (
+        step: string,
+        settleMs: number,
+        expect?: Expect,
+        holdMs: number = FRAME_HOLD_MS,
+      ): Promise<void> => {
+        if (settleMs > 0) await wait(settleMs);
+        await verify(name, step, expect);
+        const file = `${String(frames.length).padStart(2, "0")}-${step}`;
+        const full = path.join(dir, `${file}.png`);
+        trace(`scene ${name}: ${file}`);
+        await shot(file, "window", dir);
+        const bytes = fs.readFileSync(full);
+        if (previousBytes && bytes.equals(previousBytes)) {
+          fs.rmSync(full);
+          // Identical to the frame before it: drop the duplicate but keep its
+          // time, so a state that arrives at the end of a burst lingers on screen
+          // for its own hold instead of flashing past.
+          const last = frames.at(-1);
+          if (last) last.holdMs = Math.max(last.holdMs, holdMs);
+          trace(`scene ${name}: ${file} unchanged, previous frame holds ${last?.holdMs}ms`);
+          return;
+        }
+        previousBytes = bytes;
+        frames.push({ step, file: path.join(name, `${file}.png`), holdMs });
+      };
+
+      return {
+        frame: (step: string, expect?: Expect, holdMs: number = FRAME_HOLD_MS) =>
+          record(step, FRAME_SETTLE_MS, expect, holdMs),
+        burst: async (step: string, count: number, expect?: Expect): Promise<void> => {
+          for (let i = 0; i < count; i++) {
+            // Only the first frame of a burst waits and verifies; the rest ride
+            // the motion with no settle at all, which is what samples it.
+            await record(
+              `${step}-${i}`,
+              i === 0 ? BURST_SETTLE_MS : 0,
+              i === 0 ? expect : undefined,
+              BURST_HOLD_MS,
+            );
+          }
+        },
+        end: (): void => {
+          scenes.push({ name, title, frames });
+          trace(`scene ${name}: ${frames.length} frames`);
+        },
+      };
+    };
+
+    // ---- ⌘N: a new window is blank, location armed, watermark behind --------
+    // Deliberately dark only. A blank window in light mode is a full-screen
+    // near-white frame, which reads as a jarring flash between the dark scenes;
+    // light mode is shown where it has content (light-mode, strip, theme-picker).
+    if (wanted("new-window")) {
+      const s = openScene("new-window", "New window (⌘N)");
+      await openPalette();
+      await s.frame("location-armed", { shell: ".palette" }, 1_200);
+      await closePalette();
+      await s.frame("watermark-dark", { shell: ".blank" }, 1_000);
+      s.end();
+    }
+
+    // ---- extensions: an install, through every state the surface shows -----
+    // Runs before the first navigation, while the window is still blank, so the
+    // status surface sits on the watermark instead of over a busy page — the thin
+    // top strip is hard to read against content, and this is the state a new
+    // window is in anyway.
+    if (wanted("extensions")) {
+      type Status = Parameters<AppWindow["setExtensionStatus"]>[0];
+      const s = openScene("extensions", "Extension install states");
+      const name = "React Developer Tools";
+
+      // The store row, as it appears when a Web Store link or ID is pasted.
+      await closePalette();
+      await openPalette();
+      await chooseScope("Extensions");
+      await typeQuery("fmkadmapgofadopljbjfkapdkoienihi");
+      await s.frame("palette-install", { shell: ".palette" }, 1_400);
+      await closePalette();
+      await wait(FRAME_SETTLE_MS);
+
+      // The surface is driven directly rather than by installing for real: a
+      // store install needs the network and runs on its own clock, which is the
+      // whole reason the surface has a dev preview (specs/008-surface-preview).
+      const total = 670_658;
+      const steps: Array<[string, Status, number]> = [
+        [
+          "resolving",
+          {
+            phase: "resolving",
+            name: "fmkadmapgofadopljbjfkapdkoienihi",
+            message: "Looking up the extension",
+          },
+          900,
+        ],
+        ...[20, 40, 60, 80, 100].map((percent): [string, Status, number] => [
+          `downloading-${percent}`,
+          {
+            phase: "downloading",
+            name,
+            message: "Downloading from the Chrome Web Store",
+            progress: { received: Math.round((total * percent) / 100), total },
+          },
+          260,
+        ]),
+        ["verifying", { phase: "verifying", name, message: "Verifying the package" }, 800],
+        ["extracting", { phase: "extracting", name, message: "Unpacking files" }, 800],
+        ["loading", { phase: "loading", name, message: "Loading extension" }, 800],
+        ["done", { phase: "done", name, message: `Installed ${name}` }, 1_600],
+        [
+          "error",
+          {
+            phase: "error",
+            name,
+            message: `Couldn't install ${name}`,
+            error: "The store returned HTTP 404",
+          },
+          1_600,
+        ],
+        [
+          "warning",
+          {
+            phase: "warning",
+            name,
+            message: `${name} keeps its Manifest V3 service worker, which Tlachialoni tears down if it hits an API the app doesn't compile. Its background runs as authored and may not survive, but the rest of it does.`,
+          },
+          1_800,
+        ],
+      ];
+      for (const [step, status, hold] of steps) {
+        win.setExtensionStatus(status);
+        await s.frame(step, { shell: ".status" }, hold);
+      }
+      win.dismissExtensionStatus();
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- ⌘P: open, Tab through the groups, type a target, commit ------------
+    if (wanted("palette")) {
+      const s = openScene("palette", "Command palette (⌘P)");
+      await closePalette();
+      await s.frame("closed", { shell: ".blank" }, 700);
+      await openPalette();
+      await chooseScope("All");
+      await s.frame("all", { shell: ".palette" });
+      for (const label of ["DevTools", "Theme", "Extensions", "Other"]) {
+        await chooseScope(label);
+        await s.frame(`tab-${label.toLowerCase()}`, { shell: ".palette" }, 650);
+      }
+      await chooseScope("Location");
+      await typeQuery(":3000");
+      await s.frame("typed", { shell: ".palette" }, 1_100);
+      await pressInPalette("Enter");
+      await settleNavigation();
+      await s.frame("committed", undefined, 900);
+      s.end();
+    }
+
+    // ---- ⌘L: the target editor, recents grouped, filtered, committed -------
+    if (wanted("location")) {
+      const s = openScene("location", "Edit target (⌘L)");
+      await closePalette();
+      await win.runCommand("palette.editUrl");
+      await wait(FRAME_SETTLE_MS);
+      await s.frame("edit", { shell: ".palette" }, 1_100);
+      await typeQuery("");
+      await s.frame("recents", { shell: ".palette" }, 1_000);
+      await expandFirstHost();
+      await s.frame("expanded", { shell: ".palette" }, 1_000);
+      await typeQuery("dashboard");
+      await s.frame("filtered", { shell: ".palette" }, 1_100);
+      await closePalette();
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- ⌘T: browse themes — chrome and page re-theme, then the mode -------
+    if (wanted("theme-picker")) {
+      const s = openScene("theme-picker", "Browse themes (⌘T)");
+      await closePalette();
+      await win.runCommand("palette.openTheme");
+      await wait(FRAME_SETTLE_MS);
+      await s.frame("theme-group", { shell: ".palette" }, 1_100);
+      for (const slug of ["gold", "turquoise", "lapis-lazuli"] as VariantSlug[]) {
+        win.setVariant(slug);
+        await s.frame(`variant-${slug}`, { shell: ".palette" }, 850);
+      }
+      win.setColorMode("light");
+      await s.frame("mode-light", { shell: ".palette" }, 1_100);
+      win.setColorMode("dark");
+      await s.frame("mode-dark", { shell: ".palette" }, 900);
+      await closePalette();
+      win.setVariant("obsidian");
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- light mode with a surface open, then both at once -----------------
+    if (wanted("light-mode")) {
+      const s = openScene("light-mode", "Light mode surfaces");
+      win.setColorMode("light");
+      await openPalette();
+      await s.frame("palette", { shell: ".palette" }, 1_100);
+      await closePalette();
+      await wait(FRAME_SETTLE_MS);
+      await win.runCommand("devtools.dock.bottom");
+      await waitForDock("bottom");
+      await wait(DEVTOOLS_SETTLE_MS);
+      await s.frame("devtools", undefined, 1_200);
+      await openPalette();
+      await s.frame("both", { shell: ".palette" }, 1_300);
+      await closePalette();
+      await win.runCommand("devtools.toggle");
+      await wait(SETTLE_MS);
+      win.setColorMode("dark");
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- the strip; proximity is frozen for the run, so it is pinned -------
+    if (wanted("strip")) {
+      const s = openScene("strip", "Window strip");
+      await s.frame("hidden", undefined, 700);
+      await win.runCommand("strip.toggle");
+      await waitForState((state) => state.stripVisible);
+      await s.frame("pinned-dark", { shell: ".strip" }, 1_000);
+      win.setColorMode("light");
+      await s.frame("pinned-light", { shell: ".strip" }, 1_000);
+      win.setColorMode("dark");
+      await win.runCommand("strip.toggle");
+      await waitForState((state) => !state.stripVisible);
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- ⇧⌘F: the strip docks as a title bar, the page moves below ---------
+    if (wanted("titlebar")) {
+      const s = openScene("titlebar", "Titlebar mode (⇧⌘F)");
+      await s.frame("before", undefined, 700);
+      await win.runCommand("titlebar.toggle");
+      await waitForState((state) => state.titlebarMode);
+      await wait(SETTLE_MS);
+      await s.frame("docked", { shell: ".shell-root.is-titlebar .strip" }, 1_300);
+      await win.runCommand("titlebar.toggle");
+      await waitForState((state) => !state.titlebarMode);
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- ⌘⌥J and ⌘1/2/3: DevTools, docked on each side ---------------------
+    if (wanted("devtools")) {
+      const s = openScene("devtools", "Docked DevTools (⌘⌥J, ⌘1/2/3)");
+      await s.frame("closed", undefined, 700);
+      for (const dock of ["bottom", "right", "left"] as DockMode[]) {
+        await win.runCommand(`devtools.dock.${dock}`);
+        // The panel takes the better part of two seconds to lay itself out, which
+        // is slow enough for a burst to sample it moving, not just landing. Burst
+        // frames identical to the one before are dropped for free, so asking for
+        // more costs nothing when the panel has not moved yet.
+        await s.burst(`docking-${dock}`, 6);
+        await waitForDock(dock);
+        await wait(DEVTOOLS_SETTLE_MS);
+        await s.frame(`dock-${dock}`, undefined, 1_100);
+      }
+      await win.runCommand("devtools.toggle");
+      await wait(SETTLE_MS);
+      s.end();
+    }
+
+    // ⌘J (focus.toggle) deliberately has no scene. It moves keyboard focus,
+    // which changes no pixels in a screen capture, so a GIF of it would be a
+    // single still — the capture proved this: both frames came out byte-identical
+    // and the second was dropped. It is covered by the DevTools bullet instead.
+
+    // ---- ⌘⇧C: the element picker, hover highlight following the pointer ----
+    if (wanted("picker")) {
+      const s = openScene("picker", "Element picker (⌘⇧C)");
+      win.pickerArm();
+      await wait(300);
+      await s.frame("armed", undefined, 800);
+      const target = await findPickerTarget();
+      const point = target ?? { x: Math.round(WINDOW_WIDTH / 2), y: Math.round(WINDOW_HEIGHT / 2) };
+      trace(
+        `picker target: ${target ? target.label : "centre fallback"} at (${point.x}, ${point.y})`,
+      );
+      site.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
+      await wait(400);
+      await s.frame("hover", { site: "[data-tlachialoni-picker]" }, 1_200);
+      win.pickerDisarm();
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- ⌘R / ⇧⌘R: reload, with the veil sampled mid-flight ----------------
+    if (wanted("reload")) {
+      const s = openScene("reload", "Reload (⌘R, ⇧⌘R)");
+      // Pin the document first so "before" and "after" are the same known page.
+      await loadTarget(pageUrl);
+      await s.frame("before", undefined, 800);
+      await win.runCommand("view.hardReload");
+      await s.burst("reloading", 4);
+      await settleNavigation();
+      await s.frame("after", undefined, 900);
+      s.end();
+    }
+
+    // ---- ⌘← / ⌘→ and the armed swipe overlay -------------------------------
+    if (wanted("history")) {
+      const s = openScene("history", "Back / forward and the swipe overlay");
+      await s.frame("idle", undefined, 700);
+      win.previewHistoryArm();
+      await s.frame("back-overlay", { shell: ".history-overlay--back" }, 1_100);
+      await s.frame("forward-overlay", { shell: ".history-overlay--forward" }, 1_100);
+      win.stopSurfacePreview();
+      await wait(FRAME_SETTLE_MS);
+      s.end();
+    }
+
+    // ---- themed DevTools over the showcase (needs the real server) ---------
+    if (wanted("themed-devtools")) {
+      if (!showcaseUp) {
+        const note =
+          `themed-devtools: ${showcaseUrl} is not reachable, so the themed page + ` +
+          `DevTools sweep was skipped. Start the showcase dev server and re-run.`;
+        warnings.push(note);
+        process.stderr.write(`[shots] ${note}\n`);
+      } else {
+        const s = openScene("themed-devtools", "Themed page + DevTools (showcase)");
+        await closePalette();
+        await loadTarget(showcaseUrl);
+        await win.runCommand("devtools.dock.bottom");
+        await waitForDock("bottom");
+        await wait(DEVTOOLS_SETTLE_MS);
+        await openPalette();
+        await s.frame("obsidian", { shell: ".palette" }, 1_300);
+        for (const slug of [
+          "gold",
+          "turquoise",
+          "lapis-lazuli",
+          "jade",
+          "fire-opal",
+        ] as VariantSlug[]) {
+          win.setVariant(slug);
+          await s.frame(`variant-${slug}`, { shell: ".palette" }, 1_000);
+        }
+        win.setColorMode("light");
+        await s.frame("light", { shell: ".palette" }, 1_300);
+        win.setColorMode("dark");
+        win.setVariant("obsidian");
+        await closePalette();
+        await win.runCommand("devtools.toggle");
+        await wait(SETTLE_MS);
+        s.end();
+      }
+    }
+
+    fs.writeFileSync(
+      path.join(framesRoot, "manifest.json"),
+      JSON.stringify(
+        {
+          width: WINDOW_WIDTH,
+          height: WINDOW_HEIGHT,
+          backend,
+          pageUrl,
+          showcaseUrl,
+          showcaseUp,
+          scenes,
+          warnings,
+        },
+        null,
+        2,
+      ),
+    );
+    process.stdout.write(
+      `SCENES ${JSON.stringify({
+        dir: framesRoot,
+        pageUrl,
+        showcaseUp,
+        scenes: scenes.map((scene) => ({ name: scene.name, frames: scene.frames.length })),
+        warnings,
+      })}\n`,
+    );
+  };
+
+  try {
+    for (let i = 0; i < SHELL_TIMEOUT_MS / SHELL_POLL_MS && !win.isShellReady(); i++) {
+      await wait(SHELL_POLL_MS);
+    }
+    await wait(SETTLE_MS);
+    trace("shell ready");
+
+    if (mode === "scenes") await captureScenes();
+    else await captureStates();
   } finally {
     win.freezeProximity(false);
     if (!win.win.isDestroyed()) win.win.setAlwaysOnTop(false);
@@ -1015,6 +1566,10 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     shots,
     errors,
   };
-  fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify(report, null, 2));
+  // The state walk owns `report.json`; a scenes run reports through the frames
+  // manifest instead, so re-running one never clobbers the other's report.
+  if (mode === "states") {
+    fs.writeFileSync(path.join(outDir, "report.json"), JSON.stringify(report, null, 2));
+  }
   process.stdout.write(`SCREENSHOTS ${JSON.stringify(report)}\n`);
 }
