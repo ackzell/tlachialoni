@@ -24,6 +24,47 @@ TLACHIALONI_SCREENSHOTS_URL=http://localhost:3000 pnpm screenshots
 > `src/main/index.ts`, and `runScreenshots` is never reachable in a packaged
 > build. See `src/main/screenshots.ts`.
 
+## GIFs
+
+The same harness also records the README's animated demos:
+
+```sh
+pnpm gifs
+```
+
+That builds the app, runs it with `TLACHIALONI_SCREENSHOTS_MODE=scenes`, and then
+assembles the result. The state walk above writes one still per state; the scene
+walk drives one real interaction per command and records an ordered set of frames
+per scene, so each README shortcut can show what it actually does.
+
+- **Storyboard frames** hold long enough to read and are checked against a
+  selector before capture, exactly like the state walk, so a frame is never taken
+  from a state that silently failed to apply.
+- **Burst frames** run back to back with almost no settle, so a transition that is
+  slow enough — DevTools docking, a page reloading — is sampled moving instead of
+  jumped over. A frame identical to the one before it is dropped, and its hold is
+  folded into the previous frame; that is also what makes a settled end state
+  linger rather than flash past. The shell's own entrance animations are faster
+  than one window capture (~250 ms), so a burst there yields nothing and none is
+  taken.
+
+Frames land in `docs/screenshots/.frames/` (gitignored) with a `manifest.json`
+describing the order and hold of each frame. `scripts/build-gifs.mjs` turns that
+into `docs/gifs/<scene>.gif` and a `docs/gifs/tour.gif` that runs every scene in
+order. Re-assemble without re-capturing with `pnpm gifs:assemble`, and set
+`--width` to change the output size (default 960 px on the long edge; the README
+renders them near ~830 px wide).
+
+Page-backed scenes run on `localhost:3000` rather than an ephemeral port, so a
+typed target and the recents group read the way they do on a real machine. When a
+dev server already owns that port it is used as the page; otherwise the stub is
+served there instead. The `themed-devtools` scene needs the real showcase — it
+loads `TLACHIALONI_SCREENSHOTS_SHOWCASE_URL` (default
+`http://localhost:3000/en/reactivity/reactive`) with the palette and the DevTools
+panel both open — and is skipped with a warning in the manifest when that URL does
+not answer, so a missing server can never produce a silently wrong GIF. Capture a
+single scene while iterating with `TLACHIALONI_SCREENSHOTS_SCENES=palette,strip`.
+
 ## The shorthand
 
 A window is a `BaseWindow` holding two stacked `WebContentsView`s — the guest page
@@ -93,3 +134,32 @@ tends to land on the body.
 | `36-picker-hover`                          | Element picker armed, hovering an element                   |
 | `37-history-overlay-back`                  | Armed history swipe, Back                                   |
 | `38-history-overlay-forward`               | Armed history swipe, Forward                                |
+
+## Scenes
+
+The scene walk (`pnpm gifs`) is the GIF set. Each scene is one command, and the
+frames it records become `docs/gifs/<name>.gif`:
+
+| GIF               | Command             | What the frames show                                                        |
+| ----------------- | ------------------- | --------------------------------------------------------------------------- |
+| `new-window`      | ⌘N, ⌘W              | a blank window: the location palette armed, then the dark watermark         |
+| `extensions`      | (Extensions)        | the store row on the blank window, then an install through every state      |
+| `palette`         | ⌘P, `Tab` / `⇧Tab`  | the palette opening, Tab cycling the groups, a target typed and committed   |
+| `location`        | ⌘L                  | the target editor: prefilled, recents grouped by origin, expanded, filtered |
+| `theme-picker`    | ⌘T                  | the Theme group, variants applied, the color mode cycled                    |
+| `light-mode`      | —                   | light mode with the palette open, then DevTools, then both at once          |
+| `strip`           | top-edge reveal, ⌘B | the strip hidden, then pinned, dark and light                               |
+| `titlebar`        | ⇧⌘F                 | the strip docked as a title bar, with the page laid out below it            |
+| `devtools`        | ⌘⌥J, ⌘1/2/3         | DevTools docked bottom, right, then left                                    |
+| `picker`          | ⌘⇧C                 | the element picker armed, its highlight on a control                        |
+| `reload`          | ⌘R, ⇧⌘R             | a page reloaded, sampled mid-flight                                         |
+| `history`         | ⌘← / ⌘→, swipe      | the armed edge overlay, both directions                                     |
+| `themed-devtools` | (theming)           | the showcase with the palette and DevTools open, the variants sweeping      |
+
+`docs/gifs/tour.gif` is every scene in order. The strip's proximity reveal is
+frozen for a capture run — a cursor resting near the top edge would otherwise add
+the strip to every frame — so the strip is pinned with ⌘B rather than hovered.
+
+⌘J has no scene: moving keyboard focus changes no pixels, so a GIF of it would be
+one still. The capture demonstrated it — both frames came out byte-identical and
+the duplicate was dropped.
