@@ -12,7 +12,6 @@
   <img src="docs/gifs/tour.gif" alt="Every Tlachialoni command in motion: the command palette and its groups, themes, the window strip and titlebar mode, docked DevTools, the element picker, reload and the history overlays" />
 </p>
 
-
 A minimal local browser for frontend development: a frameless window that renders a local dev server edge-to-edge with real Chromium DevTools docked inside the same window, and essentially no other browser chrome.
 
 Each window is one target, and you can open as many windows as you have dev servers (`⌘N`), each fully independent.
@@ -89,6 +88,10 @@ extension …**, or choose **Install Extension from Folder** for an unpacked
 extension. Installs show a transient status surface with a spinner, the current
 stage, and a download progress bar; each installed extension also appears in the
 palette as a row you can enable, disable, update, or remove.
+
+<p align="center">
+  <img src="docs/gifs/extensions.gif" alt="An extension installed from the palette: the status surface running through resolving, downloading with a progress bar, verifying, unpacking, loading and installed, then its error and warning states" />
+</p>
 
 Extensions load only into the guest page, never into the shell UI. Electron
 runs Manifest V3 background service workers, but a worker that throws while
