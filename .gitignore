@@ -27,3 +27,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Dev-only live overrides for the docked DevTools palette
+devtools-theme.override.json
+
+# CodeGraph index (local, project-specific)
+.codegraph/

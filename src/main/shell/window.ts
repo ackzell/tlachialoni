@@ -172,6 +172,7 @@ export class AppWindow implements SwipeWindow {
       () => this.siteView,
       this.surfaceState(),
       (status) => this.sendToShell("devtools:changed", status),
+      () => ({ variant: this.activeVariant(), mode: this.resolvedMode() }),
     );
     this.picker = new PickerController(() => this.siteView, this.devtools);
 
@@ -1045,10 +1046,10 @@ export class AppWindow implements SwipeWindow {
   };
 
   /**
-   * Pushes this window's theme to its background and shell. `nativeTheme` is
-   * intentionally NOT set: it is process-wide and would make one window's color
-   * mode change every window (and the guest page / DevTools). Those follow the
-   * OS; only the tool's own surfaces are per-window.
+   * Pushes this window's theme to its background, shell and docked DevTools.
+   * `nativeTheme` is intentionally NOT set: it is process-wide and would make one
+   * window's color mode change every window (and the guest page). Those follow
+   * the OS; only the tool's own surfaces are per-window.
    */
   private applyTheme(): void {
     this.pushTheme();
@@ -1074,6 +1075,8 @@ export class AppWindow implements SwipeWindow {
       colorMode: this.record()?.colorMode ?? "system",
       resolved: this.resolvedMode(),
     });
+    // The docked DevTools follow this window's variant too.
+    this.devtools.refreshTheme();
   }
 
   private resolvedMode(): "dark" | "light" {

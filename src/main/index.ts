@@ -1,4 +1,5 @@
 import { app, Menu, session } from "electron";
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import icon from "../../resources/icon.png?asset";
@@ -12,6 +13,19 @@ import { registerIpc } from "./ipc";
 import type { AppWindow } from "./shell/window";
 import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-test";
 import { runScreenshots, seedScreenshotState } from "./screenshots";
+import { configureDevtoolsThemeOverride } from "./shell/devtools-theme-override";
+import { openDevtoolsInspector } from "./shell/devtools-inspector";
+
+/**
+ * Dev-only: inspect the DevTools front-end itself (see devtools-inspector.ts).
+ * The remote debugging switches must be appended before the app is ready.
+ */
+const INSPECT_DEVTOOLS = !app.isPackaged && process.env.TLACHIALONI_INSPECT_DEVTOOLS === "1";
+const INSPECT_PORT = Number(process.env.TLACHIALONI_INSPECT_PORT ?? 9333);
+if (INSPECT_DEVTOOLS) {
+  app.commandLine.appendSwitch("remote-debugging-port", String(INSPECT_PORT));
+  app.commandLine.appendSwitch("remote-allow-origins", "*");
+}
 
 /**
  * App identity. The development Dock icon and the About panel use the same
@@ -254,6 +268,15 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
 
 app.whenReady().then(async () => {
   configureAppIdentity();
+  // Dev-only: the live DevTools palette override (repo-root JSON), so colour
+  // edits land within a tick without a restart. No file → no override.
+  if (!app.isPackaged) {
+    const name = "devtools-theme.override.json";
+    const candidates = [path.join(app.getAppPath(), name), path.join(process.cwd(), name)];
+    const overridePath = candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+    configureDevtoolsThemeOverride(overridePath);
+    process.stdout.write(`devtools theme override: ${overridePath}\n`);
+  }
   // Start the process-wide trackpad swipe monitor (macOS only; a missing addon
   // leaves swiping off and everything else working).
   swipeNavigation.start();
@@ -289,6 +312,16 @@ app.whenReady().then(async () => {
     app.exit(0);
   } else if (process.env.TLACHIALONI_EXTENSION_TEST === "1") {
     await runExtensionSelfTest(primary);
+  }
+
+  // Dev-only: dock DevTools, then point an inspector at the DevTools front-end so
+  // its own DOM and custom properties can be inspected (see devtools-inspector.ts).
+  if (INSPECT_DEVTOOLS) {
+    primary.devtools.ensureOpen();
+    const inspector = await openDevtoolsInspector(INSPECT_PORT);
+    if (!inspector) {
+      process.stderr.write(`DevTools inspector: no DevTools target on port ${INSPECT_PORT}\n`);
+    }
   }
 });
 

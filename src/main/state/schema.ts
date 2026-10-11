@@ -59,9 +59,9 @@ export interface WindowRecord {
   /** This window's Tlapalli mineral variant. */
   variant: VariantSlug;
   /**
-   * This window's color mode for the tool's own surfaces. The guest page's
-   * `prefers-color-scheme` and the docked DevTools' internal theme are not
-   * per-window; they follow the OS (specs/012-multi-window).
+   * This window's color mode for the tool's own surfaces, and for the docked
+   * DevTools palette, which is repainted per window. The guest page's
+   * `prefers-color-scheme` still follows the OS (specs/012-multi-window).
    */
   colorMode: ColorMode;
 }
