@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.15](https://github.com/ackzell/tlachialoni/compare/v0.1.14...v0.1.15) (2026-10-11)
+
+### Features
+
+* **devtools:** theme the docked DevTools per window ([56979bc](https://github.com/ackzell/tlachialoni/commit/56979bc30f2157ca6f6931f65624fefb37df521c))
+* **screenshots:** record per-command scenes as GIF frames ([fee1b35](https://github.com/ackzell/tlachialoni/commit/fee1b3555954f2a968278536398a691db962140e))
+
 ## [0.1.14](https://github.com/ackzell/tlachialoni/compare/v0.1.13...v0.1.14) (2026-10-06)
 
 ## [0.1.13](https://github.com/ackzell/tlachialoni/compare/v0.1.12...v0.1.13) (2026-10-06)
