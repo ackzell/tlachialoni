@@ -5,46 +5,81 @@
   <img src="resources/icon.png" alt="tlachialoni-logo" width="200" />
 </p>
 
+> [!NOTE]
 > **[tlah-chia-LO-nee](https://nahuatl.wired-humanities.org/content/tlachialoni)** in Nahuatl means _viewer_ (a device for viewing, seeing)
 
+<p align="center">
+  <img src="docs/gifs/tour.gif" alt="Every Tlachialoni command in motion: the command palette and its groups, themes, the window strip and titlebar mode, docked DevTools, the element picker, reload and the history overlays" />
+</p>
 
-A minimal local browser for frontend development: a frameless window that renders a local dev server edge-to-edge with real Chromium DevTools docked inside the same window, and essentially no other browser chrome. 
+
+A minimal local browser for frontend development: a frameless window that renders a local dev server edge-to-edge with real Chromium DevTools docked inside the same window, and essentially no other browser chrome.
 
 Each window is one target, and you can open as many windows as you have dev servers (`⌘N`), each fully independent.
 
 The only UI is transient and keyboard-first:
 
-<p align="center">
-  <br>
-  <img src="docs/screenshots/04-palette-all.png" alt="thachialoni-logo" width="500" />
-</p>
-
-
 - `⌘N`: open a new window (blank, with the location entry focused and the logo
   watermark on the empty page); `⌘W` closes it
-- `⌘P`: toggle the command palette (type a target like `:5173`, or run a command)
+
+  <img src="docs/gifs/new-window.gif" alt="A new window: a blank page with the location palette armed, then the logo watermark" />
+
+- `⌘P`: toggle the command palette — type a target like `:5173`, or run a command;
+  `Tab` / `Shift+Tab` cycle its groups (Location, DevTools, View, Theme, Extensions, Other)
+
+  <img src="docs/gifs/palette.gif" alt="The command palette opening, Tab cycling through its groups, a target typed and committed" />
+
 - `⌘L`: edit the current target, with recent pages listed and grouped by origin
+
+  <img src="docs/gifs/location.gif" alt="The target editor: the current target, recents grouped by origin and expanded, then filtered by a query" />
+
 - `⌘T`: jump to the theme picker
-- `Tab` / `Shift+Tab`: cycle the palette's groups (Location, DevTools, View, Theme, Extensions, Other)
+
+  <img src="docs/gifs/theme-picker.gif" alt="The Theme group of the palette with variants applied and the color mode cycled between dark and light" />
+
 - Drag from the top of the window at any time, pointer only; hovering the top
   edge or resting there briefly reveals the strip
 - `⌘B`: pin the window strip on screen (and, with it, the macOS window controls)
+
+  <img src="docs/gifs/strip.gif" alt="The window strip revealed and pinned, with the macOS window controls, in dark and light" />
+
 - `⇧⌘F`: toggle titlebar mode: the strip docks permanently as a title bar and the
   page moves below it, so the target and controls are always visible without covering
   the page
-- `⌘⌥J`: toggle DevTools; `⌘1/2/3` dock it bottom/right/left
-- `⌘J`: toggle keyboard focus between the page and DevTools
+
+  <img src="docs/gifs/titlebar.gif" alt="Titlebar mode: the strip docked as a title bar with the page laid out below it" />
+
+- `⌘⌥J`: toggle DevTools; `⌘1/2/3` dock it bottom/right/left; `⌘J` moves keyboard
+  focus between the page and DevTools
+
+  <img src="docs/gifs/devtools.gif" alt="Chromium DevTools opening and docking to the bottom, right, then left" />
+
 - `⌘⇧C`: element picker with hover highlight
+
+  <img src="docs/gifs/picker.gif" alt="The element picker armed, with a hover highlight on a control" />
+
 - `⌘R` / `⇧⌘R`: reload / hard reload
+
+  <img src="docs/gifs/reload.gif" alt="A page reloading, sampled mid-flight" />
+
 - `⌘←` / `⌘→`: back / forward (native text behavior inside inputs)
 - Two-finger horizontal swipe on the trackpad — back / forward, with an armed
   edge overlay that grows as the swipe commits and recedes as it cancels (the
   strip's back/forward buttons reflect the same availability)
 
+  <img src="docs/gifs/history.gif" alt="The armed edge overlay for a history swipe, in both directions" />
+
 Everything is themed with [Tlapalli](https://tlapalli.ackzell.dev) (eight mineral
 variants, dark/light following the system) in Source Code Pro. Theme is
-per-window: each window can use its own variant and color mode (the guest page
-and DevTools still follow the OS).
+per-window: each window can use its own variant and color mode, and the docked
+DevTools are repainted to match it — chrome, syntax colours and selection
+included. Only the guest page still follows the OS.
+
+<p align="center">
+  <img src="docs/gifs/themed-devtools.gif" alt="The showcase page with the palette and DevTools both open while the Tlapalli variants sweep, repainting chrome, syntax colours and selection together" />
+  <br />
+  <img src="docs/gifs/light-mode.gif" alt="Light mode with the palette open, then the docked DevTools, then both at once" />
+</p>
 
 ## Extensions
 
@@ -136,9 +171,9 @@ an HMR session overwrites what the installed app restores on its next launch.
 
 `app.setName()` alone cannot rename the dev app, because macOS reads the visible
 name from the bundle. `scripts/dev-identity.mjs` (run automatically before
-`dev`, `preview`, and `screenshots`) rewrites the three relevant `Info.plist`
-keys in `node_modules/electron/dist/Electron.app` and re-signs it ad-hoc. Two
-consequences:
+`dev`, `dev:inspect`, `preview`, and `screenshots`) rewrites the three relevant
+`Info.plist` keys in `node_modules/electron/dist/Electron.app` and re-signs it
+ad-hoc. Two consequences:
 
 - **Reinstalling `electron` reverts it.** Nothing breaks — the next `pnpm dev`
   detects the original plist and re-patches.
@@ -169,6 +204,38 @@ TLACHIALONI_DEMO_STATUS=1 pnpm dev
 
 The Developer menu is absent from packaged builds. See
 `specs/008-surface-preview/spec.md`.
+
+### DevTools theme
+
+The docked DevTools are repainted with the window's Tlapalli variant and colour
+mode — chrome, syntax colours and selection included — instead of following the
+OS. Only the guest page still follows the system appearance. See
+`specs/022-devtools-theme/spec.md`.
+
+Two dev-only affordances make the palette tunable:
+
+```sh
+pnpm dev:inspect    # dock DevTools and inspect the DevTools front-end itself
+```
+
+`pnpm dev:inspect` runs `dev` with `TLACHIALONI_INSPECT_DEVTOOLS=1`, which docks
+the panel and opens a second window inspecting the DevTools front-end over the
+remote debugging protocol — so its Elements and Styles panes show which custom
+property each rule consumes. The port defaults to `9333`
+(`TLACHIALONI_INSPECT_PORT`). It appends a local debug port, so it is gated to
+unpackaged builds.
+
+`devtools-theme.override.json` at the repo root (gitignored) is read live: edit
+it and the panel repaints within about a second, no restart. Any custom property
+can be moved, and it is applied last, so it beats the generated palette:
+
+```json
+{ "dark": { "--sys-color-tonal-container": "hsl(178 75% 13%)" }, "light": {} }
+```
+
+The path is printed at startup as `devtools theme override: …`, and every load
+logs a summary line. Because the file is gitignored, VS Code's search skips it
+until **Search: Use Ignore Files** is turned off.
 
 ## Packaging
 
@@ -269,6 +336,8 @@ See:
 - `specs/019-mv2-background-shim/spec.md` — running extensions whose MV3 background dies here
 - `specs/020-extension-load-narrowing/spec.md` — **pending**: narrow that rewrite to the
   extensions that need it, so most run as authored
+- `specs/022-devtools-theme/spec.md` — repainting the docked DevTools from the window's
+  Tlapalli variant
 
 ## License
 
