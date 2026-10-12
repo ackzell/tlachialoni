@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.16](https://github.com/ackzell/tlachialoni/compare/v0.1.15...v0.1.16) (2026-10-12)
+
+### Features
+
+* **zoom:** add keyboard and palette zoom with a transient indicator ([a1faef1](https://github.com/ackzell/tlachialoni/commit/a1faef11c8ff8a19c45b3cb0e37dd04f394d6aa4))
+* **zoom:** add the shared zoom ladder and per-window zoom state ([4c22c77](https://github.com/ackzell/tlachialoni/commit/4c22c77cf1742fa7fe8667d29d95fe4c4607dbc5))
+* **zoom:** capture Command+wheel and pinch gestures natively ([0fee70e](https://github.com/ackzell/tlachialoni/commit/0fee70ea0e03abe6c53061d3517921dd1a456157))
+
 ## [0.1.15](https://github.com/ackzell/tlachialoni/compare/v0.1.14...v0.1.15) (2026-10-11)
 
 ### Features
