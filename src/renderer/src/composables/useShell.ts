@@ -42,6 +42,8 @@ const paletteInitial = ref("");
 const paletteScope = ref<Scope>("all");
 const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bottom" });
 const extensionStatus = ref<ExtensionStatus | null>(null);
+/** The transient zoom confirmation level, or null when hidden (specs/023). */
+const zoomLevel = ref<number | null>(null);
 /** Transient strip reveal driven by pointer proximity in main (specs/013). */
 const peeking = ref(false);
 /** Transient armed history signal; drives the edge overlay (specs/015). */
@@ -128,6 +130,10 @@ function init(): void {
   api.on("extension:status", (payload) => {
     extensionStatus.value = (payload as ExtensionStatus | null) ?? null;
   });
+  api.on("zoom:changed", (payload) => {
+    const status = payload as { percent: number } | null;
+    zoomLevel.value = status ? status.percent : null;
+  });
   api.on("strip:peek", (payload) => {
     peeking.value = payload === true;
   });
@@ -179,6 +185,7 @@ export function useShell() {
     paletteScope: readonly(paletteScope),
     devtools: readonly(devtools),
     extensionStatus: readonly(extensionStatus),
+    zoomLevel: readonly(zoomLevel),
     peeking: readonly(peeking),
     historyArmed: readonly(historyArmed),
     historyAvailable: readonly(historyAvailable),

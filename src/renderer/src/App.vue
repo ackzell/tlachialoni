@@ -10,6 +10,7 @@ import FailureView from "./components/FailureView.vue";
 import HistoryOverlay from "./components/HistoryOverlay.vue";
 import InstallStatus from "./components/InstallStatus.vue";
 import LoadingVeil from "./components/LoadingVeil.vue";
+import ZoomIndicator from "./components/ZoomIndicator.vue";
 import {
   markSurfaceLeaveCancelled,
   markSurfaceLeaving,
@@ -28,6 +29,7 @@ const {
   peeking,
   historyArmed,
   extensionStatus,
+  zoomLevel,
 } = useShell();
 
 // Main shows the native macOS traffic lights off the same predicate, so the
@@ -114,6 +116,15 @@ const historyProgress = computed(() => historyArmed.value?.progress ?? 0);
       @leave-cancelled="markSurfaceLeaveCancelled"
     >
       <DragStrip v-if="stripVisible" />
+    </Transition>
+
+    <Transition
+      name="zoom"
+      @leave="markSurfaceLeaving"
+      @after-leave="markSurfaceLeft"
+      @leave-cancelled="markSurfaceLeaveCancelled"
+    >
+      <ZoomIndicator v-if="zoomLevel !== null" :percent="zoomLevel" />
     </Transition>
 
     <Transition

@@ -33,6 +33,13 @@ import { ProximityTracker } from "./proximity";
 import { CommandRegistry, type CommandResult } from "./commands";
 import { swipeNavigation, type SwipeWindow } from "./swipe/navigation";
 import { PAGE_AT_BOTH_EDGES, type PageScrollEdge } from "@shared/scroll-edge";
+import {
+  DEFAULT_ZOOM_INDEX,
+  clampZoomIndex,
+  stepZoom,
+  zoomFactor,
+  zoomPercent,
+} from "@shared/zoom";
 
 /** How long main waits for the renderer settle ack before collapsing anyway. */
 const SHELL_SETTLE_TIMEOUT_MS = 500;
@@ -42,6 +49,15 @@ const PROXIMITY_POLL_MS = 150;
 
 /** How long after the last move the window still counts as being dragged. */
 const DRAG_SETTLE_MS = 200;
+
+/** How long the transient zoom indicator stays up after the last change. */
+const ZOOM_INDICATOR_MS = 1500;
+
+/** Keyboard zoom within this window is one press arriving on both paths. */
+const ZOOM_KEY_DEDUPE_MS = 20;
+
+/** Debounce for persisting the zoom step, so a gesture never fsyncs per step. */
+const ZOOM_PERSIST_MS = 300;
 
 /**
  * Shell overlay heights. `band` is the thin always-on drag/reveal region that keeps
@@ -111,6 +127,15 @@ export class AppWindow implements SwipeWindow {
   private gestureProbe: GestureProbeHandle | null = null;
   /** The live armed signal driving the edge overlay (specs/015). */
   private historyArmed: HistoryArmed | null = null;
+  /** This window's persistent zoom step; the guest renders at ZOOM_STEPS[zoomIndex]. */
+  private zoomIndex: number;
+  /** The transient zoom confirmation, shown briefly after any change. */
+  private zoomStatus: { percent: number } | null = null;
+  private zoomTimer: NodeJS.Timeout | null = null;
+  /** Last keyboard zoom, so the menu and input dispatcher cannot double-step. */
+  private lastKeyboardZoomAt = 0;
+  /** Debounced persistence of the zoom step (never fsync per gesture step). */
+  private zoomPersistTimer: NodeJS.Timeout | null = null;
   /** Dev-only: keeps the armed overlay cycling for styling. */
   private historyPreviewTimer: NodeJS.Timeout | null = null;
   /** Latest report of what the page under the pointer can still scroll. */
@@ -137,6 +162,7 @@ export class AppWindow implements SwipeWindow {
 
     const record = this.record();
     this.currentUrl = record?.target ?? "";
+    this.zoomIndex = clampZoomIndex(record?.zoomIndex ?? DEFAULT_ZOOM_INDEX);
 
     this.win = new BaseWindow({
       width: record?.bounds?.width ?? DEFAULT_WIDTH,
@@ -181,6 +207,14 @@ export class AppWindow implements SwipeWindow {
     swipeNavigation.register(this);
 
     this.registerCommands();
+
+    // Own the zoom ladder while letting Chromium actually render the zoom. NOTE:
+    // `manual` zoom mode looks right but does not repaint the page (setZoomFactor
+    // changes the value yet devicePixelRatio stays put), so `isolated` is used:
+    // per-webContents, rendering works, and the level persists across navigation.
+    this.siteView.webContents.setZoomMode("isolated");
+    this.applyZoomFactor();
+    if (process.env["TLACHIALONI_ZOOM_DEBUG"] === "1") this.installZoomDebug();
 
     // TEMPORARY: the specs/015 M0 spike probe. Observes only; see
     // src/main/shell/gesture-probe.ts. Deleted once research.md §10 records it.
@@ -276,11 +310,18 @@ export class AppWindow implements SwipeWindow {
       this.store.patchWindow(this.windowId, {
         bounds: this.win.getBounds(),
         devtoolsOpen: this.devtools.isOpen(),
+        // A debounced zoom write may still be pending; fold it into this one.
+        zoomIndex: this.zoomIndex,
       });
+      if (this.zoomPersistTimer) {
+        clearTimeout(this.zoomPersistTimer);
+        this.zoomPersistTimer = null;
+      }
     });
     this.win.on("closed", () => {
       this.clearPendingSettle();
       this.clearStatusDemo();
+      this.clearZoomTimer();
       this.clearHistoryPreview();
       this.gestureProbe?.dispose();
       this.gestureProbe = null;
@@ -397,6 +438,9 @@ export class AppWindow implements SwipeWindow {
         this.siteView.webContents.navigationHistory.goForward();
       }
     });
+    commands.register("view.zoomIn", () => this.keyboardZoom(1));
+    commands.register("view.zoomOut", () => this.keyboardZoom(-1));
+    commands.register("view.zoomReset", () => this.keyboardZoomReset());
     commands.register("devtools.toggle", () => this.devtools.toggle());
     commands.register("devtools.dock.bottom", () => this.devtools.dock("bottom"));
     commands.register("devtools.dock.right", () => this.devtools.dock("right"));
@@ -453,6 +497,103 @@ export class AppWindow implements SwipeWindow {
     this.extensionStatus = null;
     this.sendToShell("extension:status", null);
     this.relayout(true);
+  }
+
+  // ---- zoom (specs/023) ------------------------------------------------
+
+  /** Applies this window's persisted zoom to the guest view. */
+  private applyZoomFactor(): void {
+    if (this.siteView.webContents.isDestroyed()) return;
+    this.siteView.webContents.setZoomFactor(zoomFactor(this.zoomIndex));
+  }
+
+  private zoomBy(delta: number): void {
+    this.setZoomIndex(stepZoom(this.zoomIndex, delta));
+  }
+
+  /**
+   * Keyboard zoom. The command can arrive twice for one press — the View menu's OS
+   * accelerator and the view's `before-input-event` dispatcher both match it — so
+   * presses within a few milliseconds collapse to one step.
+   */
+  private keyboardZoom(delta: number): void {
+    if (!this.acceptKeyboardZoom()) return;
+    this.zoomBy(delta);
+  }
+
+  private keyboardZoomReset(): void {
+    if (!this.acceptKeyboardZoom()) return;
+    this.setZoomIndex(DEFAULT_ZOOM_INDEX);
+  }
+
+  private acceptKeyboardZoom(): boolean {
+    const now = Date.now();
+    if (now - this.lastKeyboardZoomAt < ZOOM_KEY_DEDUPE_MS) return false;
+    this.lastKeyboardZoomAt = now;
+    return true;
+  }
+
+  /** Sets the step, applies it, flashes the indicator, and persists (debounced). */
+  private setZoomIndex(index: number): void {
+    const next = clampZoomIndex(index);
+    this.zoomIndex = next;
+    this.applyZoomFactor();
+    // Re-assert on the next tick: in a non-manual zoom mode Chromium may apply its
+    // own wheel step after us; our absolute factor must be the value that sticks.
+    setImmediate(() => this.applyZoomFactor());
+    this.scheduleZoomPersist();
+    this.showZoomIndicator();
+  }
+
+  /**
+   * Persists the zoom step shortly after it settles. Writing on every step does a
+   * synchronous fsync, which stalls the main process mid-gesture and makes fast
+   * wheel/pinch input feel like it is being dropped.
+   */
+  private scheduleZoomPersist(): void {
+    if (this.zoomPersistTimer) return;
+    this.zoomPersistTimer = setTimeout(() => {
+      this.zoomPersistTimer = null;
+      this.store.patchWindow(this.windowId, { zoomIndex: this.zoomIndex });
+    }, ZOOM_PERSIST_MS);
+  }
+
+  /** Shows/refreshes the transient indicator and restarts its dismissal timer. */
+  private showZoomIndicator(): void {
+    this.zoomStatus = { percent: zoomPercent(this.zoomIndex) };
+    this.sendToShell("zoom:changed", this.zoomStatus);
+    this.relayout();
+    if (this.zoomTimer) clearTimeout(this.zoomTimer);
+    this.zoomTimer = setTimeout(() => this.hideZoomIndicator(), ZOOM_INDICATOR_MS);
+  }
+
+  /** Clears the indicator and lets the shell collapse once its leave settles. */
+  private hideZoomIndicator(): void {
+    this.clearZoomTimer();
+    if (!this.zoomStatus) return;
+    this.zoomStatus = null;
+    this.sendToShell("zoom:changed", null);
+    this.relayout(true);
+  }
+
+  private clearZoomTimer(): void {
+    if (this.zoomTimer) {
+      clearTimeout(this.zoomTimer);
+      this.zoomTimer = null;
+    }
+  }
+
+  /** Dev-only: logs the raw input stream so the gesture path can be tuned. */
+  private installZoomDebug(): void {
+    this.siteView.webContents.on("input-event", (_event, input) => {
+      const raw = input as { type?: string; modifiers?: string[] };
+      if (raw.type === "mouseWheel" || raw.type?.startsWith("gesturePinch")) {
+        console.log("[zoom-debug] input", raw.type, "mods=", raw.modifiers);
+      }
+    });
+    this.siteView.webContents.on("zoom-changed", (_event, direction) => {
+      console.log("[zoom-debug] zoom-changed", direction);
+    });
   }
 
   /**
@@ -875,6 +1016,8 @@ export class AppWindow implements SwipeWindow {
     const veilWasUp = this.showLoading;
     this.showLoading = false;
     this.failed = false;
+    // A fresh document can carry a different origin's default zoom; re-assert ours.
+    this.applyZoomFactor();
     if (url) {
       this.currentUrl = url;
       this.shownUrl = url;
@@ -903,6 +1046,8 @@ export class AppWindow implements SwipeWindow {
     // History moved (or a fresh load replaced the stack): refresh the strip's
     // back/forward availability before the early return below.
     this.reportHistoryAvailability();
+    // Keep this window's zoom across navigation (Chromium remembers it per origin).
+    this.applyZoomFactor();
     if (!url || url === this.currentUrl) return;
     this.currentUrl = url;
     this.shownUrl = url;
@@ -1158,6 +1303,9 @@ export class AppWindow implements SwipeWindow {
       this.failed ||
       this.extensionStatus ||
       this.devPreview ||
+      // The zoom indicator sits in the bottom-right corner, so the shell must span
+      // the window to paint it (specs/023).
+      this.zoomStatus !== null ||
       // An armed history signal paints a full-height edge overlay, so the shell
       // must span the window to host it (specs/015).
       isHistoryArmedVisible(this.historyArmed, this.paletteOpen) ||

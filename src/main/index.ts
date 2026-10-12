@@ -92,6 +92,10 @@ const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
       "view.reload",
       "view.hardReload",
       null,
+      "view.zoomIn",
+      "view.zoomOut",
+      "view.zoomReset",
+      null,
       "strip.toggle",
       "titlebar.toggle",
     ],
@@ -128,10 +132,12 @@ const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
 ];
 
 /**
- * Commands that must never carry an OS accelerator: macOS would then swallow
+ * Commands that must never carry an OS accelerator: macOS would swallow
  * `⌘←`/`⌘→` app-wide and break native text navigation in editable fields. They
  * remain clickable menu items; the page-level dispatcher owns the keyboard path
- * and yields the keys to focused inputs.
+ * and yields the keys to focused inputs. (The zoom commands DO carry OS
+ * accelerators — see `menuAccelerator` — so they work app-wide and show in the
+ * View menu.)
  */
 const NO_OS_ACCELERATOR = new Set(["view.back", "view.forward"]);
 
@@ -172,6 +178,7 @@ function buildSection(
 }
 
 function toElectronAccelerator(accelerator: Accelerator): string {
+  if (accelerator.menuAccelerator) return accelerator.menuAccelerator;
   const parts: string[] = [];
   if (accelerator.meta) parts.push("CommandOrControl");
   if (accelerator.alt) parts.push("Alt");

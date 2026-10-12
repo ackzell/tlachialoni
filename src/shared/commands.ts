@@ -13,6 +13,17 @@ export interface Accelerator {
   alt?: boolean;
   /** KeyboardEvent.code, e.g. "KeyP", "Digit1", "ArrowLeft". */
   code: string;
+  /**
+   * When true, the Shift modifier is not significant when matching. Used for
+   * zoom in, whose `+` is Shift+`=` on a US layout, so both `⌘=` and `⌘⇧=`
+   * resolve to the same command (specs/023).
+   */
+  shiftInsensitive?: boolean;
+  /**
+   * Overrides the OS-menu accelerator string when `code` has no Electron key name
+   * (e.g. `Equal` for `+`). Shown in the menu and handled app-wide (specs/023).
+   */
+  menuAccelerator?: string;
 }
 
 /**
@@ -155,6 +166,36 @@ export const COMMANDS: CommandDef[] = [
     group: "view",
   },
   {
+    id: "view.zoomIn",
+    label: "Zoom In",
+    acceleratorLabel: "⌘+",
+    // `+` is Shift+`=` on a US layout, so accept both chords (specs/023).
+    accelerator: {
+      meta: true,
+      code: "Equal",
+      shiftInsensitive: true,
+      menuAccelerator: "CommandOrControl+Plus",
+    },
+    palette: true,
+    group: "view",
+  },
+  {
+    id: "view.zoomOut",
+    label: "Zoom Out",
+    acceleratorLabel: "⌘−",
+    accelerator: { meta: true, code: "Minus", menuAccelerator: "CommandOrControl+-" },
+    palette: true,
+    group: "view",
+  },
+  {
+    id: "view.zoomReset",
+    label: "Reset Zoom",
+    acceleratorLabel: "⌘0",
+    accelerator: { meta: true, code: "Digit0", menuAccelerator: "CommandOrControl+0" },
+    palette: true,
+    group: "view",
+  },
+  {
     id: "devtools.toggle",
     label: "Toggle DevTools",
     acceleratorLabel: "⌘⌥J",
@@ -291,9 +332,10 @@ export function commandForInput(input: KeyInput): CommandDef | undefined {
   return COMMANDS.find((cmd) => {
     const a = cmd.accelerator;
     if (!a) return false;
+    const shiftMatches = a.shiftInsensitive ? true : Boolean(a.shift) === input.shift;
     return (
       Boolean(a.meta) === input.meta &&
-      Boolean(a.shift) === input.shift &&
+      shiftMatches &&
       Boolean(a.alt) === input.alt &&
       a.code === input.code
     );

@@ -406,3 +406,62 @@ describe("palette row identity", () => {
     expect(before).toBe("command:view.reload");
   });
 });
+
+describe("zoom commands", () => {
+  const input = (over: Partial<{ meta: boolean; shift: boolean; code: string }>) => ({
+    type: "keyDown",
+    meta: false,
+    shift: false,
+    alt: false,
+    control: false,
+    code: "",
+    ...over,
+  });
+
+  it("binds zoom in to ⌘= and ⌘⇧= (both resolve to +)", () => {
+    const command = COMMANDS.find((entry) => entry.id === "view.zoomIn");
+    expect(command).toMatchObject({
+      palette: true,
+      group: "view",
+      acceleratorLabel: "⌘+",
+      accelerator: {
+        meta: true,
+        code: "Equal",
+        shiftInsensitive: true,
+        menuAccelerator: "CommandOrControl+Plus",
+      },
+    });
+    expect(commandForInput(input({ meta: true, code: "Equal" }))?.id).toBe("view.zoomIn");
+    expect(commandForInput(input({ meta: true, shift: true, code: "Equal" }))?.id).toBe(
+      "view.zoomIn",
+    );
+  });
+
+  it("binds zoom out to ⌘- and reset to ⌘0", () => {
+    expect(COMMANDS.find((entry) => entry.id === "view.zoomOut")).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘−",
+      accelerator: { meta: true, code: "Minus", menuAccelerator: "CommandOrControl+-" },
+    });
+    expect(COMMANDS.find((entry) => entry.id === "view.zoomReset")).toMatchObject({
+      palette: true,
+      acceleratorLabel: "⌘0",
+      accelerator: { meta: true, code: "Digit0", menuAccelerator: "CommandOrControl+0" },
+    });
+    expect(commandForInput(input({ meta: true, code: "Minus" }))?.id).toBe("view.zoomOut");
+    expect(commandForInput(input({ meta: true, code: "Digit0" }))?.id).toBe("view.zoomReset");
+  });
+
+  it("lists all three zoom commands in the palette", () => {
+    const ids = PALETTE_COMMANDS.map((entry) => entry.id);
+    expect(ids).toContain("view.zoomIn");
+    expect(ids).toContain("view.zoomOut");
+    expect(ids).toContain("view.zoomReset");
+  });
+
+  it("does not let the unshifted ⌘= fall through to another command", () => {
+    // The shift-insensitive match must not shadow anything: only zoom in uses it.
+    const shifted = COMMANDS.filter((entry) => entry.accelerator?.shiftInsensitive);
+    expect(shifted.map((entry) => entry.id)).toEqual(["view.zoomIn"]);
+  });
+});
