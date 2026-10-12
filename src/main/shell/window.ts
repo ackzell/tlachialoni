@@ -32,6 +32,7 @@ import { installGestureProbe, type GestureProbeHandle } from "./gesture-probe";
 import { ProximityTracker } from "./proximity";
 import { CommandRegistry, type CommandResult } from "./commands";
 import { swipeNavigation, type SwipeWindow } from "./swipe/navigation";
+import type { ZoomGestureEvent } from "./swipe/addon";
 import { PAGE_AT_BOTH_EDGES, type PageScrollEdge } from "@shared/scroll-edge";
 import {
   DEFAULT_ZOOM_INDEX,
@@ -55,6 +56,18 @@ const ZOOM_INDICATOR_MS = 1500;
 
 /** Keyboard zoom within this window is one press arriving on both paths. */
 const ZOOM_KEY_DEDUPE_MS = 20;
+
+/** Accumulated mouse-wheel travel (its precise deltas are ~1–2 each) per step. */
+const ZOOM_WHEEL_MOUSE_STEP = 12;
+
+/** Accumulated trackpad Command + scroll travel (px) per zoom step (more = calmer). */
+const ZOOM_WHEEL_TRACKPAD_STEP = 120;
+
+/** Accumulated pinch magnification per zoom step (more = calmer). */
+const ZOOM_PINCH_STEP = 0.3;
+
+/** Idle gap that ends a gesture and clears its leftover travel. */
+const ZOOM_GESTURE_IDLE_MS = 160;
 
 /** Debounce for persisting the zoom step, so a gesture never fsyncs per step. */
 const ZOOM_PERSIST_MS = 300;
@@ -132,6 +145,11 @@ export class AppWindow implements SwipeWindow {
   /** The transient zoom confirmation, shown briefly after any change. */
   private zoomStatus: { percent: number } | null = null;
   private zoomTimer: NodeJS.Timeout | null = null;
+  /** Running gesture travel, mapped to ladder steps (one accumulator per source). */
+  private zoomMouseAccumulator = 0;
+  private zoomWheelAccumulator = 0;
+  private zoomPinchAccumulator = 0;
+  private gestureIdleTimer: NodeJS.Timeout | null = null;
   /** Last keyboard zoom, so the menu and input dispatcher cannot double-step. */
   private lastKeyboardZoomAt = 0;
   /** Debounced persistence of the zoom step (never fsync per gesture step). */
@@ -322,6 +340,10 @@ export class AppWindow implements SwipeWindow {
       this.clearPendingSettle();
       this.clearStatusDemo();
       this.clearZoomTimer();
+      if (this.gestureIdleTimer) {
+        clearTimeout(this.gestureIdleTimer);
+        this.gestureIdleTimer = null;
+      }
       this.clearHistoryPreview();
       this.gestureProbe?.dispose();
       this.gestureProbe = null;
@@ -556,6 +578,88 @@ export class AppWindow implements SwipeWindow {
       this.zoomPersistTimer = null;
       this.store.patchWindow(this.windowId, { zoomIndex: this.zoomIndex });
     }, ZOOM_PERSIST_MS);
+  }
+
+  /**
+   * A native zoom gesture (Command + scroll, or a trackpad pinch) from the swipe
+   * addon's NSEvent monitor. It belongs to the guest page, so it is ignored while
+   * the pointer is over the docked DevTools or DevTools has focus (FR-019).
+   */
+  onZoomGesture(event: ZoomGestureEvent): void {
+    if (this.isDevToolsFocused() || this.isPointerOverDevTools(event.x, event.y)) return;
+
+    if (process.env["TLACHIALONI_ZOOM_DEBUG"] === "1") {
+      console.log(
+        "[zoom-debug]",
+        event.source,
+        "discrete=",
+        event.discrete,
+        "precise=",
+        event.precise,
+        "deltaY=",
+        event.deltaY,
+        "magnification=",
+        event.magnification,
+      );
+    }
+
+    if (event.source === "pinch") {
+      this.accumulateZoom("pinch", event.magnification);
+      return;
+    }
+
+    if (event.discrete) {
+      // Mouse wheel: many small precise events per notch. Accumulate them; the
+      // mouse's delta sign is opposite the trackpad's, so it is not negated.
+      this.accumulateZoom("mouse", event.deltaY);
+    } else {
+      // Trackpad Command + scroll: a continuous stream, so accumulate it.
+      this.accumulateZoom("wheel", -event.deltaY);
+    }
+  }
+
+  /** Accumulates gesture travel and advances the ladder one step per threshold. */
+  private accumulateZoom(kind: "mouse" | "wheel" | "pinch", zoomInPositiveDelta: number): void {
+    if (!Number.isFinite(zoomInPositiveDelta) || zoomInPositiveDelta === 0) return;
+    const threshold =
+      kind === "pinch"
+        ? ZOOM_PINCH_STEP
+        : kind === "mouse"
+          ? ZOOM_WHEEL_MOUSE_STEP
+          : ZOOM_WHEEL_TRACKPAD_STEP;
+    if (kind === "pinch") this.zoomPinchAccumulator += zoomInPositiveDelta;
+    else if (kind === "mouse") this.zoomMouseAccumulator += zoomInPositiveDelta;
+    else this.zoomWheelAccumulator += zoomInPositiveDelta;
+    if (process.env["TLACHIALONI_ZOOM_DEBUG"] === "1") {
+      console.log("[zoom-debug]", kind, "delta=", zoomInPositiveDelta, "threshold=", threshold);
+    }
+    this.consumeZoomSteps(kind, threshold);
+    // A gesture ends when the input pauses; clear the leftover so it never leaks
+    // into the next gesture.
+    if (this.gestureIdleTimer) clearTimeout(this.gestureIdleTimer);
+    this.gestureIdleTimer = setTimeout(() => {
+      this.gestureIdleTimer = null;
+      this.zoomMouseAccumulator = 0;
+      this.zoomWheelAccumulator = 0;
+      this.zoomPinchAccumulator = 0;
+    }, ZOOM_GESTURE_IDLE_MS);
+  }
+
+  private consumeZoomSteps(kind: "mouse" | "wheel" | "pinch", threshold: number): void {
+    for (;;) {
+      const value =
+        kind === "pinch"
+          ? this.zoomPinchAccumulator
+          : kind === "mouse"
+            ? this.zoomMouseAccumulator
+            : this.zoomWheelAccumulator;
+      if (Math.abs(value) < threshold) return;
+      const direction = value > 0 ? 1 : -1;
+      if (kind === "pinch") this.zoomPinchAccumulator -= direction * threshold;
+      else if (kind === "mouse") this.zoomMouseAccumulator -= direction * threshold;
+      else this.zoomWheelAccumulator -= direction * threshold;
+      this.zoomBy(direction);
+    }
   }
 
   /** Shows/refreshes the transient indicator and restarts its dismissal timer. */

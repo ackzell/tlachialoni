@@ -32,6 +32,35 @@ export interface SwipeTarget {
   id: number;
 }
 
+/** Which input produced a zoom gesture. */
+export type ZoomGestureSource = "wheel" | "pinch";
+
+/**
+ * A zoom gesture the native monitor saw (Command + scroll, or a trackpad pinch).
+ * Chromium does not surface either to Electron with its deltas, so the addon
+ * carries them here; the JS side decides whether and how to zoom.
+ */
+export interface ZoomGestureEvent {
+  /** The event window's content view, the same handle `SwipeWindow` matches on. */
+  windowHandle: Buffer;
+  source: ZoomGestureSource;
+  /** Wheel only: `true` for a trackpad's precise stream, `false` for mouse notches. */
+  precise: boolean;
+  /**
+   * Wheel only: `true` when the event carries no gesture phase or momentum, i.e. a
+   * discrete mouse-wheel notch. `false` for a trackpad's phased stream. This is the
+   * reliable mouse-vs-trackpad split (a precise-delta mouse is still discrete).
+   */
+  discrete: boolean;
+  /** Wheel only: `scrollingDeltaY` (negative is up, which means zoom in). */
+  deltaY: number;
+  /** Pinch only: the magnification delta (positive is spread, which means zoom in). */
+  magnification: number;
+  /** Pointer location in the window, top-left origin. */
+  x: number;
+  y: number;
+}
+
 export interface SwipeNavigationTuning {
   /**
    * The gesture progress at or above which one AppKit finished without first
@@ -57,6 +86,11 @@ export interface SwipeNavigationAddonOptions extends SwipeNavigationTuning {
   /** Left out unless something is listening, since it runs once a frame. */
   onProgress?: (id: number, progress: number) => void;
   onEnd: (id: number, direction: SwipeDirection, committed: boolean, maxProgress: number) => void;
+  /**
+   * Command + scroll and trackpad pinch. Left out when the caller does not want
+   * zoom gestures; the monitor still swallows them.
+   */
+  onZoom?: (event: ZoomGestureEvent) => void;
 }
 
 export interface SwipeNavigationAddon {

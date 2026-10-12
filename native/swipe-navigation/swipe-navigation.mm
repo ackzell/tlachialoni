@@ -39,6 +39,7 @@ napi_env g_env = nullptr;
 napi_ref g_on_begin = nullptr;
 napi_ref g_on_progress = nullptr;
 napi_ref g_on_end = nullptr;
+napi_ref g_on_zoom = nullptr;
 bool g_cleanup_hook_added = false;
 
 // AppKit calls in from outside any Node callback, so every call to JavaScript
@@ -61,6 +62,10 @@ int32_t g_tracking_generation = 0;
 int32_t g_tracking_id = 0;
 double g_tracking_max_progress = 0;
 NSString* g_tracking_direction = nil;
+
+// True while a Command + scroll zoom gesture is in flight (trackpad), so its
+// momentum is swallowed too and never mistaken for a swipe.
+bool g_zoom_scroll_active = false;
 
 }  // namespace
 
@@ -247,7 +252,116 @@ void ReportEnd(bool committed) {
   napi_close_handle_scope(g_env, scope);
 }
 
+/** Pointer location in the window, top-left origin, matching the swipe payload. */
+NSPoint PointInWindow(NSEvent* event) {
+  NSView* contentView = event.window.contentView;
+
+  if (!contentView) {
+    return NSZeroPoint;
+  }
+
+  const NSPoint pointInContentView = [contentView convertPoint:event.locationInWindow fromView:nil];
+
+  return NSMakePoint(pointInContentView.x, contentView.isFlipped
+                                             ? pointInContentView.y
+                                             : NSHeight(contentView.bounds) -
+                                                   pointInContentView.y);
+}
+
+/**
+ * Reports a zoom gesture (Command + scroll, or trackpad pinch) to JavaScript. The
+ * caller decides whether to act (for example, to ignore gestures over DevTools);
+ * this only carries the raw deltas, which Chromium never surfaces to Electron.
+ */
+void ReportZoom(NSEvent* event, const char* source, bool precise, double deltaY, double magnification) {
+  if (!g_env || !g_on_zoom) {
+    return;
+  }
+
+  NSView* contentView = event.window.contentView;
+
+  if (!contentView) {
+    return;
+  }
+
+  napi_handle_scope scope = nullptr;
+
+  if (napi_open_handle_scope(g_env, &scope) != napi_ok) {
+    return;
+  }
+
+  napi_value payload = nullptr;
+  napi_create_object(g_env, &payload);
+
+  const void* handle = (__bridge const void*)contentView;
+  napi_value windowHandle = nullptr;
+  void* windowHandleData = nullptr;
+  napi_create_buffer_copy(g_env, sizeof(handle), &handle, &windowHandleData, &windowHandle);
+  napi_set_named_property(g_env, payload, "windowHandle", windowHandle);
+
+  napi_value sourceValue = nullptr;
+  napi_create_string_utf8(g_env, source, NAPI_AUTO_LENGTH, &sourceValue);
+  napi_set_named_property(g_env, payload, "source", sourceValue);
+
+  napi_value preciseValue = nullptr;
+  napi_get_boolean(g_env, precise, &preciseValue);
+  napi_set_named_property(g_env, payload, "precise", preciseValue);
+
+  // A discrete notch (a mouse wheel) carries no gesture phase; a trackpad streams
+  // phased events (and then momentum). This is what actually separates the two —
+  // many mice report precise deltas, so `precise` alone cannot.
+  const bool discrete =
+      event.phase == NSEventPhaseNone && event.momentumPhase == NSEventPhaseNone;
+  napi_value discreteValue = nullptr;
+  napi_get_boolean(g_env, discrete, &discreteValue);
+  napi_set_named_property(g_env, payload, "discrete", discreteValue);
+
+  napi_set_named_property(g_env, payload, "deltaY", MakeNumber(deltaY));
+  napi_set_named_property(g_env, payload, "magnification", MakeNumber(magnification));
+
+  const NSPoint point = PointInWindow(event);
+  napi_set_named_property(g_env, payload, "x", MakeNumber(point.x));
+  napi_set_named_property(g_env, payload, "y", MakeNumber(point.y));
+
+  CallJs(g_on_zoom, 1, &payload, nullptr);
+
+  napi_close_handle_scope(g_env, scope);
+}
+
+/** Trackpad pinch: report the magnification delta and swallow the event. */
+bool HandleMagnify(NSEvent* event) {
+  ReportZoom(event, "pinch", false, 0, event.magnification);
+
+  return true;
+}
+
 bool HandleScrollWheel(NSEvent* event) {
+  // Command + scroll zooms the guest page, and is never a history swipe. A mouse
+  // wheel sends discrete, non-precise notches; a trackpad streams precise deltas
+  // (and then momentum), which the active flag keeps swallowing.
+  if (event.modifierFlags & NSEventModifierFlagCommand) {
+    if (event.hasPreciseScrollingDeltas) {
+      g_zoom_scroll_active = true;
+    }
+
+    ReportZoom(event, "wheel", event.hasPreciseScrollingDeltas, event.scrollingDeltaY, 0);
+
+    if (event.phase == NSEventPhaseEnded || event.phase == NSEventPhaseCancelled) {
+      g_zoom_scroll_active = false;
+    }
+
+    return true;
+  }
+
+  if (g_zoom_scroll_active) {
+    if (event.phase == NSEventPhaseEnded || event.phase == NSEventPhaseCancelled ||
+        event.momentumPhase == NSEventPhaseEnded) {
+      g_zoom_scroll_active = false;
+    }
+
+    return true;
+  }
+
   bool whileSettling = false;
 
   if (g_tracking) {
@@ -408,6 +522,11 @@ void ReleaseCallbacks() {
     napi_delete_reference(g_env, g_on_end);
     g_on_end = nullptr;
   }
+
+  if (g_on_zoom) {
+    napi_delete_reference(g_env, g_on_zoom);
+    g_on_zoom = nullptr;
+  }
 }
 
 void ReleaseAsyncResource() {
@@ -466,6 +585,7 @@ void StopSwipeNavigation() {
   g_tracking = false;
   g_tracking_released = false;
   g_tracking_direction = nil;
+  g_zoom_scroll_active = false;
 
   ReleaseCallbacks();
   ReleaseAsyncResource();
@@ -505,6 +625,7 @@ napi_value Start(napi_env env, napi_callback_info info) {
   }
 
   ReadCallback(env, argv[0], "onProgress", &g_on_progress);
+  ReadCallback(env, argv[0], "onZoom", &g_on_zoom);
 
   if (!CreateAsyncResource(env)) {
     ReleaseCallbacks();
@@ -526,15 +647,19 @@ napi_value Start(napi_env env, napi_callback_info info) {
   }
 
   if (!g_monitor) {
-    g_monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskScrollWheel
-                                                     handler:^NSEvent*(NSEvent* event) {
-                                                       if (!g_env) {
-                                                         return event;
-                                                       }
+    g_monitor = [NSEvent
+        addLocalMonitorForEventsMatchingMask:(NSEventMaskScrollWheel | NSEventMaskMagnify)
+                                     handler:^NSEvent*(NSEvent* event) {
+                                       if (!g_env) {
+                                         return event;
+                                       }
 
-                                                       return HandleScrollWheel(event) ? nil
-                                                                                       : event;
-                                                     }];
+                                       if (event.type == NSEventTypeMagnify) {
+                                         return HandleMagnify(event) ? nil : event;
+                                       }
+
+                                       return HandleScrollWheel(event) ? nil : event;
+                                     }];
   }
 
   return nullptr;

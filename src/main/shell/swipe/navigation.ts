@@ -12,7 +12,7 @@
  */
 
 import type { PageScrollEdge } from "@shared/scroll-edge";
-import type { SwipeBeginRequest, SwipeDirection } from "./addon";
+import type { SwipeBeginRequest, SwipeDirection, ZoomGestureEvent } from "./addon";
 import { loadSwipeNavigationAddon } from "./load";
 import { SWIPE_NAVIGATION_TUNING } from "./tuning";
 
@@ -50,6 +50,8 @@ export interface SwipeWindow {
   onSwipeProgress(action: SwipeAction, progress: number): void;
   /** A gesture ended; clears the overlay and, if committed, navigates. */
   onSwipeEnd(action: SwipeAction, committed: boolean): void;
+  /** A zoom gesture (Command + scroll, or pinch) under the pointer. */
+  onZoomGesture(event: ZoomGestureEvent): void;
 }
 
 /**
@@ -88,6 +90,7 @@ export class SwipeNavigation {
       onBegin: this.handleBegin,
       onProgress: this.handleProgress,
       onEnd: this.handleEnd,
+      onZoom: this.handleZoom,
     });
 
     this.started = true;
@@ -165,6 +168,11 @@ export class SwipeNavigation {
     this.gesture = null;
     if (!gesture || gesture.target.id !== id) return;
     gesture.window.onSwipeEnd(gesture.target.action, committed);
+  };
+
+  /** Routes a zoom gesture to the window under the pointer. */
+  private readonly handleZoom = (event: ZoomGestureEvent): void => {
+    this.windowFor(event.windowHandle)?.onZoomGesture(event);
   };
 }
 
