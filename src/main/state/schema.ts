@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import { isLocalHostname } from "../nav/policy";
 import type { ExtensionSource, InstalledExtension } from "@shared/extensions";
+import { DEFAULT_ZOOM_INDEX, clampZoomIndex } from "@shared/zoom";
 
 export type DockMode = "bottom" | "right" | "left";
 export type ColorMode = "system" | "dark" | "light";
@@ -64,6 +65,12 @@ export interface WindowRecord {
    * `prefers-color-scheme` still follows the OS (specs/012-multi-window).
    */
   colorMode: ColorMode;
+  /**
+   * This window's zoom step, an index into the shared zoom ladder (specs/023).
+   * Additive and defaulted to 100%, so a document without the field reads as the
+   * default scale rather than being dropped.
+   */
+  zoomIndex: number;
 }
 
 export interface PersistedState {
@@ -75,7 +82,7 @@ export interface PersistedState {
   windows: WindowRecord[];
 }
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const DEFAULT_TARGET = "http://localhost:3000";
 export const MAX_RECENTS = 30;
 /** How many recent pages a single origin may keep, so one busy server cannot
@@ -110,6 +117,7 @@ export function defaultWindowRecord(): WindowRecord {
     titlebarMode: false,
     variant: "obsidian",
     colorMode: "system",
+    zoomIndex: DEFAULT_ZOOM_INDEX,
   };
 }
 
@@ -183,6 +191,9 @@ export function sanitizeWindowRecord(raw: unknown): WindowRecord | null {
     titlebarMode: typeof record.titlebarMode === "boolean" ? record.titlebarMode : false,
     variant: sanitizeVariant(record.variant),
     colorMode: sanitizeColorMode(record.colorMode),
+    // Additive and defaulted: a record without the field (or with a corrupt one)
+    // reads as the default scale; never dropped, never out of range.
+    zoomIndex: clampZoomIndex(record.zoomIndex as number),
   };
 }
 
@@ -229,6 +240,7 @@ function migrateLegacyWindow(input: Record<string, unknown>): WindowRecord {
     // The old document's theme was app-wide; it becomes the migrated window's.
     variant: sanitizeVariant(input.variant),
     colorMode: sanitizeColorMode(input.colorMode),
+    zoomIndex: DEFAULT_ZOOM_INDEX,
   };
 }
 

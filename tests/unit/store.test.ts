@@ -16,6 +16,7 @@ import {
   sanitizeWindows,
   type WindowRecord,
 } from "../../src/main/state/schema";
+import { DEFAULT_ZOOM_INDEX, ZOOM_STEPS } from "../../src/shared/zoom";
 import { StateStore } from "../../src/main/state/store";
 
 const tmpDirs: string[] = [];
@@ -36,6 +37,7 @@ function record(id: string, overrides: Partial<WindowRecord> = {}): WindowRecord
     titlebarMode: false,
     variant: "obsidian",
     colorMode: "system",
+    zoomIndex: DEFAULT_ZOOM_INDEX,
     ...overrides,
   };
 }
@@ -64,7 +66,7 @@ describe("sanitizeState", () => {
       colorMode: "light",
       extensions: [],
     });
-    expect(state.schemaVersion).toBe(3);
+    expect(state.schemaVersion).toBe(4);
     expect(state.windows).toHaveLength(1);
     expect(state.windows[0]).toMatchObject({
       target: "http://localhost:5173/",
@@ -75,6 +77,8 @@ describe("sanitizeState", () => {
       // The old app-wide theme becomes the migrated window's theme.
       variant: "jade",
       colorMode: "light",
+      // A document with no zoom step reads as the default scale.
+      zoomIndex: DEFAULT_ZOOM_INDEX,
     });
   });
 
@@ -132,6 +136,21 @@ describe("sanitizeWindows", () => {
       { id: "garbage", titlebarMode: "yes" },
     ]);
     expect(windows.map((w) => w.titlebarMode)).toEqual([false, true, false]);
+  });
+
+  it("defaults zoomIndex to 100% and clamps a corrupt value", () => {
+    const windows = sanitizeWindows([
+      { id: "default" },
+      { id: "custom", zoomIndex: 12 },
+      { id: "huge", zoomIndex: 999 },
+      { id: "garbage", zoomIndex: "nope" },
+    ]);
+    expect(windows.map((w) => w.zoomIndex)).toEqual([
+      DEFAULT_ZOOM_INDEX,
+      12,
+      ZOOM_STEPS.length - 1,
+      DEFAULT_ZOOM_INDEX,
+    ]);
   });
 });
 

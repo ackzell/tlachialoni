@@ -10,6 +10,7 @@ import type { ExtensionStatus } from "@shared/extensions";
 import type { StateStore } from "../state/store";
 import type { ExtensionManager } from "../extensions/manager";
 import { DEFAULT_TARGET, newWindowId, type WindowRecord } from "../state/schema";
+import { DEFAULT_ZOOM_INDEX } from "@shared/zoom";
 import type { CommandResult } from "./commands";
 import { AppWindow } from "./window";
 import { cascadeBounds, ensureVisibleBounds, type WorkArea } from "./geometry";
@@ -63,6 +64,7 @@ export class WindowManager {
       titlebarMode: false,
       variant: "obsidian",
       colorMode: "system",
+      zoomIndex: DEFAULT_ZOOM_INDEX,
     });
   }
 
@@ -104,6 +106,8 @@ export class WindowManager {
       // A new window inherits the focused window's theme.
       variant: parentRecord?.variant ?? "obsidian",
       colorMode: parentRecord?.colorMode ?? "system",
+      // Zoom is per window; a new window starts at the default scale.
+      zoomIndex: DEFAULT_ZOOM_INDEX,
     });
   }
 
