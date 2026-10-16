@@ -74,6 +74,10 @@ export function registerIpc(manager: WindowManager): void {
     resolve(event.sender)?.setPageScrollEdge(payload);
   });
 
+  ipcMain.on("page:viewport", (event, payload: { width: number; height: number }) => {
+    resolve(event.sender)?.onPageViewport(payload);
+  });
+
   ipcMain.on("picker:picked", (event, payload: { x: number; y: number }) => {
     resolve(event.sender)?.pickerPick(payload.x, payload.y);
   });

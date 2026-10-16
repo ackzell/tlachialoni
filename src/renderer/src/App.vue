@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { isHistoryArmedVisible } from "@shared/history";
-import { isBlankSurfaceVisible, isStripSurfaceVisible } from "@shared/shell";
+import { isBlankSurfaceVisible, isStripSurfaceVisible, STRIP_HEIGHT } from "@shared/shell";
 import BlankView from "./components/BlankView.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import DragBand from "./components/DragBand.vue";
@@ -10,6 +10,7 @@ import FailureView from "./components/FailureView.vue";
 import HistoryOverlay from "./components/HistoryOverlay.vue";
 import InstallStatus from "./components/InstallStatus.vue";
 import LoadingVeil from "./components/LoadingVeil.vue";
+import ViewportSizeIndicator from "./components/ViewportSizeIndicator.vue";
 import ZoomIndicator from "./components/ZoomIndicator.vue";
 import {
   markSurfaceLeaveCancelled,
@@ -30,6 +31,7 @@ const {
   historyArmed,
   extensionStatus,
   zoomLevel,
+  viewportSize,
 } = useShell();
 
 // Main shows the native macOS traffic lights off the same predicate, so the
@@ -65,6 +67,15 @@ const historyOverlayVisible = computed(() =>
 );
 const historyDirection = computed(() => historyArmed.value?.direction ?? "back");
 const historyProgress = computed(() => historyArmed.value?.progress ?? 0);
+
+// In overlay mode the strip floats over the page's top edge, so the size readout
+// drops below it while the strip is up (pinned or peeking). In titlebar mode the
+// page already starts below the docked strip, so nothing is added.
+const sizeInsets = computed(() => {
+  const insets = viewportSize.value?.insets ?? { top: 0, right: 0, bottom: 0 };
+  const overStrip = stripVisible.value && !titlebar.value ? STRIP_HEIGHT : 0;
+  return { top: insets.top + overStrip, right: insets.right };
+});
 </script>
 
 <template>
@@ -119,12 +130,29 @@ const historyProgress = computed(() => historyArmed.value?.progress ?? 0);
     </Transition>
 
     <Transition
-      name="zoom"
+      name="badge"
       @leave="markSurfaceLeaving"
       @after-leave="markSurfaceLeft"
       @leave-cancelled="markSurfaceLeaveCancelled"
     >
-      <ZoomIndicator v-if="zoomLevel !== null" :percent="zoomLevel" />
+      <ViewportSizeIndicator
+        v-if="viewportSize !== null"
+        :size="{ width: viewportSize.width, height: viewportSize.height }"
+        :insets="sizeInsets"
+      />
+    </Transition>
+
+    <Transition
+      name="badge"
+      @leave="markSurfaceLeaving"
+      @after-leave="markSurfaceLeft"
+      @leave-cancelled="markSurfaceLeaveCancelled"
+    >
+      <ZoomIndicator
+        v-if="zoomLevel !== null"
+        :percent="zoomLevel.percent"
+        :insets="zoomLevel.insets"
+      />
     </Transition>
 
     <Transition

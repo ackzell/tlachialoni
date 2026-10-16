@@ -31,6 +31,13 @@ export interface Failure {
   previousUrl?: string | null;
 }
 
+/** Where a shell badge sits relative to the guest page's corner (specs/024). */
+export interface BadgeInsets {
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 const api = window.tlachialoni;
 
 const state = ref<ShellState | null>(null);
@@ -42,8 +49,10 @@ const paletteInitial = ref("");
 const paletteScope = ref<Scope>("all");
 const devtools = ref<{ open: boolean; mode: DockMode }>({ open: false, mode: "bottom" });
 const extensionStatus = ref<ExtensionStatus | null>(null);
-/** The transient zoom confirmation level, or null when hidden (specs/023). */
-const zoomLevel = ref<number | null>(null);
+/** The transient zoom confirmation, or null when hidden (specs/023). */
+const zoomLevel = ref<{ percent: number; insets: BadgeInsets } | null>(null);
+/** The transient viewport-size confirmation, or null when hidden (specs/024). */
+const viewportSize = ref<{ width: number; height: number; insets: BadgeInsets } | null>(null);
 /** Transient strip reveal driven by pointer proximity in main (specs/013). */
 const peeking = ref(false);
 /** Transient armed history signal; drives the edge overlay (specs/015). */
@@ -131,8 +140,11 @@ function init(): void {
     extensionStatus.value = (payload as ExtensionStatus | null) ?? null;
   });
   api.on("zoom:changed", (payload) => {
-    const status = payload as { percent: number } | null;
-    zoomLevel.value = status ? status.percent : null;
+    zoomLevel.value = (payload as { percent: number; insets: BadgeInsets } | null) ?? null;
+  });
+  api.on("viewport:changed", (payload) => {
+    viewportSize.value =
+      (payload as { width: number; height: number; insets: BadgeInsets } | null) ?? null;
   });
   api.on("strip:peek", (payload) => {
     peeking.value = payload === true;
@@ -186,6 +198,7 @@ export function useShell() {
     devtools: readonly(devtools),
     extensionStatus: readonly(extensionStatus),
     zoomLevel: readonly(zoomLevel),
+    viewportSize: readonly(viewportSize),
     peeking: readonly(peeking),
     historyArmed: readonly(historyArmed),
     historyAvailable: readonly(historyAvailable),

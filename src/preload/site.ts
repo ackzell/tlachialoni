@@ -93,6 +93,7 @@ window.addEventListener(
   (event) => ipcRenderer.send("site:focus-editable", { editable: isEditable(event.target) }),
   true,
 );
+
 window.addEventListener(
   "focusout",
   () => ipcRenderer.send("site:focus-editable", { editable: false }),
@@ -100,3 +101,15 @@ window.addEventListener(
 );
 
 window.addEventListener("beforeunload", () => disarm());
+
+// The page's own viewport, reported on every resize — a window resize, a DevTools
+// panel resize, or a dock change. Main renders the size/zoom badges in the shell
+// (unscaled by page zoom) and uses this to place them in the page's corner. It is
+// the page's own measurement, so it needs neither DevTools nor polling.
+function reportPageViewport(): void {
+  ipcRenderer.send("page:viewport", { width: window.innerWidth, height: window.innerHeight });
+}
+
+window.addEventListener("resize", reportPageViewport, { passive: true });
+window.addEventListener("load", reportPageViewport);
+document.addEventListener("DOMContentLoaded", reportPageViewport);

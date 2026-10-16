@@ -41,6 +41,7 @@ import {
   zoomFactor,
   zoomPercent,
 } from "@shared/zoom";
+import { normalizeViewportSize, viewportSizeEquals, type ViewportSize } from "@shared/viewport";
 
 /** How long main waits for the renderer settle ack before collapsing anyway. */
 const SHELL_SETTLE_TIMEOUT_MS = 500;
@@ -53,6 +54,16 @@ const DRAG_SETTLE_MS = 200;
 
 /** How long the transient zoom indicator stays up after the last change. */
 const ZOOM_INDICATOR_MS = 1500;
+
+/** How long the transient viewport-size readout stays up after the last change. */
+const VIEWPORT_INDICATOR_MS = 1500;
+
+/**
+ * Page zoom changes the page's CSS viewport, so it fires the page `resize` too.
+ * For this long after a zoom step the size readout is suppressed, so pinching
+ * shows only the zoom readout, not a size readout flashing on every step.
+ */
+const ZOOM_RESIZE_SUPPRESS_MS = 400;
 
 /** Keyboard zoom within this window is one press arriving on both paths. */
 const ZOOM_KEY_DEDUPE_MS = 20;
@@ -158,6 +169,15 @@ export class AppWindow implements SwipeWindow {
   private historyPreviewTimer: NodeJS.Timeout | null = null;
   /** Latest report of what the page under the pointer can still scroll. */
   private scrollEdge: PageScrollEdge = PAGE_AT_BOTH_EDGES;
+  /** The guest page's reported viewport, so the docked panel's band is exact. */
+  private pageViewport: { width: number; height: number } | null = null;
+  /** The transient viewport-size readout (rendered in the shell, specs/024). */
+  private viewportStatus: { width: number; height: number } | null = null;
+  private viewportTimer: NodeJS.Timeout | null = null;
+  /** The last page viewport read, so a poll/event only reacts to real changes. */
+  private lastViewport: ViewportSize | null = null;
+  /** Until this time, page resizes are zoom-induced and skip the size readout. */
+  private zoomResizeUntil = 0;
   private pendingShellMessages: Array<[string, unknown]> = [];
   private requestedTarget: string | null = null;
   private attachedDevTools: Electron.WebContents | null = null;
@@ -340,6 +360,7 @@ export class AppWindow implements SwipeWindow {
       this.clearPendingSettle();
       this.clearStatusDemo();
       this.clearZoomTimer();
+      this.clearViewportTimer();
       if (this.gestureIdleTimer) {
         clearTimeout(this.gestureIdleTimer);
         this.gestureIdleTimer = null;
@@ -560,6 +581,9 @@ export class AppWindow implements SwipeWindow {
     const next = clampZoomIndex(index);
     this.zoomIndex = next;
     this.applyZoomFactor();
+    // A zoom changes the page's CSS viewport, which fires the page resize; keep the
+    // size readout out of the way while the zoom settles (ROWS: zoom feedback only).
+    this.zoomResizeUntil = Date.now() + ZOOM_RESIZE_SUPPRESS_MS;
     // Re-assert on the next tick: in a non-manual zoom mode Chromium may apply its
     // own wheel step after us; our absolute factor must be the value that sticks.
     setImmediate(() => this.applyZoomFactor());
@@ -662,16 +686,20 @@ export class AppWindow implements SwipeWindow {
     }
   }
 
-  /** Shows/refreshes the transient indicator and restarts its dismissal timer. */
+  /**
+   * Shows/refreshes the transient zoom readout and restarts its dismissal timer.
+   * It renders in the shell (never scaled by page zoom), so the shell must span
+   * the window while it is visible.
+   */
   private showZoomIndicator(): void {
     this.zoomStatus = { percent: zoomPercent(this.zoomIndex) };
-    this.sendToShell("zoom:changed", this.zoomStatus);
+    this.sendToShell("zoom:changed", { ...this.zoomStatus, insets: this.viewportInsets() });
     this.relayout();
     if (this.zoomTimer) clearTimeout(this.zoomTimer);
     this.zoomTimer = setTimeout(() => this.hideZoomIndicator(), ZOOM_INDICATOR_MS);
   }
 
-  /** Clears the indicator and lets the shell collapse once its leave settles. */
+  /** Clears the zoom readout and lets the shell collapse once it settles. */
   private hideZoomIndicator(): void {
     this.clearZoomTimer();
     if (!this.zoomStatus) return;
@@ -796,6 +824,89 @@ export class AppWindow implements SwipeWindow {
   }
 
   /**
+   * The guest page reported its viewport (see `page:viewport`). This is both the
+   * value shown and the trigger — the page fires `resize` for a window resize, a
+   * DevTools panel resize, and a dock change, so no polling is needed. Main stores
+   * the physical page size (for the panel band and badge placement) and shows the
+   * shell readout with the value the page (and DevTools) reports.
+   */
+  onPageViewport(size: { width: number; height: number }): void {
+    // Ignore a pre-layout (zero) report; the gate is permissive until a real size
+    // is known, which is safer than treating the whole window as DevTools.
+    if (!(size.width > 0) || !(size.height > 0)) return;
+    const next = normalizeViewportSize(size);
+    const changed = !viewportSizeEquals(this.lastViewport, next);
+    this.lastViewport = next;
+    // Page zoom changes the CSS viewport but not the page's physical size, so the
+    // resize it causes is ignored: recomputing the panel band from it would jitter
+    // the badges up and down, and it would flash the size readout. While zooming,
+    // only the zoom readout shows.
+    if (Date.now() < this.zoomResizeUntil) return;
+    const factor = zoomFactor(this.zoomIndex);
+    // Page zoom shrinks the CSS viewport; the panel band is physical, so keep the
+    // physical size for the gate and for placing the (unscaled) shell badge.
+    this.pageViewport = {
+      width: Math.round(next.width * factor),
+      height: Math.round(next.height * factor),
+    };
+
+    if (changed) {
+      this.showViewportStatus(next);
+    } else if (this.viewportStatus) {
+      // Same size still on screen: keep it up without re-emitting.
+      this.restartViewportTimer();
+    }
+  }
+
+  /** Shows/refreshes the size readout and restarts its dismissal timer. */
+  private showViewportStatus(size: ViewportSize): void {
+    this.viewportStatus = size;
+    this.sendToShell("viewport:changed", { ...size, insets: this.viewportInsets() });
+    this.relayout();
+    this.restartViewportTimer();
+  }
+
+  /** Clears the readout and lets the shell collapse once it settles. */
+  private hideViewportStatus(): void {
+    this.clearViewportTimer();
+    if (!this.viewportStatus) return;
+    this.viewportStatus = null;
+    this.sendToShell("viewport:changed", null);
+    this.relayout(true);
+  }
+
+  private restartViewportTimer(): void {
+    this.clearViewportTimer();
+    this.viewportTimer = setTimeout(() => this.hideViewportStatus(), VIEWPORT_INDICATOR_MS);
+  }
+
+  private clearViewportTimer(): void {
+    if (this.viewportTimer) {
+      clearTimeout(this.viewportTimer);
+      this.viewportTimer = null;
+    }
+  }
+
+  /**
+   * Insets that place a shell badge at the guest page's corner: the docked DevTools
+   * panel occupies one edge, and the page (unscaled) sits in the rest. The size
+   * readout uses the page's top-right; the zoom readout the page's bottom-right.
+   */
+  private viewportInsets(): { top: number; right: number; bottom: number } {
+    const { width, height } = this.win.getContentBounds();
+    const inset = titlebarInset(this.titlebarActive());
+    const dock = this.record()?.dockMode ?? "bottom";
+    const page = this.pageViewport;
+    const panelW = page ? Math.max(0, width - page.width) : 0;
+    const panelH = page ? Math.max(0, height - inset - page.height) : 0;
+    return {
+      top: inset,
+      right: dock === "right" ? panelW : 0,
+      bottom: dock === "bottom" ? panelH : 0,
+    };
+  }
+
+  /**
    * The window-side half of the swipe integration (see swipe/navigation.ts). The
    * native addon owns the gesture; these answer its questions and apply its
    * outcome.
@@ -818,18 +929,24 @@ export class AppWindow implements SwipeWindow {
     );
   }
 
-  /** The DevTools panel's bounds, when docked beside or below the page. */
+  /**
+   * Whether the pointer is over the docked DevTools panel. Uses the guest page's
+   * own reported viewport, so the panel's band is exact: the page keeps the rest
+   * of the window. A coarse half-window heuristic silently dropped zooms over a
+   * third of the page, so this must be the real geometry.
+   */
   isPointerOverDevTools(x: number, y: number): boolean {
     if (!this.devtools.isOpen()) return false;
-    const { width, height } = this.win.getContentBounds();
-    // DevTools always takes a band along one edge; the page keeps the rest.
-    // Without a public API for the panel's exact frame, use the dock side to
-    // decide the band that cannot be the page. Conservative: a pointer in that
-    // band is treated as over DevTools.
+    const viewport = this.pageViewport;
+    // The page's size is not known yet: do not block the gesture.
+    if (!viewport) return false;
+    const { width } = this.win.getContentBounds();
+    const inset = titlebarInset(this.titlebarActive());
     const dock = this.record()?.dockMode ?? "bottom";
-    if (dock === "bottom") return y >= height * 0.5;
-    if (dock === "right") return x >= width * 0.5;
-    return x < width * 0.5;
+    // The panel takes one edge; the page holds the rest, anchored opposite it.
+    if (dock === "bottom") return y >= inset + viewport.height;
+    if (dock === "right") return x >= viewport.width;
+    return x < width - viewport.width;
   }
 
   canGoBack(): boolean {
@@ -1407,9 +1524,10 @@ export class AppWindow implements SwipeWindow {
       this.failed ||
       this.extensionStatus ||
       this.devPreview ||
-      // The zoom indicator sits in the bottom-right corner, so the shell must span
-      // the window to paint it (specs/023).
+      // The zoom and viewport readouts render in the shell (specs/023/024), so the
+      // shell must span the window to paint the page's corners.
       this.zoomStatus !== null ||
+      this.viewportStatus !== null ||
       // An armed history signal paints a full-height edge overlay, so the shell
       // must span the window to host it (specs/015).
       isHistoryArmedVisible(this.historyArmed, this.paletteOpen) ||

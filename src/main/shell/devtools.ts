@@ -2,6 +2,7 @@ import type { WebContentsView } from "electron";
 import type { DockMode } from "../state/schema";
 import { devtoolsThemeScript, type DevtoolsThemeMode } from "./devtools-theme";
 import { devtoolsThemeOverrides } from "./devtools-theme-override";
+import { suppressDevToolsResizeOverlay } from "./devtools-overlay";
 
 export interface DevToolsStatus {
   open: boolean;
@@ -68,6 +69,7 @@ export class DevToolsController {
     this.lastSyncedSide = mode;
     this.notify({ open: true, mode });
     this.startDockPolling();
+    void this.suppressResizeOverlay();
     setTimeout(() => void this.tick(), 500);
   }
 
@@ -132,10 +134,23 @@ export class DevToolsController {
     }
   }
 
-  /** One poll tick: keep the palette and the dock side in step. */
+  /** One poll tick: keep the palette, the dock side, and the resize overlay in step. */
   private async tick(): Promise<void> {
     await this.syncTheme();
     await this.syncDockSide();
+    await this.suppressResizeOverlay();
+  }
+
+  /**
+   * Keeps the built-in DevTools resize readout off so it never competes with the
+   * tool's own indicator (specs/024, FR-004). Re-asserted every tick because the
+   * front-end re-applies its own default when its overlay model restarts (for
+   * example after a dock change reloads DevTools).
+   */
+  private async suppressResizeOverlay(): Promise<void> {
+    const devtools = this.wc()?.devToolsWebContents;
+    if (!devtools || devtools.isDestroyed()) return;
+    await suppressDevToolsResizeOverlay(devtools);
   }
 
   /** Reads the real dock side from the DevTools front-end and persists changes. */

@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import type { WebContentsView } from "electron";
 import { STRIP_HEIGHT } from "@shared/shell";
+import { formatViewportSize } from "@shared/viewport";
+import { suppressDevToolsResizeOverlay } from "./shell/devtools-overlay";
 import type { AppWindow } from "./shell/window";
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -163,6 +165,71 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
     const restoredBounds = appWindow.siteView.getBounds();
     log.titlebarRestored = { siteTop: restoredBounds.y, siteHeight: restoredBounds.height };
 
+    // Transient status badges (specs/024): they render in the shell — so page zoom
+    // never scales them — placed at the guest page's corner and driven by the page's
+    // own reported viewport (which fires for window resizes, DevTools panel resizes,
+    // and dock changes). The built-in DevTools resize readout stays suppressed.
+    const shellBadge = async (kind: "size" | "zoom"): Promise<string | null> =>
+      (await appWindow.shellView.webContents.executeJavaScript(
+        `document.querySelector('[data-tlachialoni-badge="${kind}"]')?.textContent ?? null`,
+      )) as string | null;
+
+    // Open through the controller so the window records the dock side.
+    appWindow.devtools.open("bottom");
+    await wait(800);
+    const devtoolsForOverlay = wc.devToolsWebContents;
+    const suppressed = devtoolsForOverlay
+      ? (await suppressDevToolsResizeOverlay(devtoolsForOverlay)) === true
+      : false;
+
+    // A page viewport report flashes the size readout with that value and places it
+    // at the page's top-right. Driven directly so it does not depend on the window
+    // manager reflowing this dev box; the same report is what a window resize, a
+    // DevTools panel resize, and a dock change emit from the page.
+    appWindow.onPageViewport({ width: 1234, height: 567 });
+    await wait(200);
+    const shown = await shellBadge("size");
+    const expected = formatViewportSize({ width: 1234, height: 567 });
+    const matches = shown === expected;
+    await wait(2400);
+    const cleared = (await shellBadge("size")) === null;
+
+    // Changing the docked DevTools size changes the page viewport, which the page
+    // reports; the size readout must follow. Logged, not asserted: some headless
+    // sessions do not reflow on a dock change, so it is checked by hand instead.
+    appWindow.devtools.dock("right");
+    await wait(1000);
+    const devtoolsResizeShown = (await shellBadge("size")) !== null;
+
+    // A zoom flashes the zoom readout (in the shell, so it is not scaled).
+    await appWindow.runCommand("view.zoomIn");
+    await wait(300);
+    const zoomShown = (await shellBadge("zoom")) !== null;
+
+    // The panel band is exact: with DevTools docked bottom and the page at 1440×600,
+    // the gate must allow a point over the page and reject one over the panel.
+    // Deterministic — it does not depend on the window manager reflowing.
+    await appWindow.runCommand("view.zoomReset");
+    await wait(500);
+    appWindow.devtools.open("bottom");
+    appWindow.onPageViewport({ width: 1440, height: 600 });
+    const zoomGate =
+      appWindow.isPointerOverDevTools(10, 300) === false &&
+      appWindow.isPointerOverDevTools(10, 700) === true;
+
+    log.viewport = {
+      suppressed,
+      devtoolsResizeShown,
+      shown,
+      expected,
+      matches,
+      cleared,
+      zoomShown,
+      zoomGate,
+    };
+    wc.closeDevTools();
+    await wait(600);
+
     const titlebar = log.titlebar as {
       siteTop: number;
       heightDrop: number;
@@ -171,6 +238,14 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
       stripMounted: boolean;
     };
     const restored = log.titlebarRestored as { siteTop: number };
+    const viewport = log.viewport as {
+      suppressed: boolean;
+      devtoolsResizeShown: boolean;
+      matches: boolean;
+      cleared: boolean;
+      zoomShown: boolean;
+      zoomGate: boolean;
+    };
 
     log.pass =
       bottom.innerHeight < baseline.innerHeight &&
@@ -183,7 +258,12 @@ export async function runDockSelfTest(appWindow: AppWindow): Promise<void> {
       titlebar.sentinel === 42 &&
       titlebar.reloaded === false &&
       titlebar.stripMounted === true &&
-      restored.siteTop === 0;
+      restored.siteTop === 0 &&
+      viewport.suppressed &&
+      viewport.matches &&
+      viewport.cleared &&
+      viewport.zoomShown &&
+      viewport.zoomGate;
   } catch (error) {
     log.error = String(error);
     log.pass = false;
