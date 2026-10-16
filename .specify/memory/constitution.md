@@ -42,7 +42,10 @@ Rationale: the tool inspects an application under development. Polluting that
 application with the tool's own code would corrupt the very thing being
 debugged and invalidate frontend work. Developer-installed extensions are a
 deliberate exception: they are the developer's own tooling, chosen and auditable
-by them, and they belong to the inspected page rather than to the shell.
+by them, and they belong to the inspected page rather than to the shell. The
+transient status readouts (zoom level and viewport size) are deliberately **not**
+an exception: they render in the shell overlay, positioned at the page's edge,
+so the page itself is left untouched.
 
 ### III. Keyboard-First Ergonomics
 
@@ -181,4 +184,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.6 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-01
+**Version**: 2.2.7 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-16
