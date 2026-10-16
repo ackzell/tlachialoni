@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.17](https://github.com/ackzell/tlachialoni/compare/v0.1.16...v0.1.17) (2026-10-16)
+
+### Features
+
+* **viewport:** add a transient page viewport-size readout ([df99118](https://github.com/ackzell/tlachialoni/commit/df991185cac921eec45a7c89001d973280b1d073))
+
 ## [0.1.16](https://github.com/ackzell/tlachialoni/compare/v0.1.15...v0.1.16) (2026-10-12)
 
 ### Features
