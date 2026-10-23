@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.18](https://github.com/ackzell/tlachialoni/compare/v0.1.17...v0.1.18) (2026-10-23)
+
+### Features
+
+* **rim:** add a four-edge loading rim for in-place loads ([a84c0de](https://github.com/ackzell/tlachialoni/commit/a84c0ded1acac4422b3bd9dfd52832882d93d9f0))
+
 ## [0.1.17](https://github.com/ackzell/tlachialoni/compare/v0.1.16...v0.1.17) (2026-10-16)
 
 ### Features
