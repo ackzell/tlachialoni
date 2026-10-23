@@ -43,6 +43,8 @@ const api = window.tlachialoni;
 const state = ref<ShellState | null>(null);
 const loading = ref(false);
 const loadingTarget = ref("");
+/** The transient load rim, or null when no in-place load is running (specs/025). */
+const reloading = ref<{ hard: boolean } | null>(null);
 const failed = ref<Failure | null>(null);
 const paletteOpen = ref(false);
 const paletteInitial = ref("");
@@ -123,6 +125,7 @@ function init(): void {
     // and names the incoming target in the veil.
     if (isLoading) {
       failed.value = null;
+      reloading.value = null;
       if (url) loadingTarget.value = url;
     }
   });
@@ -132,6 +135,11 @@ function init(): void {
   api.on("viewport:failed", (payload) => {
     failed.value = payload as Failure;
     loading.value = false;
+    reloading.value = null;
+  });
+  api.on("viewport:reloading", (payload) => {
+    const next = payload as { hard?: boolean } | null;
+    reloading.value = next ? { hard: next.hard === true } : null;
   });
   api.on("devtools:changed", (payload) => {
     devtools.value = payload as { open: boolean; mode: DockMode };
@@ -191,6 +199,7 @@ export function useShell() {
     state: readonly(state),
     loading: readonly(loading),
     loadingTarget: readonly(loadingTarget),
+    reloading: readonly(reloading),
     failed: readonly(failed),
     paletteOpen: readonly(paletteOpen),
     paletteInitial: readonly(paletteInitial),

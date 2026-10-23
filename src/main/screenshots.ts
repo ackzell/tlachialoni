@@ -1451,14 +1451,18 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       s.end();
     }
 
-    // ---- ⌘R / ⇧⌘R: reload, with the veil sampled mid-flight ----------------
+    // ---- ⌘R / ⇧⌘R: both rim kinds, sampled mid-flight ----------------------
     if (wanted("reload")) {
       const s = openScene("reload", "Reload (⌘R, ⇧⌘R)");
       // Pin the document first so "before" and "after" are the same known page.
       await loadTarget(pageUrl);
       await s.frame("before", undefined, 800);
+      await win.runCommand("view.reload");
+      await s.burst("reloading-normal", 4);
+      await settleNavigation();
+      await s.frame("between", undefined, 600);
       await win.runCommand("view.hardReload");
-      await s.burst("reloading", 4);
+      await s.burst("reloading-hard", 4);
       await settleNavigation();
       await s.frame("after", undefined, 900);
       s.end();

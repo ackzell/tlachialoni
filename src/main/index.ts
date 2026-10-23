@@ -233,6 +233,14 @@ function installMenu(manager: WindowManager): void {
           label: "Preview History Navigation",
           click: () => manager.focused()?.previewHistoryArm(),
         },
+        {
+          label: "Preview Load Rim",
+          click: () => manager.focused()?.previewLoadRim(false),
+        },
+        {
+          label: "Preview Hard Reload Rim",
+          click: () => manager.focused()?.previewLoadRim(true),
+        },
         { type: "separator" },
         {
           label: "Stop Preview",

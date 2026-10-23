@@ -4,6 +4,8 @@ import { isAllowedUrl, isLocalHostname } from "../nav/policy";
 
 export interface SiteViewEvents {
   onLoading: (loading: boolean) => void;
+  /** A main-frame document navigation began (not an in-page route change). */
+  onNavigateStart: (url: string) => void;
   onReady: (url: string) => void;
   onNavigated: (url: string) => void;
   onFailed: (url: string, reason: string) => void;
@@ -80,6 +82,13 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
       details.preventDefault();
       openExternal(details.url);
     }
+  });
+
+  wc.on("did-start-navigation", (details) => {
+    // In-page routes are not document loads; the shell should not treat them as
+    // reloads or navigations (specs/025).
+    if (!details.isMainFrame || details.isSameDocument) return;
+    events.onNavigateStart(details.url);
   });
 
   wc.on("did-start-loading", () => {

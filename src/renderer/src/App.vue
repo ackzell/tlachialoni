@@ -10,6 +10,7 @@ import FailureView from "./components/FailureView.vue";
 import HistoryOverlay from "./components/HistoryOverlay.vue";
 import InstallStatus from "./components/InstallStatus.vue";
 import LoadingVeil from "./components/LoadingVeil.vue";
+import ReloadIndicator from "./components/ReloadIndicator.vue";
 import ViewportSizeIndicator from "./components/ViewportSizeIndicator.vue";
 import ZoomIndicator from "./components/ZoomIndicator.vue";
 import {
@@ -23,6 +24,7 @@ import {
 const {
   state,
   loading,
+  reloading,
   failed,
   paletteOpen,
   paletteInitial,
@@ -76,11 +78,24 @@ const sizeInsets = computed(() => {
   const overStrip = stripVisible.value && !titlebar.value ? STRIP_HEIGHT : 0;
   return { top: insets.top + overStrip, right: insets.right };
 });
+
+// The load rim wraps the guest page area: its top edge starts below the strip
+// when it is visible (floating or docked), otherwise at the very top (specs/025).
+const reloadTop = computed(() => (stripVisible.value ? STRIP_HEIGHT : 0));
 </script>
 
 <template>
   <div class="shell-root" :class="{ 'is-titlebar': titlebar }">
     <BlankView v-if="blankVisible" />
+
+    <Transition
+      name="reload"
+      @leave="markSurfaceLeaving"
+      @after-leave="markSurfaceLeft"
+      @leave-cancelled="markSurfaceLeaveCancelled"
+    >
+      <ReloadIndicator v-if="reloading" :hard="reloading.hard" :top="reloadTop" />
+    </Transition>
 
     <Transition
       name="history"

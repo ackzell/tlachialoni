@@ -23,6 +23,7 @@ import {
 } from "@shared/shell";
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { isHistoryArmedVisible, type HistoryArmed } from "@shared/history";
+import { isReloadNavigation, rimKindFor, type ReloadKind } from "@shared/reload";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
 import { framesEqual } from "./geometry";
@@ -126,6 +127,10 @@ export class AppWindow implements SwipeWindow {
   private showLoading = false;
   private failed = false;
   private failedUrl: string | null = null;
+  /** The transient load rim, or null when no in-place load is running (specs/025). */
+  private reloading: { hard: boolean } | null = null;
+  /** Command intent for the next navigation: normal reload or cache bypass. */
+  private pendingReloadKind: ReloadKind | null = null;
   private paletteOpen = false;
   private shellMode: ShellMode = "band";
   private pendingSettle = false;
@@ -146,7 +151,7 @@ export class AppWindow implements SwipeWindow {
   private extensionStatus: ExtensionStatus | null = null;
   private statusDemoTimer: NodeJS.Timeout | null = null;
   /** Dev-only: a transient shell surface being previewed (see specs/008). */
-  private devPreview: "loading" | "failure" | "history" | null = null;
+  private devPreview: "loading" | "failure" | "history" | "reload" | null = null;
   /** TEMPORARY: the specs/015 M0 spike probe; absent unless debugging is on. */
   private gestureProbe: GestureProbeHandle | null = null;
   /** The live armed signal driving the edge overlay (specs/015). */
@@ -218,6 +223,7 @@ export class AppWindow implements SwipeWindow {
 
     this.siteView = createSiteView({
       onLoading: (loading) => this.setLoading(loading),
+      onNavigateStart: (url) => this.handleNavigateStart(url),
       onReady: (url) => this.handleReady(url),
       onNavigated: (url) => this.handleNavigated(url),
       onFailed: (url, reason) => this.handleFailed(url, reason),
@@ -469,8 +475,8 @@ export class AppWindow implements SwipeWindow {
     commands.register("target.navigate", (arg) => this.navigate(String(arg ?? "")));
     commands.register("strip.toggle", () => this.toggleStrip());
     commands.register("titlebar.toggle", () => this.toggleTitlebar());
-    commands.register("view.reload", () => this.siteView.webContents.reload());
-    commands.register("view.hardReload", () => this.siteView.webContents.reloadIgnoringCache());
+    commands.register("view.reload", () => this.reloadSite("normal"));
+    commands.register("view.hardReload", () => this.reloadSite("hard"));
     commands.register("view.back", () => {
       if (this.siteView.webContents.navigationHistory.canGoBack()) {
         this.siteView.webContents.navigationHistory.goBack();
@@ -781,6 +787,18 @@ export class AppWindow implements SwipeWindow {
     this.relayout();
   }
 
+  /** Dev-only: holds the load rim on screen so its look and motion can be styled. */
+  previewLoadRim(hard = false): void {
+    this.enterDevPreview();
+    this.devPreview = "reload";
+    this.reloading = { hard };
+    this.sendToShell("viewport:reloading", {
+      hard,
+      url: this.requestedTarget ?? this.currentUrl ?? "http://localhost:5173",
+    });
+    this.relayout();
+  }
+
   /** Dev-only: clears whichever surface is being previewed. */
   stopSurfacePreview(): void {
     this.exitDevPreview();
@@ -810,6 +828,9 @@ export class AppWindow implements SwipeWindow {
       });
     } else if (preview === "failure") {
       this.sendToShell("viewport:ready", { url: this.currentUrl });
+    } else if (preview === "reload") {
+      this.reloading = null;
+      this.sendToShell("viewport:reloading", null);
     } else {
       // The history preview never overrode a viewport signal; just drop the arm.
       this.clearHistoryPreview();
@@ -1204,6 +1225,61 @@ export class AppWindow implements SwipeWindow {
 
   // ---- internals -------------------------------------------------------
 
+  /**
+   * Reload the guest page and mark the rim kind (specs/025). The veil and the
+   * failure view own their loads, so a reload under either gets no rim.
+   */
+  private reloadSite(kind: ReloadKind): void {
+    this.pendingReloadKind =
+      this.shownUrl !== null && !this.showLoading && !this.failed ? kind : null;
+    if (kind === "hard") {
+      this.siteView.webContents.reloadIgnoringCache();
+    } else {
+      this.siteView.webContents.reload();
+    }
+  }
+
+  /**
+   * A main-frame document navigation began. When the guest page is already on
+   * screen and no full-screen veil owns the load, the rim mirrors it — reloads,
+   * link clicks, history moves, and same-origin palette navigations alike. A
+   * site switch, cold start, or failure load keeps the veil as its sole surface.
+   * In-page routes never reach here (specs/025).
+   */
+  private handleNavigateStart(url: string): void {
+    const isReload = isReloadNavigation(url, this.shownUrl);
+    const pending = this.pendingReloadKind;
+    this.pendingReloadKind = null;
+
+    if (this.showLoading || this.failed || this.shownUrl === null) {
+      this.setReloading(null);
+      return;
+    }
+
+    // A pending command decides a reload's kind; a redirect (or any follow-up
+    // navigation in the same load) keeps the kind already on screen.
+    const active = this.reloading === null ? null : this.reloading.hard ? "hard" : "normal";
+    this.setReloading({ hard: rimKindFor(isReload, pending, active) === "hard" });
+  }
+
+  /** Shows, refreshes, or clears the transient load rim (specs/025). */
+  private setReloading(next: { hard: boolean } | null): void {
+    if (next === null) {
+      if (this.reloading === null) return;
+      this.reloading = null;
+      this.sendToShell("viewport:reloading", null);
+      this.relayout(true);
+      return;
+    }
+    if (this.reloading?.hard === next.hard) return;
+    this.reloading = next;
+    this.sendToShell("viewport:reloading", {
+      hard: next.hard,
+      url: this.requestedTarget ?? this.currentUrl,
+    });
+    this.relayout();
+  }
+
   private loadTarget(url: string): void {
     // A real navigation owns the surfaces from here; drop any dev preview so the
     // page stays interactive and the renderer follows the actual load.
@@ -1220,6 +1296,8 @@ export class AppWindow implements SwipeWindow {
       nextUrl: url,
       failed: this.failed,
     });
+    // The veil owns a site switch; otherwise the rim follows the navigation.
+    if (veil) this.setReloading(null);
     this.failed = false;
     this.failedUrl = null;
     this.showLoading = veil;
@@ -1280,6 +1358,7 @@ export class AppWindow implements SwipeWindow {
   private handleFailed(url: string, reason: string): void {
     // Ignore a late failure from a navigation that has since been superseded.
     if (this.requestedTarget && sameUrl(url, this.requestedTarget) === false) return;
+    this.setReloading(null);
     this.showLoading = false;
     this.failed = true;
     this.failedUrl = url;
@@ -1302,7 +1381,10 @@ export class AppWindow implements SwipeWindow {
     // Link clicks and iframe loads never cover the view, and neither does a
     // same-origin palette navigation: the old frame stays visible until the new
     // one commits, so there is no white flash to hide (matches Chrome).
-    if (!loading) this.showLoading = false;
+    if (!loading) {
+      this.showLoading = false;
+      this.setReloading(null);
+    }
     this.relayout();
     this.reportLoading(this.showLoading);
   }
@@ -1524,6 +1606,9 @@ export class AppWindow implements SwipeWindow {
       this.failed ||
       this.extensionStatus ||
       this.devPreview ||
+      // The load rim wraps the page edges and needs the whole window, so the
+      // shell spans it while the rim is up (specs/025).
+      this.reloading !== null ||
       // The zoom and viewport readouts render in the shell (specs/023/024), so the
       // shell must span the window to paint the page's corners.
       this.zoomStatus !== null ||
