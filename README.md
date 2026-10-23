@@ -57,9 +57,11 @@ The only UI is transient and keyboard-first:
 
   <img src="docs/gifs/picker.gif" alt="The element picker armed, with a hover highlight on a control" />
 
-- `⌘R` / `⇧⌘R`: reload / hard reload
+- `⌘R` / `⇧⌘R`: reload / hard reload — a rim wraps the page while it loads;
+  the same rim mirrors link clicks and history moves that keep the current page
+  up, while a site switch still uses the full-screen veil
 
-  <img src="docs/gifs/reload.gif" alt="A page reloading, sampled mid-flight" />
+  <img src="docs/gifs/reload.gif" alt="Normal and hard reloads, with the loading rim sampled mid-flight" />
 
 - `⌘←` / `⌘→`: back / forward (native text behavior inside inputs)
 - Two-finger horizontal swipe on the trackpad — back / forward, with an armed
