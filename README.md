@@ -34,7 +34,7 @@ The only UI is transient and keyboard-first:
 
 - `⌘T`: jump to the theme picker
 
-  <img src="docs/gifs/theme-picker.gif" alt="The Theme group of the palette with variants applied and the color mode switched between dark and light" />
+  <img src="docs/gifs/theme-picker.gif" alt="The Theme group of the palette with the selection walking through variants and the new Light, Dark, and System rows" />
 
 - Drag from the top of the window at any time, pointer only; hovering the top
   edge or resting there briefly reveals the strip
@@ -55,7 +55,7 @@ The only UI is transient and keyboard-first:
 
 - `⌘⇧C`: element picker with hover highlight
 
-  <img src="docs/gifs/picker.gif" alt="The element picker armed, with a hover highlight on a control" />
+  <img src="docs/gifs/picker.gif" alt="The element picker moving across the heading, accent swatch, primary button, and status card" />
 
 - `⌘R` / `⇧⌘R`: reload / hard reload — a rim wraps the page while it loads;
   the same rim mirrors link clicks and history moves that keep the current page
@@ -77,7 +77,7 @@ DevTools are repainted to match it — chrome, syntax colours and selection
 included. Only the guest page still follows the OS.
 
 <p align="center">
-  <img src="docs/gifs/themed-devtools.gif" alt="The showcase page with the palette and DevTools both open while the Tlapalli variants sweep, repainting chrome, syntax colours and selection together" />
+  <img src="docs/gifs/themed-devtools.gif" alt="The test card page with the palette and DevTools both open while the Tlapalli variants sweep, repainting chrome, syntax colours and selection together" />
   <br />
   <img src="docs/gifs/light-mode.gif" alt="Light mode with the palette open, then the docked DevTools, then both at once" />
 </p>
