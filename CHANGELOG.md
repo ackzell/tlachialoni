@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.19](https://github.com/ackzell/tlachialoni/compare/v0.1.18...v0.1.19) (2026-10-26)
+
+### Features
+
+* **screenshots:** record visible interaction on the test card ([77df27d](https://github.com/ackzell/tlachialoni/commit/77df27da19a2de21c6a1d9fc79a480cd33be680d))
+* **test-card:** add a neutral demo page for feature recordings ([264265b](https://github.com/ackzell/tlachialoni/commit/264265b9768099617795c2181328801577ea0b41))
+* **theme:** offer light, dark, and system color modes ([e93018a](https://github.com/ackzell/tlachialoni/commit/e93018ad46f8eb2a2bca863482f0fec386a47695))
+
 ## [0.1.18](https://github.com/ackzell/tlachialoni/compare/v0.1.17...v0.1.18) (2026-10-23)
 
 ### Features
