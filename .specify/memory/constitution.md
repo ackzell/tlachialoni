@@ -112,9 +112,11 @@ source keeps the small UI coherent without a design system of its own.
   (the current target, window bounds, DevTools open state and dock side, strip
   visibility, titlebar-mode layout, theme variant, and color mode) is independent
   per window; the installed-extension list and recents are shared, with recents
-  merged on write and the shared list last-writer-wins. A window's color mode
-  governs the tool's own surfaces; the guest page's `prefers-color-scheme` and the
-  docked DevTools follow the OS. No database, no config-file editing by the user.
+  merged on write and the shared list last-writer-wins. A window's color mode is
+  one of light, dark, or system. It governs the tool's own surfaces, including the
+  docked DevTools palette. System follows the live OS appearance; light and dark
+  pin the tool's surfaces. The guest page's `prefers-color-scheme` still follows
+  the OS. No database, no config-file editing by the user.
 
 ## Security & Isolation Requirements
 
@@ -184,4 +186,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.7 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-16
+**Version**: 2.2.8 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-26
