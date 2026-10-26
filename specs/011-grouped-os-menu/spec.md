@@ -22,10 +22,13 @@ and Window, and browsers/editors already group this way. "Location" and "Other"
 also read poorly as menu titles. So the palette groups map to readable domains,
 with a standard Window menu added for native window commands.
 
-The menu is **static**: it lists commands but does not mirror state (active theme,
-recents, per-extension rows), because checked/radio state would require rebuilding
-the application menu on every change. The palette remains the primary,
-always-current surface (constitution III).
+The menu is **mostly static**: it lists commands and does not mirror state (active
+variant, recents, per-extension rows), because checked/radio state would require
+rebuilding the application menu on every change. The palette remains the primary,
+always-current surface (constitution III). One exception arrived with
+`specs/027-color-mode-options/`: the three color-mode items carry a radio mark for
+the focused window. That mark is updated in place, so the menu is still not
+rebuilt.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -48,7 +51,7 @@ expected domain heading, with the same labels and accelerators as the palette.
 2. **Given** the DevTools menu, **When** it is opened, **Then** it holds the
    toggle, the three dock sides, focus toggle, and inspect element.
 3. **Given** the Theme menu, **When** it is opened, **Then** it lists the eight
-   variants (without the `Theme:` prefix) and Cycle Color Mode.
+   variants (without the `Theme:` prefix) and the three color modes.
 4. **Given** any menu item, **When** it is clicked, **Then** it runs through the
    same command registry as the palette (nothing exists only in the menu).
 
@@ -80,8 +83,10 @@ command fires.
 
 - **Dev builds**: a separate **Developer** menu of surface previews is appended
   after Window; it is absent from packaged builds.
-- **Static state**: the menu does not change when the theme, dock side, strip, or
-  extensions change; the palette owns live state.
+- **Static state**: the menu does not change when the theme variant, dock side,
+  strip, or extensions change. The one exception is the color-mode radio mark,
+  which follows the focused window (specs/027). The palette owns the rest of the
+  live state.
 - **Platform**: the Window menu's Front item is macOS-only; Electron no-ops it
   elsewhere. Minimize/Zoom use standard roles.
 - **Duplicated affordances**: `⌘P`/`⌘T` appear in View while the Theme menu lists
@@ -100,8 +105,9 @@ command fires.
   that previously fired from DevTools focus may lose its accelerator.
 - **FR-004**: `view.back` / `view.forward` MUST NOT carry OS accelerators, so
   native text navigation in editable fields is preserved (FR-011).
-- **FR-005**: The menu MUST NOT mirror live state; it does not need to rebuild on
-  theme, dock, strip, or extension changes.
+- **FR-005**: The menu MUST NOT mirror live state, with one exception: the three
+  color-mode items carry a radio mark for the focused window's mode, updated in
+  place (specs/027).
 - **FR-006**: Theme variant items MUST be labeled with the variant name alone
   inside the Theme menu.
 - **FR-007**: A standard Window menu MUST provide Close Window plus native
@@ -126,6 +132,7 @@ command fires.
 ## Assumptions
 
 - macOS is the only shipping target; the menus are standard Electron templates.
-- Recents and per-extension rows stay palette-only this iteration; a dynamic
-  rebuild (History menu, radio/checkbox state) is a possible follow-up.
+- Recents and per-extension rows stay palette-only. Radio state exists only for
+  the three color-mode items (specs/027); a broader dynamic History menu remains a
+  possible follow-up.
 - A Help menu is out of scope; the app has no help content yet.

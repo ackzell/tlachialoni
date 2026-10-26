@@ -28,7 +28,7 @@ are derived from `COMMAND_GROUPS` in `src/shared/commands.ts` (FR-020).
 | `focus.toggle`        | Toggle Focus (Page / DevTools) | `⌘J` | devtools | Moves keyboard focus between the page and the docked DevTools |
 | `picker.toggle`        | Inspect Element (arm/disarm) | `⌘⇧C`                 | devtools    | Hover highlight; click selects in DevTools            |
 | `theme.variant.<slug>` | Theme: <Variant Name>        | —                     | theme       | Eight commands, one per mineral variant               |
-| `theme.cycleMode`      | Cycle Color Mode             | —                     | theme       | `system → dark → light`, persisted                    |
+| `theme.mode.<slug>`    | Color Mode: <Mode Name>      | —                     | theme       | Three commands: `light`, `dark`, `system`; persisted  |
 | `extensions.install`   | Install extension …          | —                     | extensions  | Contextual: offered when the input is a store URL/ID  |
 | `extensions.installFolder` | Install Extension from Folder | —                 | extensions  |                                                       |
 | `extensions.reload`    | Reload Extensions            | —                     | extensions  |                                                       |
@@ -89,7 +89,7 @@ menu on every change.
 | View | Toggle Command Palette `⌘P`, Browse Themes `⌘T` · Reload `⌘R`, Hard Reload `⇧⌘R` · Toggle Window Strip `⌘B` |
 | History | Back, Forward · Edit Current Target `⌘L` |
 | DevTools | Toggle DevTools `⌘⌥J` · Dock Bottom/Right/Left `⌘1/2/3` · Toggle Focus `⌘J`, Inspect Element `⌘⇧C` |
-| Theme | the eight variants · Cycle Color Mode |
+| Theme | the eight variants · Light, Dark, System |
 | Extensions | Install from Folder, Reload Extensions, Reveal Extensions Folder |
 | Window | Minimize, Zoom, Front (standard roles) |
 

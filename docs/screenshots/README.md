@@ -146,7 +146,7 @@ frames it records become `docs/gifs/<name>.gif`:
 | `extensions`      | (Extensions)        | the store row on the blank window, then an install through every state      |
 | `palette`         | ⌘P, `Tab` / `⇧Tab`  | the palette opening, Tab cycling the groups, a target typed and committed   |
 | `location`        | ⌘L                  | the target editor: prefilled, recents grouped by origin, expanded, filtered |
-| `theme-picker`    | ⌘T                  | the Theme group, variants applied, the color mode cycled                    |
+| `theme-picker`    | ⌘T                  | the Theme group, variants applied, the color mode switched dark and light   |
 | `light-mode`      | —                   | light mode with the palette open, then DevTools, then both at once          |
 | `strip`           | top-edge reveal, ⌘B | the strip hidden, then pinned, dark and light                               |
 | `titlebar`        | ⇧⌘F                 | the strip docked as a title bar, with the page laid out below it            |

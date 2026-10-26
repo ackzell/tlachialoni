@@ -34,7 +34,7 @@ The only UI is transient and keyboard-first:
 
 - `⌘T`: jump to the theme picker
 
-  <img src="docs/gifs/theme-picker.gif" alt="The Theme group of the palette with variants applied and the color mode cycled between dark and light" />
+  <img src="docs/gifs/theme-picker.gif" alt="The Theme group of the palette with variants applied and the color mode switched between dark and light" />
 
 - Drag from the top of the window at any time, pointer only; hovering the top
   edge or resting there briefly reveals the strip
