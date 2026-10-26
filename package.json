@@ -13,6 +13,7 @@
     "dev": "electron-vite dev",
     "predev:inspect": "node scripts/dev-identity.mjs",
     "dev:inspect": "TLACHIALONI_INSPECT_DEVTOOLS=1 electron-vite dev",
+    "test-card": "vite --config examples/test-card/vite.config.ts",
     "prepreview": "node scripts/dev-identity.mjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -33,7 +34,8 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:preload": "tsc --noEmit -p tsconfig.preload.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
-    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:preload && pnpm run typecheck:web",
+    "typecheck:example": "vue-tsc --noEmit -p examples/test-card/tsconfig.json",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:preload && pnpm run typecheck:web && pnpm run typecheck:example",
     "test": "vp test",
     "probe:gesture": "TLACHIALONI_GESTURE_DEBUG=1 electron-vite dev",
     "check": "vp check",
@@ -43,7 +45,8 @@
     "@fontsource-variable/source-code-pro": "^5.3.0",
     "@vueuse/core": "^15.0.0",
     "fflate": "^0.8.3",
-    "vue": "^3.5.43"
+    "vue": "^3.5.43",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

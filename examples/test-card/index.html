@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Test Card</title>
+    <style>
+      /* First paint only. Keep these values in sync with --bg / --ink in styles.css. */
+      :root {
+        color-scheme: light dark;
+        background: #dbdfe2;
+        color: #111315;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          background: #2d353c;
+          color: #dcdddf;
+        }
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+        font-size: smaller;
+      }
+
+      body {
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
