@@ -1,11 +1,11 @@
 import { readonly, ref } from "vue";
-import type { Scope } from "@shared/commands";
+import type { ColorMode, Scope } from "@shared/commands";
 import type { ExtensionStatus, InstalledExtension } from "@shared/extensions";
 import type { HistoryArmed } from "@shared/history";
 import { applyTheme, type ResolvedMode } from "../theme/apply";
 
 export type DockMode = "bottom" | "right" | "left";
-export type ColorMode = "system" | "dark" | "light";
+export type { ColorMode };
 
 export interface RecentEntry {
   url: string;

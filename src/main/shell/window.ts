@@ -13,7 +13,13 @@ import {
   type WindowRecord,
 } from "../state/schema";
 import { normalizeTarget, shouldVeilTarget } from "../nav/policy";
-import { commandForInput, THEME_VARIANTS, type Scope } from "@shared/commands";
+import {
+  commandForInput,
+  COLOR_MODES,
+  colorModeCommandId,
+  THEME_VARIANTS,
+  type Scope,
+} from "@shared/commands";
 import {
   DRAG_BAND_HEIGHT,
   STRIP_HEIGHT,
@@ -107,6 +113,8 @@ export interface AppWindowOptions {
   onNewWindow?: () => void;
   /** Called once the window has fully closed, so the manager can clean up. */
   onClosed?: () => void;
+  /** Called after this window's color mode changes, so the menu mark can follow. */
+  onColorModeChanged?: () => void;
 }
 
 export class AppWindow implements SwipeWindow {
@@ -123,6 +131,7 @@ export class AppWindow implements SwipeWindow {
 
   private readonly onNewWindow: () => void;
   private readonly onClosed: () => void;
+  private readonly onColorModeChanged: () => void;
 
   private showLoading = false;
   private failed = false;
@@ -202,6 +211,7 @@ export class AppWindow implements SwipeWindow {
     this.windowId = options.windowId;
     this.onNewWindow = options.onNewWindow ?? (() => {});
     this.onClosed = options.onClosed ?? (() => {});
+    this.onColorModeChanged = options.onColorModeChanged ?? (() => {});
 
     const record = this.record();
     this.currentUrl = record?.target ?? "";
@@ -499,7 +509,9 @@ export class AppWindow implements SwipeWindow {
     for (const variant of THEME_VARIANTS) {
       commands.register(`theme.variant.${variant.slug}`, () => this.setVariant(variant.slug));
     }
-    commands.register("theme.cycleMode", () => this.cycleColorMode());
+    for (const mode of COLOR_MODES) {
+      commands.register(colorModeCommandId(mode.slug), () => this.setColorMode(mode.slug));
+    }
     commands.register("failure.retry", () => {
       this.failed = false;
       this.showLoading = true;
@@ -1169,18 +1181,18 @@ export class AppWindow implements SwipeWindow {
     this.pushTheme();
   }
 
+  /** This window's color mode, read by the menu for its selection mark. */
+  colorMode(): ColorMode {
+    return this.record()?.colorMode ?? "system";
+  }
+
   /** Sets this window's color mode only (FR-009). */
   setColorMode(mode: ColorMode): void {
+    if (this.record()?.colorMode === mode) return;
     this.store.patchWindow(this.windowId, { colorMode: mode });
     this.applyTheme();
     this.broadcastState();
-  }
-
-  cycleColorMode(): void {
-    const order: ColorMode[] = ["system", "dark", "light"];
-    const current = this.record()?.colorMode ?? "system";
-    const next = order[(order.indexOf(current) + 1) % order.length];
-    this.setColorMode(next);
+    this.onColorModeChanged();
   }
 
   setPaletteVisible(open: boolean): void {

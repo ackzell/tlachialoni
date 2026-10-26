@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  COLOR_MODES,
   COMMANDS,
   COMMAND_GROUPS,
   PALETTE_COMMANDS,
   SCOPES,
+  colorModeCommandId,
   commandForInput,
   nextScope,
   scopeLabel,
@@ -64,6 +66,19 @@ describe("command catalog", () => {
   it("assigns every command a declared group", () => {
     const ids = new Set(COMMAND_GROUPS.map((group) => group.id));
     for (const command of COMMANDS) expect(ids.has(command.group)).toBe(true);
+  });
+
+  it("offers exactly the three color modes and no cycle command", () => {
+    const modes = COMMANDS.filter((command) => command.id.startsWith("theme.mode."));
+    expect(modes.map((command) => command.id)).toEqual(
+      COLOR_MODES.map((mode) => colorModeCommandId(mode.slug)),
+    );
+    for (const command of modes) {
+      expect(command.group).toBe("theme");
+      expect(command.palette).toBe(true);
+      expect(command.accelerator).toBeUndefined();
+    }
+    expect(COMMANDS.some((command) => command.id === "theme.cycleMode")).toBe(false);
   });
 
   it("binds ⌘N to New Window and lists it in the palette", () => {
@@ -237,9 +252,17 @@ describe("palette rows", () => {
     expect(variants).toHaveLength(8);
   });
 
-  it("annotates the cycle-mode row with the engaged mode", () => {
+  it("lists every theme mode command when searching for mode", () => {
+    const rows = buildRows("mode", [], undefined, { variant: "jade", colorMode: "system" });
+    const modes = rows.filter((row) => row.id.startsWith("theme.mode."));
+    expect(modes).toHaveLength(3);
+  });
+
+  it("marks only the active color mode as current", () => {
     const rows = buildRows("", [], undefined, { variant: "jade", colorMode: "light" });
-    expect(rows.find((row) => row.id === "theme.cycleMode")?.detail).toBe("mode: light");
+    expect(rows.find((row) => row.id === "theme.mode.light")?.detail).toBe("current");
+    expect(rows.find((row) => row.id === "theme.mode.dark")?.detail).toBeUndefined();
+    expect(rows.find((row) => row.id === "theme.mode.system")?.detail).toBeUndefined();
   });
 
   it("marks only the persisted variant as current", () => {
@@ -250,7 +273,9 @@ describe("palette rows", () => {
 
   it("omits theme annotations when no theme state is supplied", () => {
     const rows = buildRows("", []);
-    expect(rows.find((row) => row.id === "theme.cycleMode")?.detail).toBeUndefined();
+    for (const mode of COLOR_MODES) {
+      expect(rows.find((row) => row.id === colorModeCommandId(mode.slug))?.detail).toBeUndefined();
+    }
   });
 
   it("scores fuzzy matches and rejects non-matches", () => {

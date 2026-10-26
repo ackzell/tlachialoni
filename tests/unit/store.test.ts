@@ -12,6 +12,7 @@ import {
   mergeRecentLists,
   mergeRecents,
   mergeWindows,
+  sanitizeColorMode,
   sanitizeState,
   sanitizeWindows,
   type WindowRecord,
@@ -136,6 +137,18 @@ describe("sanitizeWindows", () => {
       { id: "garbage", titlebarMode: "yes" },
     ]);
     expect(windows.map((w) => w.titlebarMode)).toEqual([false, true, false]);
+  });
+
+  it("defaults an unknown colorMode to system and preserves a known value", () => {
+    expect(sanitizeColorMode("dark")).toBe("dark");
+    expect(sanitizeColorMode("sepia")).toBe("system");
+    expect(sanitizeColorMode(undefined)).toBe("system");
+    const windows = sanitizeWindows([
+      { id: "default" },
+      { id: "dark", colorMode: "dark" },
+      { id: "garbage", colorMode: "sepia" },
+    ]);
+    expect(windows.map((w) => w.colorMode)).toEqual(["system", "dark", "system"]);
   });
 
   it("defaults zoomIndex to 100% and clamps a corrupt value", () => {

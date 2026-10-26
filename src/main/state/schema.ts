@@ -10,10 +10,11 @@
 import { randomUUID } from "node:crypto";
 import { isLocalHostname } from "../nav/policy";
 import type { ExtensionSource, InstalledExtension } from "@shared/extensions";
+import { COLOR_MODES, type ColorMode } from "@shared/commands";
 import { DEFAULT_ZOOM_INDEX, clampZoomIndex } from "@shared/zoom";
 
 export type DockMode = "bottom" | "right" | "left";
-export type ColorMode = "system" | "dark" | "light";
+export type { ColorMode };
 
 export const VARIANT_SLUGS = [
   "obsidian",
@@ -97,7 +98,6 @@ export const DEFAULT_WIDTH = 1440;
 export const DEFAULT_HEIGHT = 900;
 
 const DOCK_MODES: DockMode[] = ["bottom", "right", "left"];
-const COLOR_MODES: ColorMode[] = ["system", "dark", "light"];
 const EXTENSION_SOURCES: ExtensionSource[] = ["store", "folder"];
 /** Fields that only existed before schema 3; their presence marks a v1/v2 file. */
 const LEGACY_KEYS = ["target", "bounds", "dockMode", "devtoolsOpen", "stripVisible"] as const;
@@ -139,7 +139,7 @@ export function sanitizeVariant(raw: unknown): VariantSlug {
 
 /** Coerces a color mode, falling back to `system` for anything unknown. */
 export function sanitizeColorMode(raw: unknown): ColorMode {
-  return COLOR_MODES.includes(raw as ColorMode) ? (raw as ColorMode) : "system";
+  return COLOR_MODES.some((mode) => mode.slug === raw) ? (raw as ColorMode) : "system";
 }
 
 function isAllowedTarget(value: unknown): value is string {

@@ -6,6 +6,8 @@
 import {
   COMMAND_GROUPS,
   PALETTE_COMMANDS,
+  colorModeCommandId,
+  type ColorMode,
   type CommandDef,
   type CommandGroup,
   type Scope,
@@ -92,7 +94,7 @@ export interface Row {
 
 export interface ThemeFlags {
   variant: string;
-  colorMode: string;
+  colorMode: ColorMode;
 }
 
 /** View state the palette supplies on top of the catalog. */
@@ -330,8 +332,8 @@ export function buildRows(
 
   for (const { command, match } of scored) {
     let detail: string | undefined;
-    if (command.id === "theme.cycleMode" && theme) {
-      detail = `mode: ${theme.colorMode}`;
+    if (theme && command.id === colorModeCommandId(theme.colorMode)) {
+      detail = "current";
     } else if (theme && command.id === `theme.variant.${theme.variant}`) {
       detail = "current";
     }

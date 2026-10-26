@@ -3,7 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import icon from "../../resources/icon.png?asset";
-import { COMMANDS, THEME_VARIANTS, type Accelerator } from "@shared/commands";
+import {
+  COLOR_MODES,
+  COMMANDS,
+  colorModeCommandId,
+  THEME_VARIANTS,
+  type Accelerator,
+} from "@shared/commands";
 import { formatReleaseDate } from "@shared/release";
 import { StateStore } from "./state/store";
 import { ExtensionManager } from "./extensions/manager";
@@ -79,8 +85,9 @@ if (
  * `null` entry is a separator. Every item is a catalog command id, so labels and
  * accelerators stay sourced from `COMMANDS`.
  *
- * These menus are static: state such as the active theme or recents is
- * intentionally not shown (it would need a rebuild on every change).
+ * These menus mostly list commands. The three color-mode items are the one
+ * exception: they carry a radio mark for the focused window's mode, synced in
+ * place so the menu is not rebuilt on every focus change (specs/027).
  */
 const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
   {
@@ -122,7 +129,7 @@ const MENU_SECTIONS: Array<{ label: string; items: Array<string | null> }> = [
     items: [
       ...THEME_VARIANTS.map((variant) => `theme.variant.${variant.slug}`),
       null,
-      "theme.cycleMode",
+      ...COLOR_MODES.map((mode) => colorModeCommandId(mode.slug)),
     ],
   },
   {
@@ -147,22 +154,47 @@ function menuItemFor(
 ): Electron.MenuItemConstructorOptions {
   const command = COMMANDS.find((entry) => entry.id === commandId);
   if (!command) throw new Error(`Unknown menu command: ${commandId}`);
-  // A "Theme: Jade" row reads fine in the palette; inside the Theme menu the
-  // prefix is redundant.
+  const mode = COLOR_MODES.find((entry) => colorModeCommandId(entry.slug) === command.id);
+  // A "Theme: Jade" or "Color Mode: Light" row reads fine in the palette;
+  // inside the Theme menu the prefix is redundant.
   const label = command.id.startsWith("theme.variant.")
     ? command.label.replace(/^Theme: /, "")
-    : command.label;
+    : mode
+      ? command.label.replace(/^Color Mode: /, "")
+      : command.label;
   const accelerator =
     command.accelerator && !NO_OS_ACCELERATOR.has(command.id)
       ? toElectronAccelerator(command.accelerator)
       : undefined;
-  return {
+  const item: Electron.MenuItemConstructorOptions = {
+    id: command.id,
     label,
     accelerator,
     click: () => {
       void manager.runOnFocused(command.id);
     },
   };
+  // The mode items are one radio group. The check is derived from the focused
+  // window; `syncModeMenu` moves it when focus or the mode changes (specs/027).
+  if (mode) {
+    item.type = "radio";
+    item.checked = (manager.focused()?.colorMode() ?? "system") === mode.slug;
+  }
+  return item;
+}
+
+/**
+ * Moves the Theme menu's radio mark to the focused window's color mode. Uses
+ * stable item ids, so the native menu is updated in place rather than rebuilt.
+ */
+function syncModeMenu(manager: WindowManager): void {
+  const menu = Menu.getApplicationMenu();
+  if (!menu) return;
+  const active = manager.focused()?.colorMode() ?? "system";
+  for (const mode of COLOR_MODES) {
+    const item = menu.getMenuItemById(colorModeCommandId(mode.slug));
+    if (item) item.checked = mode.slug === active;
+  }
 }
 
 function buildSection(
@@ -251,6 +283,7 @@ function installMenu(manager: WindowManager): void {
   }
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  manager.onMenuStateChange = () => syncModeMenu(manager);
 }
 
 /**

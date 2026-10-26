@@ -33,6 +33,11 @@ export class WindowManager {
   /** The window that started the current extension action, for status routing. */
   private statusInitiator: AppWindow | null = null;
   /**
+   * Set by the menu installer. Re-syncs the Theme menu's mode check when the
+   * focused window or its color mode changes (specs/027).
+   */
+  onMenuStateChange: (() => void) | null = null;
+  /**
    * True once the app is quitting. Quitting closes every window, so their
    * `closed` handlers must NOT drop the records — the saved set is what the next
    * launch restores. Only a user-closed window is forgotten.
@@ -135,6 +140,7 @@ export class WindowManager {
         this.createNew();
       },
       onClosed: () => this.handleClosed(appWindow),
+      onColorModeChanged: () => this.notifyMenuState(),
     });
     this.windows.set(record.id, appWindow);
     const shellId = appWindow.shellView.webContents.id;
@@ -161,6 +167,7 @@ export class WindowManager {
     if (!this.quitting) this.store.removeWindow(appWindow.windowId);
     if (this.statusInitiator === appWindow) this.statusInitiator = null;
     this.refreshDockMenu();
+    this.notifyMenuState();
   }
 
   /** Marks the start of app shutdown so closing windows keep their records. */
@@ -249,6 +256,11 @@ export class WindowManager {
   private touch(id: string): void {
     this.focusStack = this.focusStack.filter((entry) => entry !== id);
     this.focusStack.push(id);
+    this.notifyMenuState();
+  }
+
+  private notifyMenuState(): void {
+    this.onMenuStateChange?.();
   }
 
   private areaFor(appWindow: AppWindow): WorkArea {

@@ -85,6 +85,23 @@ export const THEME_VARIANTS = [
   { slug: "fire-opal", name: "Fire Opal" },
 ] as const;
 
+/**
+ * The three color-mode choices, in palette and menu order. The slug is both the
+ * persisted value and the command-id suffix, so the catalog, the store, and the
+ * menu cannot disagree about the set.
+ */
+export const COLOR_MODES = [
+  { slug: "light", name: "Light" },
+  { slug: "dark", name: "Dark" },
+  { slug: "system", name: "System" },
+] as const;
+
+export type ColorMode = (typeof COLOR_MODES)[number]["slug"];
+
+export function colorModeCommandId(mode: ColorMode): string {
+  return `theme.mode.${mode}`;
+}
+
 export const COMMANDS: CommandDef[] = [
   {
     id: "palette.open",
@@ -249,12 +266,12 @@ export const COMMANDS: CommandDef[] = [
     palette: true,
     group: "theme",
   })),
-  {
-    id: "theme.cycleMode",
-    label: "Cycle Color Mode",
+  ...COLOR_MODES.map((mode): CommandDef => ({
+    id: colorModeCommandId(mode.slug),
+    label: `Color Mode: ${mode.name}`,
     palette: true,
     group: "theme",
-  },
+  })),
   {
     id: "extensions.install",
     label: "Install Extension from Chrome Web Store",
