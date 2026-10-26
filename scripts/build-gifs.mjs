@@ -165,8 +165,8 @@ function main() {
   process.stdout.write(
     `${"".padEnd(width)}  ${"".padStart(6)}  ${kib(total).padStart(9)}  total\n`,
   );
-  if (manifest.showcaseUp === false) {
-    process.stdout.write("\nnote: the showcase was unreachable, so themed-devtools was skipped\n");
+  if (manifest.demoUp === false) {
+    process.stdout.write("\nnote: the test card was unreachable, so themed-devtools was skipped\n");
   }
   for (const warning of manifest.warnings ?? []) process.stdout.write(`warning: ${warning}\n`);
 }

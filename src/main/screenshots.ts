@@ -76,8 +76,8 @@ const BURST_HOLD_MS = 110;
  * free — a running dev server there is used instead.
  */
 const SCENE_STUB_PORT = 3000;
-/** The page the themed-DevTools scene loads, so chrome + syntax are on screen. */
-const SHOWCASE_URL = "http://localhost:3000/en/reactivity/reactive";
+/** The test-card page the scenes load by default; the themed-DevTools scene needs it. */
+const DEFAULT_GUEST_URL = "http://localhost:3000/";
 
 const SCREENCAPTURE = "/usr/sbin/screencapture";
 const GET_WINDOW_ID = "/opt/homebrew/bin/GetWindowID";
@@ -608,6 +608,15 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     );
   };
 
+  /** Walk the palette highlight one row at a time, so the GIF shows the movement. */
+  const movePaletteSelection = async (delta: number): Promise<void> => {
+    const key = delta < 0 ? "ArrowUp" : "ArrowDown";
+    for (let i = 0; i < Math.abs(delta); i++) {
+      await pressInPalette(key);
+      await wait(90);
+    }
+  };
+
   const expandFirstHost = async (): Promise<void> => {
     await evalInShell<void>(shell, "document.querySelector('.palette__chevron')?.click()");
   };
@@ -648,16 +657,81 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     return false;
   };
 
+  type PickerTarget = { x: number; y: number; label: string };
+
   /**
-   * Finds a small, text-bearing element to hover for the picker shot. The page
-   * here may be a client-rendered app, so nothing about it is known ahead of
-   * time; picking the first element under a fixed point tends to select the whole
-   * body.
+   * Finds distinct elements to hover for the picker shot. The test card declares
+   * four clear landmarks (heading, swatch, primary button, status card); other
+   * pages fall back to a generic scan for text-bearing controls.
    */
-  const findPickerTarget = async (): Promise<{ x: number; y: number; label: string } | null> => {
+  const findPickerTargets = async (limit = 4): Promise<PickerTarget[]> => {
     const found = (await site.executeJavaScript(`(() => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
+      const labelFor = (node) =>
+        (
+          (node.textContent ?? "").trim() ||
+          node.getAttribute("aria-label") ||
+          node.getAttribute("placeholder") ||
+          ""
+        )
+          .replace(/\\s+/g, " ")
+          .slice(0, 28);
+      const inView = (rect) =>
+        rect.width >= 16 &&
+        rect.height >= 12 &&
+        rect.right >= 24 &&
+        rect.bottom >= 24 &&
+        rect.left <= viewportWidth - 24 &&
+        rect.top <= viewportHeight - 24;
+      const visible = (node) => {
+        const style = getComputedStyle(node);
+        return (
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          Number(style.opacity) >= 0.35
+        );
+      };
+
+      const preferred = [".panel__headline", ".swatch", ".primary", ".status"];
+      const pointFor = (node) => {
+        const rect = node.getBoundingClientRect();
+        const points = [
+          [rect.left + 8, rect.top + 8],
+          [rect.left + 8, rect.top + rect.height / 2],
+          [rect.left + rect.width / 2, rect.top + rect.height / 2],
+          [rect.right - 8, rect.top + 8],
+          [rect.left + 8, rect.bottom - 8],
+          [rect.right - 8, rect.bottom - 8],
+        ];
+        for (const [x, y] of points) {
+          if (x < 0 || y < 0 || x > viewportWidth || y > viewportHeight) continue;
+          if (document.elementFromPoint(x, y) === node) {
+            return { x: Math.round(x), y: Math.round(y) };
+          }
+        }
+        return {
+          x: Math.round(rect.left + rect.width / 2),
+          y: Math.round(rect.top + rect.height / 2),
+        };
+      };
+      const preferredTargets = preferred
+        .map((selector) => {
+          const node = document.querySelector(selector);
+          if (!node) return null;
+          const rect = node.getBoundingClientRect();
+          if (!inView(rect) || !visible(node)) return null;
+          const point = pointFor(node);
+          return {
+            x: point.x,
+            y: point.y,
+            tag: node.tagName.toLowerCase(),
+            text: labelFor(node),
+          };
+        })
+        .filter(Boolean);
+      if (preferredTargets.length >= 2) return preferredTargets.slice(0, ${limit});
+
       const interactiveTags = ["button", "a", "input", "select", "textarea"];
       const interactiveRoles = ["button", "link", "tab", "menuitem", "checkbox", "radio"];
       const candidates = [];
@@ -668,11 +742,7 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
         const rect = node.getBoundingClientRect();
         if (rect.width < 16 || rect.height < 12) continue;
         if (rect.width > 320 || rect.height > 96) continue;
-        if (rect.right < 24 || rect.bottom < 24) continue;
-        if (rect.left > viewportWidth - 24 || rect.top > viewportHeight - 24) continue;
-        const style = getComputedStyle(node);
-        if (style.display === "none" || style.visibility === "hidden") continue;
-        if (Number(style.opacity) < 0.35) continue;
+        if (!inView(rect) || !visible(node)) continue;
         const tag = node.tagName.toLowerCase();
         const role = node.getAttribute("role") ?? "";
         candidates.push({
@@ -682,23 +752,42 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
           tag,
           // Prefer a real control over a stray text node.
           control: interactiveTags.includes(tag) || interactiveRoles.includes(role) ? 0 : 1,
-          text: (
-            (node.textContent ?? "").trim() ||
-            node.getAttribute("aria-label") ||
-            node.getAttribute("placeholder") ||
-            ""
-          )
-            .replace(/\\s+/g, " ")
-            .slice(0, 28),
+          text: labelFor(node),
         });
       }
       const labelled = candidates.filter((entry) => entry.text.length > 0);
       const pool = labelled.length > 0 ? labelled : candidates;
-      if (pool.length === 0) return null;
       pool.sort((a, b) => a.control - b.control || a.area - b.area);
-      return pool[0];
-    })()`)) as { x: number; y: number; label?: string; tag?: string; text?: string } | null;
-    return found ? { x: found.x, y: found.y, label: `${found.tag} "${found.text}"` } : null;
+
+      const picked = [];
+      for (const candidate of pool) {
+        if (
+          picked.some(
+            (entry) => Math.hypot(entry.x - candidate.x, entry.y - candidate.y) < 90,
+          )
+        ) {
+          continue;
+        }
+        picked.push(candidate);
+        if (picked.length >= ${limit}) break;
+      }
+      return picked;
+    })()`)) as Array<{ x: number; y: number; tag?: string; text?: string }> | null;
+
+    return (found ?? []).map((entry) => ({
+      x: entry.x,
+      y: entry.y,
+      label: `${entry.tag ?? "element"} "${entry.text ?? ""}"`,
+    }));
+  };
+
+  const findPickerTarget = async (): Promise<PickerTarget | null> => {
+    const targets = await findPickerTargets(4);
+    return (
+      targets.find((target) => target.label.startsWith("button") || target.label.startsWith("a")) ??
+      targets[0] ??
+      null
+    );
   };
 
   /**
@@ -1001,7 +1090,10 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     await wait(SETTLE_MS);
 
     // ---- a loaded page ----------------------------------------------------
-    win.navigate(process.env.TLACHIALONI_SCREENSHOTS_URL ?? stub.url);
+    const pageUrl =
+      process.env.TLACHIALONI_SCREENSHOTS_URL ??
+      ((await isReachable(DEFAULT_GUEST_URL)) ? DEFAULT_GUEST_URL : stub.url);
+    win.navigate(pageUrl);
     for (let i = 0; i < 120 && site.isLoading(); i++) await wait(100);
     // Client-rendered apps are still hydrating when `did-stop-loading` fires.
     await wait(1_500);
@@ -1075,8 +1167,9 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
    *
    * Page-backed scenes run on `localhost:3000` (the default target), so a typed
    * target and the recents group read the way they do on a real machine. The
-   * themed-DevTools scene needs the real showcase and is skipped — loudly, with a
-   * warning in the manifest — when it is not reachable.
+   * test-card server is used there when it is reachable; otherwise the stub is
+   * served. The themed-DevTools scene needs the real test card and is skipped —
+   * loudly, with a warning in the manifest — when it is not reachable.
    */
   const captureScenes = async (): Promise<void> => {
     interface SceneFrame {
@@ -1107,10 +1200,12 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       .filter(Boolean);
     const wanted = (name: string): boolean => only.length === 0 || only.includes(name);
 
-    const showcaseUrl = process.env.TLACHIALONI_SCREENSHOTS_SHOWCASE_URL ?? SHOWCASE_URL;
-    const showcaseUp = await isReachable(showcaseUrl);
-    const pageUrl =
-      process.env.TLACHIALONI_SCREENSHOTS_URL ?? (showcaseUp ? showcaseUrl : stub.url);
+    const demoUrl =
+      process.env.TLACHIALONI_SCREENSHOTS_SHOWCASE_URL ??
+      process.env.TLACHIALONI_SCREENSHOTS_URL ??
+      DEFAULT_GUEST_URL;
+    const demoUp = await isReachable(demoUrl);
+    const pageUrl = process.env.TLACHIALONI_SCREENSHOTS_URL ?? (demoUp ? demoUrl : stub.url);
 
     const loadTarget = async (url: string): Promise<void> => {
       win.navigate(url);
@@ -1334,23 +1429,43 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       s.end();
     }
 
-    // ---- ⌘T: browse themes — chrome and page re-theme, then the mode -------
+    // ---- ⌘T: browse themes — the highlight walks the rows, then the modes --
     if (wanted("theme-picker")) {
       const s = openScene("theme-picker", "Browse themes (⌘T)");
       await closePalette();
+      win.setVariant("obsidian");
+      win.setColorMode("dark");
+      await wait(FRAME_SETTLE_MS);
       await win.runCommand("palette.openTheme");
       await wait(FRAME_SETTLE_MS);
       await s.frame("theme-group", { shell: ".palette" }, 1_100);
-      for (const slug of ["gold", "turquoise", "lapis-lazuli"] as VariantSlug[]) {
-        win.setVariant(slug);
+
+      // The Theme group starts on the current variant. Move the highlight down,
+      // commit in place with Space, and let each frame show the selected row.
+      for (const [slug, steps] of [
+        ["gold", 1],
+        ["turquoise", 1],
+        ["lapis-lazuli", 2],
+      ] as const) {
+        await movePaletteSelection(steps);
+        await pressInPalette(" ");
         await s.frame(`variant-${slug}`, { shell: ".palette" }, 850);
       }
-      win.setColorMode("light");
+
+      // From lapis: amethyst, jade, fire opal, then Light.
+      await movePaletteSelection(4);
+      await pressInPalette(" ");
       await s.frame("mode-light", { shell: ".palette" }, 1_100);
-      win.setColorMode("dark");
+      await movePaletteSelection(1);
+      await pressInPalette(" ");
       await s.frame("mode-dark", { shell: ".palette" }, 900);
+      await movePaletteSelection(1);
+      await pressInPalette(" ");
+      await s.frame("mode-system", { shell: ".palette" }, 1_000);
+
       await closePalette();
       win.setVariant("obsidian");
+      win.setColorMode("dark");
       await wait(FRAME_SETTLE_MS);
       s.end();
     }
@@ -1432,20 +1547,38 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
     // single still — the capture proved this: both frames came out byte-identical
     // and the second was dropped. It is covered by the DevTools bullet instead.
 
-    // ---- ⌘⇧C: the element picker, hover highlight following the pointer ----
+    // ---- ⌘⇧C: the element picker, walking the page's landmarks -------------
     if (wanted("picker")) {
       const s = openScene("picker", "Element picker (⌘⇧C)");
       win.pickerArm();
       await wait(300);
       await s.frame("armed", undefined, 800);
-      const target = await findPickerTarget();
-      const point = target ?? { x: Math.round(WINDOW_WIDTH / 2), y: Math.round(WINDOW_HEIGHT / 2) };
-      trace(
-        `picker target: ${target ? target.label : "centre fallback"} at (${point.x}, ${point.y})`,
-      );
-      site.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y });
-      await wait(400);
-      await s.frame("hover", { site: "[data-tlachialoni-picker]" }, 1_200);
+
+      const targets = await findPickerTargets(4);
+      const points: PickerTarget[] =
+        targets.length > 0
+          ? targets
+          : [
+              {
+                x: Math.round(WINDOW_WIDTH / 2),
+                y: Math.round(WINDOW_HEIGHT / 2),
+                label: "centre fallback",
+              },
+            ];
+
+      for (const [index, target] of points.entries()) {
+        trace(
+          `picker target ${index + 1}/${points.length}: ${target.label} at (${target.x}, ${target.y})`,
+        );
+        site.sendInputEvent({ type: "mouseMove", x: target.x, y: target.y });
+        await wait(450);
+        await s.frame(
+          `hover-${index + 1}`,
+          { site: "[data-tlachialoni-picker]" },
+          index === points.length - 1 ? 1_400 : 1_000,
+        );
+      }
+
       win.pickerDisarm();
       await wait(FRAME_SETTLE_MS);
       s.end();
@@ -1480,38 +1613,49 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       s.end();
     }
 
-    // ---- themed DevTools over the showcase (needs the real server) ---------
+    // ---- themed DevTools over the test card (needs the real server) --------
     if (wanted("themed-devtools")) {
-      if (!showcaseUp) {
+      if (!demoUp) {
         const note =
-          `themed-devtools: ${showcaseUrl} is not reachable, so the themed page + ` +
-          `DevTools sweep was skipped. Start the showcase dev server and re-run.`;
+          `themed-devtools: ${demoUrl} is not reachable, so the themed page + ` +
+          `DevTools sweep was skipped. Start the test-card dev server and re-run.`;
         warnings.push(note);
         process.stderr.write(`[shots] ${note}\n`);
       } else {
-        const s = openScene("themed-devtools", "Themed page + DevTools (showcase)");
+        const s = openScene("themed-devtools", "Themed page + DevTools (test card)");
         await closePalette();
-        await loadTarget(showcaseUrl);
+        win.setVariant("obsidian");
+        win.setColorMode("dark");
+        await loadTarget(demoUrl);
         await win.runCommand("devtools.dock.bottom");
         await waitForDock("bottom");
         await wait(DEVTOOLS_SETTLE_MS);
-        await openPalette();
+        await win.runCommand("palette.openTheme");
+        await wait(FRAME_SETTLE_MS);
         await s.frame("obsidian", { shell: ".palette" }, 1_300);
-        for (const slug of [
-          "gold",
-          "turquoise",
-          "lapis-lazuli",
-          "jade",
-          "fire-opal",
-        ] as VariantSlug[]) {
-          win.setVariant(slug);
+
+        for (const [slug, steps] of [
+          ["gold", 1],
+          ["turquoise", 1],
+          ["lapis-lazuli", 2],
+          ["jade", 2],
+          ["fire-opal", 1],
+        ] as const) {
+          await movePaletteSelection(steps);
+          await pressInPalette(" ");
           await s.frame(`variant-${slug}`, { shell: ".palette" }, 1_000);
         }
-        win.setColorMode("light");
+
+        await movePaletteSelection(1);
+        await pressInPalette(" ");
         await s.frame("light", { shell: ".palette" }, 1_300);
-        win.setColorMode("dark");
-        win.setVariant("obsidian");
+        await movePaletteSelection(1);
+        await pressInPalette(" ");
+        await s.frame("dark", { shell: ".palette" }, 1_100);
+
         await closePalette();
+        win.setVariant("obsidian");
+        win.setColorMode("dark");
         await win.runCommand("devtools.toggle");
         await wait(SETTLE_MS);
         s.end();
@@ -1526,8 +1670,8 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
           height: WINDOW_HEIGHT,
           backend,
           pageUrl,
-          showcaseUrl,
-          showcaseUp,
+          demoUrl,
+          demoUp,
           scenes,
           warnings,
         },
@@ -1539,7 +1683,7 @@ export async function runScreenshots(primary: AppWindow): Promise<void> {
       `SCENES ${JSON.stringify({
         dir: framesRoot,
         pageUrl,
-        showcaseUp,
+        demoUp,
         scenes: scenes.map((scene) => ({ name: scene.name, frames: scene.frames.length })),
         warnings,
       })}\n`,

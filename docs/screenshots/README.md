@@ -13,8 +13,9 @@ directory. It runs against a throwaway `userData` directory seeded with a fixed
 1440×900 window, sample history, and a few installed extensions, so it never
 touches real state, and every run produces the same frame.
 
-Page-backed shots use a small in-process stub page until a real dev server is
-supplied. Point the run at a running app to use it instead:
+Page-backed shots use the test card at `http://localhost:3000/` when it is
+running. Otherwise they fall back to a small in-process stub page. Point the run
+at another app to use it instead:
 
 ```sh
 TLACHIALONI_SCREENSHOTS_URL=http://localhost:3000 pnpm screenshots
@@ -58,12 +59,13 @@ renders them near ~830 px wide).
 Page-backed scenes run on `localhost:3000` rather than an ephemeral port, so a
 typed target and the recents group read the way they do on a real machine. When a
 dev server already owns that port it is used as the page; otherwise the stub is
-served there instead. The `themed-devtools` scene needs the real showcase — it
+served there instead. The `themed-devtools` scene needs the real test card — it
 loads `TLACHIALONI_SCREENSHOTS_SHOWCASE_URL` (default
-`http://localhost:3000/en/reactivity/reactive`) with the palette and the DevTools
-panel both open — and is skipped with a warning in the manifest when that URL does
-not answer, so a missing server can never produce a silently wrong GIF. Capture a
-single scene while iterating with `TLACHIALONI_SCREENSHOTS_SCENES=palette,strip`.
+`http://localhost:3000/`, the `pnpm test-card` server) with the palette and the
+DevTools panel both open — and is skipped with a warning in the manifest when that
+URL does not answer, so a missing server can never produce a silently wrong GIF.
+Capture a single scene while iterating with
+`TLACHIALONI_SCREENSHOTS_SCENES=palette,strip`.
 
 ## The shorthand
 
@@ -96,7 +98,7 @@ TLACHIALONI_SCREENSHOTS_CAPTURE=contents pnpm screenshots  # composited fallback
 Committed images are capped to 1440px on the long edge and normalised to sRGB, and
 DevTools and the guest page are captured with the dark color scheme pinned so the
 set is consistent. Each state is checked to be on screen before it is captured, and
-for the element-picker shot a small control is found at runtime, since a fixed point
+for the element-picker shots targets are found at runtime, since a fixed point
 tends to land on the body.
 
 ## States
@@ -124,14 +126,14 @@ tends to land on the body.
 | `26-status-done`                           | Install status: done                                        |
 | `27-status-error`                          | Install status: error                                       |
 | `28-status-warning`                        | MV3 service-worker warning, which waits to be dismissed     |
-| `29-page-loaded`                           | A loaded page, edge-to-edge                                 |
+| `29-page-loaded`                           | The test card, edge-to-edge                                 |
 | `30-strip-dark`                            | Strip pinned, dark                                          |
 | `31-strip-light`                           | Strip pinned, light                                         |
 | `32-titlebar-mode`                         | Titlebar mode: the strip docked, the page laid out below it |
 | `33-devtools-bottom`                       | DevTools docked bottom                                      |
 | `34-devtools-right`                        | DevTools docked right                                       |
 | `35-devtools-left`                         | DevTools docked left                                        |
-| `36-picker-hover`                          | Element picker armed, hovering an element                   |
+| `36-picker-hover`                          | Element picker hovering the accent swatch                   |
 | `37-history-overlay-back`                  | Armed history swipe, Back                                   |
 | `38-history-overlay-forward`               | Armed history swipe, Forward                                |
 
@@ -146,15 +148,15 @@ frames it records become `docs/gifs/<name>.gif`:
 | `extensions`      | (Extensions)        | the store row on the blank window, then an install through every state      |
 | `palette`         | ⌘P, `Tab` / `⇧Tab`  | the palette opening, Tab cycling the groups, a target typed and committed   |
 | `location`        | ⌘L                  | the target editor: prefilled, recents grouped by origin, expanded, filtered |
-| `theme-picker`    | ⌘T                  | the Theme group, variants applied, the color mode switched dark and light   |
+| `theme-picker`    | ⌘T                  | the Theme group with the selection walking variants, then Light/Dark/System |
 | `light-mode`      | —                   | light mode with the palette open, then DevTools, then both at once          |
 | `strip`           | top-edge reveal, ⌘B | the strip hidden, then pinned, dark and light                               |
 | `titlebar`        | ⇧⌘F                 | the strip docked as a title bar, with the page laid out below it            |
 | `devtools`        | ⌘⌥J, ⌘1/2/3         | DevTools docked bottom, right, then left                                    |
-| `picker`          | ⌘⇧C                 | the element picker armed, its highlight on a control                        |
+| `picker`          | ⌘⇧C                 | the picker walking the heading, swatch, button, and card                    |
 | `reload`          | ⌘R, ⇧⌘R             | a page reloaded, sampled mid-flight                                         |
 | `history`         | ⌘← / ⌘→, swipe      | the armed edge overlay, both directions                                     |
-| `themed-devtools` | (theming)           | the showcase with the palette and DevTools open, the variants sweeping      |
+| `themed-devtools` | (theming)           | the test card with the palette and DevTools open, the variants sweeping     |
 
 `docs/gifs/tour.gif` is every scene in order. The strip's proximity reveal is
 frozen for a capture run — a cursor resting near the top edge would otherwise add
