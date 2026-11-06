@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.20](https://github.com/ackzell/tlachialoni/compare/v0.1.19...v0.1.20) (2026-11-06)
+
+### Features
+
+* **frames:** mark frames that fail to load inside the guest page ([baa5011](https://github.com/ackzell/tlachialoni/commit/baa50116e9ac2b52c0d51d09703fdfe5c1775d62))
+* **test-card:** add a frame status demo page ([6d38197](https://github.com/ackzell/tlachialoni/commit/6d38197a13f8f0a2a7f691ecfabb096ac8fee683))
+
 ## [0.1.19](https://github.com/ackzell/tlachialoni/compare/v0.1.18...v0.1.19) (2026-10-26)
 
 ### Features
