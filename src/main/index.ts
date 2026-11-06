@@ -262,6 +262,10 @@ function installMenu(manager: WindowManager): void {
           click: () => manager.focused()?.previewExtensionStatus(),
         },
         {
+          label: "Preview Frame Notice",
+          click: () => manager.focused()?.previewFrameNotice(),
+        },
+        {
           label: "Preview History Navigation",
           click: () => manager.focused()?.previewHistoryArm(),
         },

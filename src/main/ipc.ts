@@ -78,6 +78,10 @@ export function registerIpc(manager: WindowManager): void {
     resolve(event.sender)?.onPageViewport(payload);
   });
 
+  ipcMain.on("frame:missing", (event, payload: { urls?: string[] }) => {
+    resolve(event.sender)?.onFrameMissing(payload?.urls ?? []);
+  });
+
   ipcMain.on("picker:picked", (event, payload: { x: number; y: number }) => {
     resolve(event.sender)?.pickerPick(payload.x, payload.y);
   });

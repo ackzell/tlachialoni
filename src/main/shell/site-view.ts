@@ -1,6 +1,16 @@
 import { WebContentsView, shell } from "electron";
 import path from "node:path";
 import { isAllowedUrl, isLocalHostname } from "../nav/policy";
+import {
+  failureReason,
+  framedUrlInConsole,
+  frameFailureReason,
+  framingPolicyInConsole,
+  isIgnorableFailure,
+  isResponseBlocked,
+  type FramingPolicy,
+} from "@shared/failure";
+import type { FrameFailure } from "@shared/frame-notice";
 
 export interface SiteViewEvents {
   onLoading: (loading: boolean) => void;
@@ -9,6 +19,8 @@ export interface SiteViewEvents {
   onReady: (url: string) => void;
   onNavigated: (url: string) => void;
   onFailed: (url: string, reason: string) => void;
+  /** A frame inside the page failed to load its own document (specs/028). */
+  onFrameFailed: (failure: FrameFailure) => void;
   onTitle: (title: string) => void;
 }
 
@@ -25,21 +37,11 @@ function openExternal(rawUrl: string): void {
   }
 }
 
-/** Maps Chromium net error codes to a short human-readable reason. */
-function failureReason(errorCode: number, errorDescription: string): string {
-  switch (errorCode) {
-    case -102:
-      return "Connection refused";
-    case -105:
-      return "Name could not be resolved";
-    case -106:
-      return "The network is offline";
-    case -118:
-      return "The connection timed out";
-    default:
-      return errorDescription || `Load failed (${errorCode})`;
-  }
-}
+/** How long to wait for the console line that names a framing policy. */
+const FRAME_POLICY_GRACE_MS = 150;
+
+/** A bounded policy memo; a page cannot grow it without bound. */
+const MAX_TRACKED_FRAMES = 32;
 
 /**
  * Creates the guest view. It is sandboxed with context isolation and no Node
@@ -60,6 +62,55 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
 
   const wc = view.webContents;
   let failedUrl: string | null = null;
+
+  /**
+   * The framing policy that refused each address. Chromium is inconsistent about
+   * which address a refusal names: a cross-origin frame is quoted, a same-origin
+   * one names the ancestor. So both are recorded, one keyed by the quoted
+   * address and one by the frame that reported it, and a policy is only used
+   * when one of them matches the failed frame (specs/028).
+   */
+  const policyByQuotedUrl = new Map<string, FramingPolicy>();
+  const policyByFrameUrl = new Map<string, FramingPolicy>();
+
+  const remember = (map: Map<string, FramingPolicy>, key: string, policy: FramingPolicy) => {
+    if (map.size >= MAX_TRACKED_FRAMES && !map.has(key)) {
+      const oldest = map.keys().next();
+      if (!oldest.done) map.delete(oldest.value);
+    }
+    map.set(key, policy);
+  };
+
+  const rememberPolicy = (message: string, frameUrl: string | undefined): void => {
+    const policy = framingPolicyInConsole(message);
+    if (!policy) return;
+    const quoted = framedUrlInConsole(message);
+    if (quoted) remember(policyByQuotedUrl, quoted, policy);
+    if (frameUrl) remember(policyByFrameUrl, frameUrl, policy);
+  };
+
+  /**
+   * The policy that refused this address. Only a response block can be a framing
+   * refusal, so another failure never borrows a policy from a different frame.
+   * When neither map knows the frame, no family is named rather than guessing.
+   */
+  const policyFor = (url: string, errorCode: number): FramingPolicy | null => {
+    if (!isResponseBlocked(errorCode)) return null;
+    return policyByFrameUrl.get(url) ?? policyByQuotedUrl.get(url) ?? null;
+  };
+
+  const reportFrameFailure = (
+    url: string,
+    errorCode: number,
+    errorDescription: string,
+    policy: FramingPolicy | null,
+  ): void => {
+    events.onFrameFailed({
+      url,
+      reason: frameFailureReason(errorCode, errorDescription, policy),
+      policy,
+    });
+  };
 
   wc.setWindowOpenHandler(({ url }) => {
     openExternal(url);
@@ -88,6 +139,10 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
     // In-page routes are not document loads; the shell should not treat them as
     // reloads or navigations (specs/025).
     if (!details.isMainFrame || details.isSameDocument) return;
+    // A policy memo belongs to one page load; carrying it over would mislabel a
+    // frame on the next page that failed for a different reason.
+    policyByQuotedUrl.clear();
+    policyByFrameUrl.clear();
     events.onNavigateStart(details.url);
   });
 
@@ -106,10 +161,38 @@ export function createSiteView(events: SiteViewEvents): WebContentsView {
   });
 
   wc.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    // Ignore aborts (normal cancels/redirects) and subframe failures.
-    if (!isMainFrame || errorCode === -3 || errorCode === 0) return;
-    failedUrl = validatedURL;
-    events.onFailed(validatedURL, failureReason(errorCode, errorDescription));
+    // Ignore aborts (normal cancels/redirects) and code 0.
+    if (isIgnorableFailure(errorCode)) return;
+
+    if (isMainFrame) {
+      failedUrl = validatedURL;
+      events.onFailed(validatedURL, failureReason(errorCode, errorDescription));
+      return;
+    }
+
+    // A frame inside the page failed. Chromium paints nothing for a refused
+    // frame, so the shell reports it (specs/028). The console line naming the
+    // policy arrives first, but only just: when it has not landed yet, give it
+    // a tick before reporting without the policy family.
+    const known = policyFor(validatedURL, errorCode);
+    if (known || !isResponseBlocked(errorCode)) {
+      reportFrameFailure(validatedURL, errorCode, errorDescription, known);
+      return;
+    }
+    setTimeout(() => {
+      if (wc.isDestroyed()) return;
+      reportFrameFailure(
+        validatedURL,
+        errorCode,
+        errorDescription,
+        policyFor(validatedURL, errorCode),
+      );
+    }, FRAME_POLICY_GRACE_MS);
+  });
+
+  wc.on("console-message", (event) => {
+    const params = event as { message?: string; frame?: { url?: string } };
+    if (params.message) rememberPolicy(params.message, params.frame?.url);
   });
 
   wc.on("page-title-updated", (_event, title) => events.onTitle(title));

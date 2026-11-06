@@ -1,4 +1,6 @@
 import { ipcRenderer } from "electron";
+import type { FrameNoticeUpdate } from "@shared/frame-notice";
+import { applyFrameMarkers, refreshFrameMarkers } from "./frame-marker";
 import { observePageScrollEdge } from "./scroll-edge";
 
 /**
@@ -113,3 +115,35 @@ function reportPageViewport(): void {
 window.addEventListener("resize", reportPageViewport, { passive: true });
 window.addEventListener("load", reportPageViewport);
 document.addEventListener("DOMContentLoaded", reportPageViewport);
+
+/**
+ * Frame markers (specs/028). Main names the frames that failed and the theme to
+ * draw them in; the page draws the boxes itself, in a closed shadow root, so they
+ * move in the same layout pass as the frame they cover. Nothing here reads across
+ * processes to find a rectangle.
+ *
+ * The page is watched for DOM changes while a marker is up: a script that swaps or
+ * removes the iframe takes its marker with it, and the page is the only one that
+ * can see that happen.
+ */
+let frameObserver: MutationObserver | null = null;
+
+function watchFrameDom(watching: boolean): void {
+  if (watching && !frameObserver) {
+    frameObserver = new MutationObserver(() => refreshFrameMarkers());
+    frameObserver.observe(document.documentElement, { childList: true, subtree: true });
+    return;
+  }
+  if (!watching) {
+    frameObserver?.disconnect();
+    frameObserver = null;
+  }
+}
+
+ipcRenderer.on("frame:markers", (_event, update: FrameNoticeUpdate) => {
+  const next = update ?? { markers: [], style: null };
+  applyFrameMarkers(next);
+  watchFrameDom((next.markers?.length ?? 0) > 0);
+});
+
+window.addEventListener("beforeunload", () => watchFrameDom(false));

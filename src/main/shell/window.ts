@@ -30,6 +30,13 @@ import {
 import { TLAPALLI_TOKENS } from "@shared/theme-tokens";
 import { isHistoryArmedVisible, type HistoryArmed } from "@shared/history";
 import { isReloadNavigation, rimKindFor, type ReloadKind } from "@shared/reload";
+import {
+  addFrameMarker,
+  dropFrameMarkers,
+  type FrameFailure,
+  type FrameMarker,
+  type FrameNoticeStyle,
+} from "@shared/frame-notice";
 import { createSiteView } from "./site-view";
 import { createShellView } from "./shell-view";
 import { framesEqual } from "./geometry";
@@ -159,8 +166,10 @@ export class AppWindow implements SwipeWindow {
   private buttonsVisible = false;
   private extensionStatus: ExtensionStatus | null = null;
   private statusDemoTimer: NodeJS.Timeout | null = null;
+  /** One marker per frame inside the page that failed to load (specs/028). */
+  private frameMarkers: FrameMarker[] = [];
   /** Dev-only: a transient shell surface being previewed (see specs/008). */
-  private devPreview: "loading" | "failure" | "history" | "reload" | null = null;
+  private devPreview: "loading" | "failure" | "history" | "reload" | "frame" | null = null;
   /** TEMPORARY: the specs/015 M0 spike probe; absent unless debugging is on. */
   private gestureProbe: GestureProbeHandle | null = null;
   /** The live armed signal driving the edge overlay (specs/015). */
@@ -237,6 +246,7 @@ export class AppWindow implements SwipeWindow {
       onReady: (url) => this.handleReady(url),
       onNavigated: (url) => this.handleNavigated(url),
       onFailed: (url, reason) => this.handleFailed(url, reason),
+      onFrameFailed: (failure) => this.handleFrameFailed(failure),
       onTitle: (title) => {
         if (this.win.isDestroyed()) return;
         this.win.setTitle(title ? `${title} — Tlachialoni` : "Tlachialoni");
@@ -781,6 +791,21 @@ export class AppWindow implements SwipeWindow {
     this.relayout();
   }
 
+  /** Dev-only: shows a marker card for a representative refused embed (specs/028). */
+  previewFrameNotice(): void {
+    this.enterDevPreview();
+    this.devPreview = "frame";
+    this.frameMarkers = [
+      {
+        url: "https://example.dev/playground",
+        reason: "Blocked by the framed site's Content-Security-Policy frame-ancestors directive",
+        policy: "frame-ancestors",
+        preview: true,
+      },
+    ];
+    this.pushFrameMarkers();
+  }
+
   /** Dev-only: starts the looping extension install status. */
   previewExtensionStatus(): void {
     this.enterDevPreview();
@@ -816,6 +841,7 @@ export class AppWindow implements SwipeWindow {
     this.exitDevPreview();
     this.clearStatusDemo();
     this.dismissExtensionStatus();
+    this.dismissFrameMarkers();
     this.clearHistoryPreview();
     this.relayout(true);
   }
@@ -825,6 +851,7 @@ export class AppWindow implements SwipeWindow {
     this.exitDevPreview();
     this.clearStatusDemo();
     this.dismissExtensionStatus();
+    this.dismissFrameMarkers();
     this.clearHistoryPreview();
   }
 
@@ -843,6 +870,9 @@ export class AppWindow implements SwipeWindow {
     } else if (preview === "reload") {
       this.reloading = null;
       this.sendToShell("viewport:reloading", null);
+    } else if (preview === "frame") {
+      this.frameMarkers = [];
+      this.pushFrameMarkers();
     } else {
       // The history preview never overrode a viewport signal; just drop the arm.
       this.clearHistoryPreview();
@@ -1263,6 +1293,10 @@ export class AppWindow implements SwipeWindow {
     const pending = this.pendingReloadKind;
     this.pendingReloadKind = null;
 
+    // A new page load owns its own frames; a report from the last page must not
+    // survive into it (FR-013).
+    this.dismissFrameMarkers();
+
     if (this.showLoading || this.failed || this.shownUrl === null) {
       this.setReloading(null);
       return;
@@ -1338,6 +1372,8 @@ export class AppWindow implements SwipeWindow {
     }
     this.reportLoading(false);
     this.sendToShell("viewport:ready", { url });
+    // A frame marker held back by the veil belongs to this page; show it now.
+    if (this.frameMarkers.length > 0) this.pushFrameMarkers();
     this.broadcastState();
     this.reportHistoryAvailability();
     // The veil's fade-out happens in the renderer; hold the collapse for it.
@@ -1374,6 +1410,7 @@ export class AppWindow implements SwipeWindow {
     this.showLoading = false;
     this.failed = true;
     this.failedUrl = url;
+    this.dismissFrameMarkers();
     this.closePalette();
     this.relayout();
     // Offer a way back only when we actually have a different working target.
@@ -1386,6 +1423,64 @@ export class AppWindow implements SwipeWindow {
     const previous = this.currentUrl;
     if (!this.failedUrl || !previous || sameUrl(previous, this.failedUrl)) return;
     this.loadTarget(previous);
+  }
+
+  /**
+   * Reports a frame inside the page that failed to load (specs/028). The page
+   * draws the marker itself, so main only names the failure and the theme.
+   */
+  private handleFrameFailed(failure: FrameFailure): void {
+    // The failure page already reports the page itself, which is the more
+    // important signal (FR-015).
+    if (this.failed) return;
+    const next = addFrameMarker(this.frameMarkers, failure);
+    if (next === this.frameMarkers) return;
+    this.frameMarkers = next;
+    // While the veil is up it owns the window. The markers are held and shown
+    // when the page is ready, so a cold start still reports instead of dropping.
+    if (this.showLoading) return;
+    this.pushFrameMarkers();
+  }
+
+  /** Hands the marker set and its theme to the page that draws it. */
+  private pushFrameMarkers(): void {
+    if (this.siteView.webContents.isDestroyed()) return;
+    this.siteView.webContents.send("frame:markers", {
+      markers: this.frameMarkers,
+      style: this.frameNoticeStyle(),
+    });
+  }
+
+  /** The theme values the page's marker needs (constitution II exception). */
+  private frameNoticeStyle(): FrameNoticeStyle {
+    const tokens = TLAPALLI_TOKENS[this.activeVariant()] ?? TLAPALLI_TOKENS.obsidian;
+    const mode = tokens[this.resolvedMode()];
+    return {
+      background: mode["--tb-bg"],
+      foreground: mode["--tb-fg"],
+      muted: mode["--tb-fg-muted"],
+      accent: mode["--tb-accent"],
+      border: mode["--tb-border"],
+    };
+  }
+
+  /**
+   * The page reports a marker whose iframe left the page or stopped pointing at
+   * the failed address. Only the page can see that, so it is the one that says.
+   */
+  onFrameMissing(urls: string[]): void {
+    if (urls.length === 0) return;
+    const next = dropFrameMarkers(this.frameMarkers, urls);
+    if (next === this.frameMarkers) return;
+    this.frameMarkers = next;
+    this.pushFrameMarkers();
+  }
+
+  /** Clears the frame markers. */
+  dismissFrameMarkers(): void {
+    if (this.frameMarkers.length === 0) return;
+    this.frameMarkers = [];
+    this.pushFrameMarkers();
   }
 
   private setLoading(loading: boolean): void {
@@ -1535,6 +1630,8 @@ export class AppWindow implements SwipeWindow {
       colorMode: this.record()?.colorMode ?? "system",
       resolved: this.resolvedMode(),
     });
+    // The marker lives in the page now, so it needs the same colours pushed to it.
+    if (this.frameMarkers.length > 0) this.pushFrameMarkers();
     // The docked DevTools follow this window's variant too.
     this.devtools.refreshTheme();
   }
