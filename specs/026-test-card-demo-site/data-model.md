@@ -94,26 +94,26 @@ tests stay in the repository's node-side Vitest environment.
 
 ## Entity: Demo Page
 
-One of three linked pages, plus the fallback.
+One of four linked pages, plus the fallback.
 
-| Field | Type | Page 01 | Page 02 | Page 03 |
-|-------|------|---------|---------|---------|
-| `id` | `"one" \| "two" \| "three" \| "not-found"` | `one` | `two` | `three` |
-| `path` | string | `/` | `/grid` | `/notes` |
-| `documentTitle` | string | `01 Signal · Test Card` | `02 Grid · Test Card` | `03 Notes · Test Card` |
-| `navLabel` | string | `01 Signal` | `02 Grid` | `03 Notes` |
-| `number` | string | `01` | `02` | `03` |
-| `name` | string | `Signal` | `Grid` | `Notes` |
-| `specimen` | `"bars" \| "grid" \| "lines"` | `bars` | `grid` | `lines` |
-| `copyKey` | `"pageOne" \| "pageTwo" \| "pageThree"` | `pageOne` | `pageTwo` | `pageThree` |
+| Field | Type | Page 01 | Page 02 | Page 03 | Page 04 |
+|-------|------|---------|---------|---------|---------|
+| `id` | `"one" \| "two" \| "three" \| "four" \| "not-found"` | `one` | `two` | `three` | `four` |
+| `path` | string | `/` | `/grid` | `/notes` | `/frames` |
+| `documentTitle` | string | `01 Signal · Test Card` | `02 Grid · Test Card` | `03 Notes · Test Card` | `04 Frames · Test Card` |
+| `navLabel` | string | `01 Signal` | `02 Grid` | `03 Notes` | `04 Frames` |
+| `number` | string | `01` | `02` | `03` | `04` |
+| `name` | string | `Signal` | `Grid` | `Notes` | `Frames` |
+| `specimen` | `"bars" \| "grid" \| "lines" \| "frames"` | `bars` | `grid` | `lines` | `frames` |
+| `copyKey` | `"pageOne" \| "pageTwo" \| "pageThree" \| "pageFour"` | `pageOne` | `pageTwo` | `pageThree` | `pageFour` |
 
 **Validation rules**:
 - Paths, document titles, nav labels, and page names are unique.
-- Every demo page links to the other two demo pages and marks the current one.
+- Every demo page links to the other demo pages and marks the current one.
 - Every demo page renders the same four landmarks and the same load proof.
 - The fallback has its own title (`Lost · Test Card`) and a link to `/`; it is not
   a recording page and does not need the four landmarks.
-- A direct load of `/grid` or `/notes` is served by Vite's SPA fallback.
+- A direct load of `/grid`, `/notes`, or `/frames` is served by Vite's SPA fallback.
 
 ---
 

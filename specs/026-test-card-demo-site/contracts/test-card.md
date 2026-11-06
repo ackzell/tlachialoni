@@ -19,9 +19,10 @@ main-process, IPC, command, or persisted-state interface.
 | Setup | `pnpm install` once, then the one command |
 | Live updates | Saving a source file updates the page through Vite HMR; no restart, rebuild, or manual refresh |
 | Offline | Works with no internet after dependencies are installed; no external request is made at runtime |
-| Direct routes | `/grid` and `/notes` load the SPA through Vite's fallback |
+| Direct routes | `/grid`, `/notes`, and `/frames` load the SPA through Vite's fallback |
 | Unknown path | Renders the local NotFound view, not a server error page |
 | Public asset | `/probe.json` is served from `examples/test-card/public/probe.json` |
+| Frame demo endpoints | `/frames/refused` (CSP `frame-ancestors 'none'`), `/frames/xfo` (`X-Frame-Options: DENY`), and `/frames/live` (framable) are served by the demo's Vite config, before the SPA fallback |
 | Favicon | Declared as an inline data URI, so no favicon request or 404 appears |
 | Packaging | The example is not included in the packaged Tlachialoni artifact |
 
@@ -36,10 +37,11 @@ No environment variable, account, service, or second install step is required.
 | `/` | Card 01 | `01 Signal · Test Card` | `01 / SIGNAL` |
 | `/grid` | Card 02 | `02 Grid · Test Card` | `02 / GRID` |
 | `/notes` | Card 03 | `03 Notes · Test Card` | `03 / NOTES` |
+| `/frames` | Card 04 | `04 Frames · Test Card` | `04 / FRAMES` |
 | any other path | NotFound | `Lost · Test Card` | `LOST` |
 
 **Rules**:
-- A shared header links all three pages with large labels and marks the current
+- A shared header links every demo page with large labels and marks the current
   page with `aria-current="page"`.
 - Every demo page links to the other two demo pages; no demo page is a dead end.
 - `router.afterEach` sets `document.title` from route metadata, so each route has
@@ -49,7 +51,7 @@ No environment variable, account, service, or second install step is required.
 - Back and forward use browser history and show the destination page. They do not
   increment the load count because the document is not reloaded.
 - A direct load of any route starts the app at that route.
-- The three pages are inside one document and one Tlachialoni target. No route
+- The demo pages are inside one document and one Tlachialoni target. No route
   opens a new window, tab, or external site.
 
 ---
@@ -78,7 +80,7 @@ the three edit points and says that saving updates the page in place.
   stay the same.
 - The HMR boundary self-accepts and merges the new values into the live reactive
   object. It does not restart the app.
-- A change applies to all three pages. The next page visited uses the new value.
+- A change applies to every demo page. The next page visited uses the new value.
 - An empty or invalid value falls back rather than blanking the page: a finite
   hue wraps into 0–359, an empty headline uses the default, an unknown layout
   uses `split`, and empty copy uses the default string.
@@ -170,7 +172,7 @@ component setup, route hook, or HMR handler.
 | 4 | Status card | `<article>` with a heading | "Status card" | "Status card" |
 
 **Rules**:
-- The page's four landmarks appear on all three demo pages, in this order. The
+- The page's four landmarks appear on every demo page, in this order. The
   NotFound fallback is not a recording page and only needs its link home.
 - The page identity in the header is not a heading element. The `h1` inside the
   landmark panel is the sole heading target, so the picker has one unambiguous

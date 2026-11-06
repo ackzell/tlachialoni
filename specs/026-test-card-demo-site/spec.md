@@ -84,8 +84,8 @@ The site has three linked pages with unique titles and visibly different content
 **Acceptance Scenarios**:
 
 1. **Given** the first page, **When** the maintainer looks for navigation, **Then** two large, clearly labeled links lead to the other pages.
-2. **Given** any of the three pages, **When** it loads, **Then** a large page identifier and at least one distinct content block make the page recognizable in a still frame at 760 px.
-3. **Given** the maintainer has visited all three pages, **When** they move back and forward, **Then** each move shows a different page after the load settles.
+2. **Given** any demo page, **When** it loads, **Then** a large page identifier and at least one distinct content block make the page recognizable in a still frame at 760 px.
+3. **Given** the maintainer has visited every demo page, **When** they move back and forward, **Then** each move shows a different page after the load settles.
 4. **Given** the history direction overlay is armed, **When** the maintainer moves back or forward, **Then** the overlay points the matching direction and the destination page is obvious from its own identity.
 5. **Given** any page, **When** the maintainer follows every visible link, **Then** no link reaches a dead end.
 
@@ -218,13 +218,15 @@ The page uses a neutral, mostly monochrome palette with at most one editable acc
 **Pages and history**
 
 - **FR-023**: The site MUST have at least three pages. Each page MUST have a unique browser title and a unique large page identifier.
-- **FR-024**: Every demo page MUST link to the other two demo pages with large, readable labels. No demo page MUST be a dead end.
+- **FR-024**: Every demo page MUST link to the other demo pages with large, readable labels. No demo page MUST be a dead end.
 - **FR-025**: Each page MUST contain content that is visibly different from the other two, so page identity survives a still frame at 760 px.
 - **FR-026**: Page changes MUST be local and fast. The site MUST NOT show loading spinners or progress indicators.
 - **FR-027**: Back and forward MUST move between visited pages and MUST keep the current recording values.
 - **FR-028**: Each page MUST have a unique browser title and route, so back and forward moves are unambiguous.
 - **FR-029**: A full page load MUST increase the load count. A back or forward restore that does not reload the page MUST NOT increase it.
 - **FR-030**: An unknown local path MUST show a plain local fallback with a link to the first page. It MUST NOT show a server error page.
+- **FR-058**: One page MUST embed frames that cannot load, so the frame status surface (specs/028) can be checked with no network: one frame refused by `frame-ancestors`, one refused by `X-Frame-Options`, one pointing at a closed port, and one that loads as a control.
+- **FR-059**: The frame demo endpoints MUST be served by the demo's own server, so the check needs no second process and no internet.
 
 **Reload proof**
 
@@ -322,7 +324,7 @@ The page uses a neutral, mostly monochrome palette with at most one editable acc
 ## Out of Scope
 
 - Real application features, data, authentication, or form submission.
-- Routing beyond the three demo pages and a simple unknown-path fallback.
+- Routing beyond the demo pages and a simple unknown-path fallback.
 - Analytics, deployment, hosting, or CI changes.
 - Automated clip generation, checked-in media regeneration, and portfolio-site changes.
 - Theme switching inside the page.

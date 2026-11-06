@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
+import CardFour from "./views/CardFour.vue";
 import CardOne from "./views/CardOne.vue";
 import CardThree from "./views/CardThree.vue";
 import CardTwo from "./views/CardTwo.vue";
@@ -22,6 +23,12 @@ const routes: RouteRecordRaw[] = [
     name: "three",
     component: CardThree,
     meta: { title: "03 Notes · Test Card" },
+  },
+  {
+    path: "/frames",
+    name: "four",
+    component: CardFour,
+    meta: { title: "04 Frames · Test Card" },
   },
   {
     path: "/:pathMatch(.*)*",

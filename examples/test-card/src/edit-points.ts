@@ -12,7 +12,7 @@
 import { computed, reactive } from "vue";
 
 export type CardLayout = "split" | "stacked";
-export type PageId = "one" | "two" | "three";
+export type PageId = "one" | "two" | "three" | "four";
 
 export interface PageCopy {
   navLabel: string;
@@ -84,6 +84,13 @@ export const defaultEditPoints: EditPoints = {
         summary: "A measured grid that holds still. Placeholder copy.",
         specimenLabel: "MEASURED GRID",
       },
+      four: {
+        navLabel: "04 Frames",
+        number: "04",
+        name: "Frames",
+        summary: "Embedded pages, and what a refused one looks like. Placeholder copy.",
+        specimenLabel: "FRAME FIELD",
+      },
       three: {
         navLabel: "03 Notes",
         number: "03",
@@ -109,6 +116,7 @@ function cloneEditPoints(points: EditPoints): EditPoints {
         one: { ...points.copy.pages.one },
         two: { ...points.copy.pages.two },
         three: { ...points.copy.pages.three },
+        four: { ...points.copy.pages.four },
       },
     },
   };
@@ -158,6 +166,7 @@ function normalizeCopy(value: DeepPartial<TestCardCopy> | undefined): TestCardCo
       one: normalizePage(value?.pages?.one, fallback.pages.one),
       two: normalizePage(value?.pages?.two, fallback.pages.two),
       three: normalizePage(value?.pages?.three, fallback.pages.three),
+      four: normalizePage(value?.pages?.four, fallback.pages.four),
     },
     notFoundTitle: normalizeText(value?.notFoundTitle, fallback.notFoundTitle),
     notFoundBody: normalizeText(value?.notFoundBody, fallback.notFoundBody),

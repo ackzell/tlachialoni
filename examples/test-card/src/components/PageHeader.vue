@@ -26,6 +26,9 @@ const points = normalizedEditPoints;
       <RouterLink class="masthead__link" to="/notes">
         {{ points.copy.pages.three.navLabel }}
       </RouterLink>
+      <RouterLink class="masthead__link" to="/frames">
+        {{ points.copy.pages.four.navLabel }}
+      </RouterLink>
     </nav>
 
     <LoadProof :load-proof="loadProof" />
