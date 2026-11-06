@@ -141,6 +141,28 @@ injected when a page loads, so an extension activated afterwards never reaches t
 page already open. Reload the page, then re-select the extension's DevTools panel
 — it stops looking for the application after about ten seconds.
 
+## Failed frames
+
+A page can embed a frame that refuses to load. Chromium then paints nothing
+useful inside it — no error page, just an opaque white canvas — so a refused
+embed looks like a white hole punched in the page. Tlachialoni marks it: the
+frame's own rectangle is filled with the window's base surface, so the place
+reads as empty down to the bottom of the window, and the address and reason sit
+inside it. When the browser reports which policy refused the frame, the reason
+names it (`Content-Security-Policy: frame-ancestors` or `X-Frame-Options`);
+otherwise it says the response headers blocked the frame. Connection refused, an
+unresolvable name, an offline network, and a timeout use the same wording as the
+main-frame failure view.
+
+Each failed frame gets its own marker, and the marker is drawn inside the page, so
+it moves in the same layout pass as the frame: no trail when you scroll, zoom, or
+drag the window edge. Chrome and Firefox put their own error document in a blocked
+frame slot; Electron has no such hook, so the box is the closest equivalent. It
+is one transient node in a closed shadow root, it cannot take input, and it is
+removed when its iframe leaves the page or is repointed, or when the page
+navigates. It cannot be dismissed, because removing it would bring the white
+canvas back. The page's own main-frame failure still uses the full failure view.
+
 ## Requirements
 
 - macOS 13+ (Apple silicon)
@@ -192,12 +214,14 @@ To start over, delete `~/Library/Application Support/Tlachialoni Dev`.
 
 The transient shell surfaces are hard to trigger on demand (a slow server for
 the loading veil, a dead one for the failure view, a real download for the
-install status). In a dev build, the **Developer** menu puts each one into a
-representative state and holds it there so you can style it with live HMR:
+install status, a site that refuses to be framed). In a dev build, the
+**Developer** menu puts each one into a representative state and holds it there
+so you can style it with live HMR:
 
 - **Preview Loading Veil**
 - **Preview Failure View**
 - **Preview Extension Install** (loops every phase, including progress)
+- **Preview Frame Notice** (a frame refused by its own response headers)
 - **Preview History Navigation** (alternates the armed edge overlay)
 - **Stop Preview**
 
@@ -343,6 +367,8 @@ See:
   extensions that need it, so most run as authored
 - `specs/022-devtools-theme/spec.md` — repainting the docked DevTools from the window's
   Tlapalli variant
+- `specs/028-frame-load-status/spec.md` — reporting frames inside the page that
+  could not load
 
 ## License
 

@@ -31,12 +31,15 @@ bar exists only because the developer explicitly asked for it.
 
 The developer's site (the guest page) renders in an isolated, sandboxed context
 with no privileged runtime access. The shell MUST NOT persistently modify the
-guest page's DOM, styles, or scripts. Two exceptions are sanctioned, both
+guest page's DOM, styles, or scripts. Three exceptions are sanctioned, each
 explicit and never implicit: the armed element picker's transient overlay, which
-MUST be removed on selection, cancel, or navigation; and extensions the
-developer chooses to install, which MAY modify the page by their own design.
-Extensions are loaded only into the guest page's session and are never bundled,
-pre-installed, or injected by the tool itself.
+MUST be removed on selection, cancel, or navigation; the frame-failure marker,
+one transient host node in a closed shadow root while a frame inside the page is
+marked, which MUST be removed when that frame recovers or leaves, when the page
+navigates, or when the marker is cleared; and extensions the developer chooses to
+install, which MAY modify the page by their own design. Extensions are loaded only
+into the guest page's session and are never bundled, pre-installed, or injected by
+the tool itself.
 
 Rationale: the tool inspects an application under development. Polluting that
 application with the tool's own code would corrupt the very thing being
@@ -45,7 +48,12 @@ deliberate exception: they are the developer's own tooling, chosen and auditable
 by them, and they belong to the inspected page rather than to the shell. The
 transient status readouts (zoom level and viewport size) are deliberately **not**
 an exception: they render in the shell overlay, positioned at the page's edge,
-so the page itself is left untouched.
+so the page itself is left untouched. The frame marker is the third exception for
+a narrower reason: a browser puts its own error document in a blocked frame slot,
+and Electron exposes no such capability, so the only way to report a broken frame
+in place — without trailing it by a round trip — is a box in the page's own
+document. It is bounded to one host node, it exists only while a frame is marked,
+and it renders nothing when no frame is broken.
 
 ### III. Keyboard-First Ergonomics
 
@@ -127,6 +135,9 @@ source keeps the small UI coherent without a design system of its own.
   inside the tool.
 - Transient picker injection MUST clean up on selection, cancel, or navigation;
   no residual listeners or elements may remain.
+- The frame marker MUST clean up on recovery, dismissal, or navigation; it injects
+  one host node in a closed shadow root and MUST leave no listeners or nodes
+  behind.
 - Extensions MUST load only into the guest page's session; the shell MUST remain
   outside every extension's reach (FR-028 of `specs/007-extension-support/`).
 - Extensions are installed only by explicit developer action. The tool MUST NOT
@@ -186,4 +197,4 @@ it is now proven, so shipping is part of the product.
   Complexity or scope must be justified against Principle V (One Target Per
   Window); proposals that violate a principle require an amendment first.
 
-**Version**: 2.2.8 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-26
+**Version**: 2.3.0 | **Ratified**: 2026-09-25 | **Last Amended**: 2026-10-27
