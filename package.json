@@ -42,24 +42,24 @@
     "check:fix": "vp check --fix"
   },
   "dependencies": {
-    "@fontsource-variable/source-code-pro": "^5.3.0",
+    "@fontsource-variable/source-code-pro": "^5.3.1",
     "@vueuse/core": "^15.0.0",
     "fflate": "^0.8.3",
-    "vue": "^3.5.43",
+    "vue": "^3.5.45",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
-    "@vitejs/plugin-vue": "^6.0.9",
-    "commit-and-tag-version": "^13.2.1",
-    "electron": "^44.5.1",
-    "electron-builder": "^26.15.3",
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "commit-and-tag-version": "^13.3.0",
+    "electron": "^44.11.0",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6",
+    "vite": "^7.3.8",
     "vite-plus": "^1.0.0-rc.0",
-    "vitest": "^5.0.2",
-    "vue-tsc": "^3.3.11"
+    "vitest": "^5.1.0",
+    "vue-tsc": "^3.3.14"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
