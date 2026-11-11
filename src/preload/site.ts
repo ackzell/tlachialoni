@@ -9,6 +9,15 @@ import { observePageScrollEdge } from "./scroll-edge";
  * reports editable focus so the main process can defer ⌘←/⌘→ (FR-011).
  */
 
+/**
+ * Electron warns when a renderer allows eval without a Content-Security-Policy.
+ * A guest page is not this app: its policy belongs to the page's author, and a
+ * localhost dev server often needs eval. The warning would otherwise fill the
+ * docked DevTools console on every page. The shell renderer sets a real policy
+ * in `src/renderer/index.html`; this only silences the guest's warning.
+ */
+Object.assign(window, { ELECTRON_DISABLE_SECURITY_WARNINGS: true });
+
 let armed = false;
 let box: HTMLDivElement | null = null;
 
