@@ -146,6 +146,16 @@ function move(delta: number): void {
   selected.value = (selected.value + delta + count) % count;
 }
 
+/**
+ * Selects a row on hover, but only when the pointer really moved. List reflow
+ * after a keystroke, and a palette that opens under a resting cursor, fire
+ * without motion; those must not steal the keyboard selection.
+ */
+function hoverRow(index: number, event: MouseEvent): void {
+  if (event.movementX === 0 && event.movementY === 0) return;
+  selected.value = index;
+}
+
 function chooseScope(next: Scope): void {
   activeScope.value = next;
   void nextTick(() => input.value?.focus());
@@ -428,7 +438,7 @@ function onLeave(el: Element, done: () => void): void {
             :data-index="index"
             class="palette__row"
             :class="{ 'is-selected': index === selected, 'is-child': Boolean(row.depth) }"
-            @mouseenter="selected = index"
+            @mousemove="hoverRow(index, $event)"
             @click="activate(row)"
           >
             <span
