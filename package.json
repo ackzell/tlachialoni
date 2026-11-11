@@ -9,17 +9,17 @@
   },
   "main": "./out/main/index.js",
   "scripts": {
-    "predev": "node scripts/dev-identity.mjs",
+    "predev": "node scripts/ensure-electron.mjs && node scripts/dev-identity.mjs",
     "dev": "electron-vite dev",
-    "predev:inspect": "node scripts/dev-identity.mjs",
+    "predev:inspect": "node scripts/ensure-electron.mjs && node scripts/dev-identity.mjs",
     "dev:inspect": "TLACHIALONI_INSPECT_DEVTOOLS=1 electron-vite dev",
     "test-card": "vite --config examples/test-card/vite.config.ts",
-    "prepreview": "node scripts/dev-identity.mjs",
+    "prepreview": "node scripts/ensure-electron.mjs && node scripts/dev-identity.mjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "prescreenshots": "node scripts/dev-identity.mjs",
+    "prescreenshots": "node scripts/ensure-electron.mjs && node scripts/dev-identity.mjs",
     "screenshots": "electron-vite build && TLACHIALONI_SCREENSHOTS=1 TLACHIALONI_SCREENSHOTS_DEBUG=1 electron .",
-    "pregifs": "node scripts/dev-identity.mjs",
+    "pregifs": "node scripts/ensure-electron.mjs && node scripts/dev-identity.mjs",
     "gifs": "electron-vite build && TLACHIALONI_SCREENSHOTS=1 TLACHIALONI_SCREENSHOTS_MODE=scenes electron . && node scripts/build-gifs.mjs",
     "gifs:assemble": "node scripts/build-gifs.mjs",
     "package": "electron-vite build && electron-builder --mac --publish never",
@@ -30,13 +30,14 @@
     "tag": "commit-and-tag-version -- --no-verify",
     "tag:minor": "commit-and-tag-version --release-as minor -- --no-verify",
     "tag:major": "commit-and-tag-version --release-as major -- --no-verify",
-    "postinstall": "node node_modules/electron/install.js",
+    "postinstall": "node scripts/ensure-electron.mjs",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:preload": "tsc --noEmit -p tsconfig.preload.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck:example": "vue-tsc --noEmit -p examples/test-card/tsconfig.json",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:preload && pnpm run typecheck:web && pnpm run typecheck:example",
     "test": "vp test",
+    "preprobe:gesture": "node scripts/ensure-electron.mjs",
     "probe:gesture": "TLACHIALONI_GESTURE_DEBUG=1 electron-vite dev",
     "check": "vp check",
     "check:fix": "vp check --fix"
@@ -45,11 +46,10 @@
     "@fontsource-variable/source-code-pro": "^5.3.1",
     "@vueuse/core": "^15.0.0",
     "fflate": "^0.8.3",
-    "vue": "^3.5.45",
-    "vue-router": "^4.6.4"
+    "vue": "^3.5.45"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
+    "@types/node": "^24.19.2",
     "@vitejs/plugin-vue": "^6.0.10",
     "commit-and-tag-version": "^13.3.0",
     "electron": "^44.11.0",
@@ -59,12 +59,8 @@
     "vite": "^7.3.8",
     "vite-plus": "^1.6.0",
     "vitest": "^5.1.0",
+    "vue-router": "^4.6.4",
     "vue-tsc": "^3.3.14"
-  },
-  "allowScripts": {
-    "esbuild@0.25.12": true,
-    "esbuild@0.28.2": true,
-    "electron@44.4.5": true
   },
   "productName": "Tlachialoni"
 }

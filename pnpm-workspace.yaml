@@ -14,6 +14,9 @@ allowBuilds:
   # Selects the bundled 7-Zip arch. Only used by the Windows NSIS target, but
   # electron-builder lists it as a dependency either way.
   electron-winstaller: true
+# pnpm writes an exact-version entry here when an upgrade installs a package
+# that is newer than its minimum release age. Keep these entries: without them
+# the release-age check rejects the install. The list grows with each upgrade.
 minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-core@1.6.0"
   - "@voidzero-dev/vite-plus-darwin-arm64@1.6.0"
