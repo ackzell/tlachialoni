@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.21](https://github.com/ackzell/tlachialoni/compare/v0.1.20...v0.1.21) (2026-11-12)
+
+### Bug Fixes
+
+* **palette:** keep the keyboard selection when the pointer rests still ([9b1ba71](https://github.com/ackzell/tlachialoni/commit/9b1ba713eb60fae9a3cbcabc13871b4ac9a548e7))
+* **security:** add a shell CSP and silence the guest-page warning ([dd5e182](https://github.com/ackzell/tlachialoni/commit/dd5e182db1a903222247b855335b8b7a03c1f4b7))
+
 ## [0.1.20](https://github.com/ackzell/tlachialoni/compare/v0.1.19...v0.1.20) (2026-11-06)
 
 ### Features
