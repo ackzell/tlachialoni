@@ -21,6 +21,10 @@ import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-tes
 import { runScreenshots, seedScreenshotState } from "./screenshots";
 import { configureDevtoolsThemeOverride } from "./shell/devtools-theme-override";
 import { openDevtoolsInspector } from "./shell/devtools-inspector";
+import { installPerfHooks, mark } from "./perf";
+
+mark("module-load");
+installPerfHooks();
 
 /**
  * Dev-only: inspect the DevTools front-end itself (see devtools-inspector.ts).
@@ -303,6 +307,7 @@ function installMenu(manager: WindowManager): void {
  */
 async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }> {
   const store = new StateStore(path.join(app.getPath("userData"), "state.json"));
+  mark("store-read");
   const extensions = new ExtensionManager({
     store,
     session: session.defaultSession,
@@ -319,6 +324,7 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
 }
 
 app.whenReady().then(async () => {
+  mark("when-ready");
   configureAppIdentity();
   // Dev-only: the live DevTools palette override (repo-root JSON), so colour
   // edits land within a tick without a restart. No file → no override.

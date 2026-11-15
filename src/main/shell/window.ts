@@ -56,6 +56,7 @@ import {
   zoomPercent,
 } from "@shared/zoom";
 import { normalizeViewportSize, viewportSizeEquals, type ViewportSize } from "@shared/viewport";
+import { mark } from "../perf";
 
 /** How long main waits for the renderer settle ack before collapsing anyway. */
 const SHELL_SETTLE_TIMEOUT_MS = 500;
@@ -207,6 +208,8 @@ export class AppWindow implements SwipeWindow {
   private currentUrl: string;
   /** True once any target has been loaded, so the window stops reading as blank. */
   private targetEverLoaded = false;
+  /** Dev-only: true once this window's first site load has been marked. */
+  private siteReadyMarked = false;
   /**
    * The URL of the document actually committed to the view, or null before the
    * first paint. Unlike `currentUrl` it is never seeded from persisted state, so
@@ -1356,6 +1359,10 @@ export class AppWindow implements SwipeWindow {
   }
 
   private handleReady(url: string): void {
+    if (!this.siteReadyMarked) {
+      this.siteReadyMarked = true;
+      mark(`site-ready:${this.windowId}`);
+    }
     // Only a raised veil owes a renderer leave; without one there is nothing to
     // wait for before collapsing the shell.
     const veilWasUp = this.showLoading;
@@ -1682,6 +1689,7 @@ export class AppWindow implements SwipeWindow {
   markShellReady(): void {
     if (this.shellLoaded) return;
     this.shellLoaded = true;
+    mark(`shell-ready:${this.windowId}`);
     const queued = this.pendingShellMessages;
     this.pendingShellMessages = [];
     for (const [channel, payload] of queued) this.sendToShell(channel, payload);

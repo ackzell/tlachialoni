@@ -15,6 +15,7 @@ import type { CommandResult } from "./commands";
 import { AppWindow } from "./window";
 import { cascadeBounds, ensureVisibleBounds, type WorkArea } from "./geometry";
 import { buildDockMenuTemplate, type DockRecentEntry } from "./dock-menu";
+import { mark } from "../perf";
 
 function workAreas(): WorkArea[] {
   return screen.getAllDisplays().map((display) => display.workArea);
@@ -151,6 +152,7 @@ export class WindowManager {
     appWindow.win.on("focus", () => this.touch(record.id));
     this.touch(record.id);
     appWindow.show();
+    mark(`window-shown:${record.id}`);
     this.refreshDockMenu();
     return appWindow;
   }
