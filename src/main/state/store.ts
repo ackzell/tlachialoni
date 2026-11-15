@@ -7,6 +7,12 @@
  * merged by `id` on write so a window never drops a sibling's (or another
  * process's) record; recents are merged; shared scalars are last-writer-wins
  * (specs/012-multi-window).
+ *
+ * Writes go through a temp file and an atomic rename, so a crash mid-write can
+ * never leave a torn `state.json`. The write is deliberately not fsynced: fsync
+ * stalls the main process on every bounds write (a window drag writes once per
+ * move event), and the rename already protects against a crash. What fsync adds
+ * is durability across a power loss, which this file does not need.
  */
 
 import fs from "node:fs";
@@ -66,7 +72,6 @@ export class StateStore {
     const fd = fs.openSync(tmp, "w");
     try {
       fs.writeFileSync(fd, JSON.stringify(data, null, 2));
-      fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
     }

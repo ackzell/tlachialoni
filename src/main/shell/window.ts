@@ -98,6 +98,9 @@ const ZOOM_GESTURE_IDLE_MS = 160;
 /** Debounce for persisting the zoom step, so a gesture never fsyncs per step. */
 const ZOOM_PERSIST_MS = 300;
 
+/** Debounce for persisting window bounds, so a drag writes at most once per gap. */
+const BOUNDS_PERSIST_MS = 300;
+
 /**
  * Shell overlay heights. `band` is the thin always-on drag/reveal region that keeps
  * the page below the top edge clickable; `strip` grows the overlay just enough for
@@ -189,6 +192,8 @@ export class AppWindow implements SwipeWindow {
   private lastKeyboardZoomAt = 0;
   /** Debounced persistence of the zoom step (never fsync per gesture step). */
   private zoomPersistTimer: NodeJS.Timeout | null = null;
+  /** Debounced persistence of the window bounds (never fsync per move event). */
+  private boundsPersistTimer: NodeJS.Timeout | null = null;
   /** Dev-only: keeps the armed overlay cycling for styling. */
   private historyPreviewTimer: NodeJS.Timeout | null = null;
   /** Latest report of what the page under the pointer can still scroll. */
@@ -359,10 +364,10 @@ export class AppWindow implements SwipeWindow {
   private wireEvents(): void {
     this.win.on("resize", () => {
       this.relayout();
-      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
+      this.scheduleBoundsPersist();
     });
     this.win.on("move", () => {
-      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
+      this.scheduleBoundsPersist();
       this.noteWindowMoved();
     });
     // Keep the proximity sampler alive for the window's lifetime. macOS moves a
@@ -374,6 +379,7 @@ export class AppWindow implements SwipeWindow {
     this.win.on("show", () => this.startProximity());
     this.win.on("restore", () => this.startProximity());
     this.win.on("close", () => {
+      this.flushBoundsPersist();
       this.store.patchWindow(this.windowId, {
         bounds: this.win.getBounds(),
         devtoolsOpen: this.devtools.isOpen(),
@@ -623,9 +629,9 @@ export class AppWindow implements SwipeWindow {
   }
 
   /**
-   * Persists the zoom step shortly after it settles. Writing on every step does a
-   * synchronous fsync, which stalls the main process mid-gesture and makes fast
-   * wheel/pinch input feel like it is being dropped.
+   * Persists the zoom step shortly after it settles. Writing on every step
+   * rewrites the whole state file synchronously, which stalls the main process
+   * mid-gesture and makes fast wheel/pinch input feel like it is being dropped.
    */
   private scheduleZoomPersist(): void {
     if (this.zoomPersistTimer) return;
@@ -633,6 +639,30 @@ export class AppWindow implements SwipeWindow {
       this.zoomPersistTimer = null;
       this.store.patchWindow(this.windowId, { zoomIndex: this.zoomIndex });
     }, ZOOM_PERSIST_MS);
+  }
+
+  /**
+   * Persists the window bounds shortly after the last move/resize. Writing on
+   * every event rewrites the whole state file synchronously, which stalls the
+   * main process while a window is dragged and makes the drag feel janky.
+   */
+  private scheduleBoundsPersist(): void {
+    if (this.boundsPersistTimer) return;
+    this.boundsPersistTimer = setTimeout(() => {
+      this.boundsPersistTimer = null;
+      if (this.win.isDestroyed()) return;
+      this.store.patchWindow(this.windowId, { bounds: this.win.getBounds() });
+    }, BOUNDS_PERSIST_MS);
+  }
+
+  /**
+   * Cancels a pending bounds write. The close handler writes the final bounds in
+   * its own single write, so a debounced write must not fire afterwards.
+   */
+  private flushBoundsPersist(): void {
+    if (!this.boundsPersistTimer) return;
+    clearTimeout(this.boundsPersistTimer);
+    this.boundsPersistTimer = null;
   }
 
   /**
