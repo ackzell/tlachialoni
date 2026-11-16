@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.1.22](https://github.com/ackzell/tlachialoni/compare/v0.1.21...v0.1.22) (2026-11-16)
+
+### Features
+
+* **perf:** add dev-only timing and process metrics ([24862d8](https://github.com/ackzell/tlachialoni/commit/24862d8b593c2c8ba9b9ab3cf482806c46165c84))
+* **webmcp:** expose the page API and the DevTools WebMCP pane ([5e7bdbf](https://github.com/ackzell/tlachialoni/commit/5e7bdbfc9663f8f4d5ae81cf8f41360bb4c83c26))
+
+### Bug Fixes
+
+* **state:** debounce window bounds writes and drop fsync on the hot path ([9aa15ca](https://github.com/ackzell/tlachialoni/commit/9aa15ca3b16f51b57470a51b7f997bea8dfaecc8))
+
 ## [0.1.21](https://github.com/ackzell/tlachialoni/compare/v0.1.20...v0.1.21) (2026-11-12)
 
 ### Bug Fixes
