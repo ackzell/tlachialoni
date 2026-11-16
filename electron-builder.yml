@@ -20,6 +20,8 @@ files:
   # relative to out/main, not copied. Ship the runtime icon so its path resolves
   # inside the asar as well as in development.
   - resources/icon.png
+  # The DevTools WebMCP preload, referenced by src/main/shell/devtools-webmcp.ts.
+  - resources/devtools-webmcp-preload.js
 
 asar: true
 

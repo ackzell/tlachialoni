@@ -21,6 +21,7 @@ import { runDockSelfTest, runExtensionSelfTest, runUiSnapshot } from "./dock-tes
 import { runScreenshots, seedScreenshotState } from "./screenshots";
 import { configureDevtoolsThemeOverride } from "./shell/devtools-theme-override";
 import { openDevtoolsInspector } from "./shell/devtools-inspector";
+import { registerDevToolsWebMcpPreload } from "./shell/devtools-webmcp";
 import { installPerfHooks, mark } from "./perf";
 
 mark("module-load");
@@ -36,6 +37,13 @@ if (INSPECT_DEVTOOLS) {
   app.commandLine.appendSwitch("remote-debugging-port", String(INSPECT_PORT));
   app.commandLine.appendSwitch("remote-allow-origins", "*");
 }
+
+/**
+ * WebMCP (Chromium's experimental `document.modelContext`). Electron has no
+ * chrome://flags page, so the equivalent of `chrome://flags/#enable-webmcp-testing`
+ * must be forced on the command line before the app is ready.
+ */
+app.commandLine.appendSwitch("enable-features", "WebMCP,DevToolsWebMCPSupport");
 
 /**
  * App identity. The development Dock icon and the About panel use the same
@@ -326,6 +334,9 @@ async function boot(): Promise<{ manager: WindowManager; windows: AppWindow[] }>
 app.whenReady().then(async () => {
   mark("when-ready");
   configureAppIdentity();
+  // The WebMCP preload must be registered after ready (the session is only
+  // reachable then) but before any window restores DevTools.
+  registerDevToolsWebMcpPreload();
   // Dev-only: the live DevTools palette override (repo-root JSON), so colour
   // edits land within a tick without a restart. No file → no override.
   if (!app.isPackaged) {
